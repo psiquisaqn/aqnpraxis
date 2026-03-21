@@ -46,8 +46,8 @@ function getWebpay() {
   // Integración (sandbox) — credenciales de prueba Transbank
   return new WebpayPlus.Transaction(
     new Options(
-      IntegrationApiKeys.WEBPAY_PLUS_CODE,
-      IntegrationApiKeys.WEBPAY_PLUS_KEY,
+      IntegrationApiKeys.WEBPAY,
+      IntegrationApiKeys.WEBPAY_APIKEY,
       Environment.Integration
     )
   )
