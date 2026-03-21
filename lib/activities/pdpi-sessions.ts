@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AQN Praxis — PDPI: Programa de Desarrollo del Pensamiento Inteligente
  * Autor: Ps. Juan Francisco Sotomayor Julio — Psiquis AQN

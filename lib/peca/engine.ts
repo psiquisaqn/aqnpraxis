@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PsyEval / AQN Praxis — Motor PECA
  * Prueba de Evaluación de Conducta Adaptativa

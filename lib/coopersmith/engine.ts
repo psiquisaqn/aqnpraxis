@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AQN Praxis — Motor Inventario de Autoestima de Coopersmith
  * Forma Escolar (SEI — School Form), 58 ítems

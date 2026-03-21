@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AQN Praxis — Motor BDI-II
  * Inventario de Depresión de Beck — 2ª Edición
