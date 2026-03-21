@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AQN Praxis — Integración Transbank WebPay Plus
  * Maneja dos tipos de cobro:

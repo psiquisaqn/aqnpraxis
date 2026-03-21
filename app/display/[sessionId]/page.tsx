@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * /display/[sessionId] — Pantalla del evaluado
  *

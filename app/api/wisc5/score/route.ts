@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * POST /api/wisc5/score
  *

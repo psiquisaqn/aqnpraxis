@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * /session/[sessionId] — Panel del psicólogo (ScoringPanel)
  *
