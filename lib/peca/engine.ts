@@ -138,6 +138,6 @@ export function scorePeca(responses: PecaResponses): PecaResult {
 }
 
 export const PECA_ITEMS: Array<{num:number; left:string; right:string; fs:number}> = []
- export functionvalidatePecaResponses(r: PecaResponses): boolean {
+ export function validatePecaResponses(r: PecaResponses): boolean {
  return Object.keys(r).length > 0
 }
