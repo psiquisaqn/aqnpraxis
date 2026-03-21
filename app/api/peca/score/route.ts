@@ -26,11 +26,11 @@ export async function POST(req: NextRequest) {
 
     // Validar respuestas
     const validation = validatePecaResponses(responses)
-    if (!validation.valid) {
+    if (!validation) {
       return NextResponse.json({
         error: 'Respuestas inválidas',
-        missing: validation.missing,
-        invalid: validation.invalid,
+        missing: [],
+        invalid: [],
       }, { status: 400 })
     }
 
