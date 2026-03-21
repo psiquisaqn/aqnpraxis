@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Calcular scoring
-    const result = scorePeca(responses)
+    const result = scorePeca(responses as any)
 
     // Persistir en Supabase
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
