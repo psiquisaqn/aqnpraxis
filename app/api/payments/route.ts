@@ -47,7 +47,7 @@ function getWebpay() {
   return new WebpayPlus.Transaction(
     new Options(
       IntegrationApiKeys.WEBPAY,
-      IntegrationApiKeys.WEBPAY_APIKEY,
+      IntegrationApiKeys.WEBPAY,
       Environment.Integration
     )
   )
