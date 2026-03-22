@@ -77,7 +77,7 @@ export async function createPatient(formData: FormData) {
   }
 
   const { error } = await serviceSupabase.from('patients').insert(payload)
-  if (error) return { error: error.message }
+  if (error) return { error: 'DB Error: ' + error.message + ' | Code: ' + error.code + ' | Details: ' + error.details }
 
   revalidatePath('/dashboard')
   return { success: true }
@@ -161,4 +161,5 @@ export async function createSession(patientId: string, testId: string) {
   if (error || !data) return { error: error?.message ?? 'Error al crear sesión' }
   return { sessionId: data.id }
 }
+
 
