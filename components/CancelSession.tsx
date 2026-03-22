@@ -36,8 +36,8 @@ export function CancelSessionModal({ open, onConfirm, onClose, isPending }: Moda
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
-      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+      className="fixed inset-0 z-50 animate-fade-in"
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div

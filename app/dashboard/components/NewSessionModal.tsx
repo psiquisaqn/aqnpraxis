@@ -53,8 +53,8 @@ export function NewSessionModal({ patientId, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center p-4 animate-fade-in"
-      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+      className="fixed inset-0 z-40 animate-fade-in"
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
