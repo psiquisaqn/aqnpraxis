@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter }                      from 'next/navigation'
 import { createClient }                              from '@supabase/supabase-js'
+import { CancelSessionButton } from '@/components/CancelSession'
 import { useSessionRealtime }                        from '@/hooks/useSessionRealtime'
 import type { WiscScoringResult, SubtestCode }       from '@/lib/wisc5/engine'
 
@@ -157,6 +158,7 @@ export default function ScoringPanel() {
   const [scoring, setScoring]               = useState<WiscScoringResult | null>(null)
   const [saving, setSaving]                 = useState(false)
   const [itemScores, setItemScores]         = useState<Record<string, number[]>>({})
+  const [patientId, setPatientId]           = useState<string>('')
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -165,17 +167,15 @@ export default function ScoringPanel() {
   // Cargar datos de la sesión
   useEffect(() => {
     if (!sessionId) return
-    supabase
-      .from('sessions')
-      .select('realtime_channel, patient:patients(full_name, birth_date), started_at, age_years, age_months, age_days')
-      .eq('id', sessionId)
-      .single()
-      .then(({ data }) => {
-        if (!data) return
+    fetch('/api/sessions/' + sessionId)
+      .then(r => r.json())
+      .then(data => {
+        if (!data || data.error) return
         setChannelName(data.realtime_channel)
         setPatientName((data.patient as any)?.full_name ?? '')
+        setPatientId((data.patient as any)?.id ?? '')
         const ay = data.age_years, am = data.age_months
-        if (ay !== null && am !== null) setAgeLabel(`${ay} años ${am} meses`)
+        if (ay !== null && am !== null) setAgeLabel(ay + ' años ' + am + ' meses')
       })
   }, [sessionId])
 
@@ -228,11 +228,12 @@ export default function ScoringPanel() {
   // Terminar sesión
   const handleEndSession = useCallback(async () => {
     await sendSessionControl('end_session')
-    await supabase
-      .from('sessions')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', sessionId)
-    router.push(`/session/${sessionId}/report`)
+    await fetch('/api/sessions/' + sessionId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+    })
+    router.push('/session/' + sessionId + '/report')
   }, [sessionId, router, sendSessionControl])
 
   const activeConfig = SUBTESTS.find(s => s.code === activeSubtest)!
@@ -252,6 +253,7 @@ export default function ScoringPanel() {
             {state.connected ? 'Pantalla conectada' : 'Sin conexión'}
           </div>
           {saving && <span className="text-xs text-indigo-400 animate-pulse">Guardando…</span>}
+          <CancelSessionButton sessionId={sessionId} patientId={patientId} />
           <button
             onClick={handleEndSession}
             className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
