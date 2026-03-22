@@ -49,8 +49,8 @@ export function NewPatientModal({ open, onClose }: Props) {
 
       {/* Modal */}
       <div
-        className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }}
-        style={{ background: 'white' }}
+        className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{ background: 'white', maxHeight: '90vh' }}
       >
         {/* Header */}
         <div
