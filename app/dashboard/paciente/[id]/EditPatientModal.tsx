@@ -69,8 +69,8 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 animate-fade-in" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
-      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+      className="fixed inset-0 z-40 animate-fade-in"
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
