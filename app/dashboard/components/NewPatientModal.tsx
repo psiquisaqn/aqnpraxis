@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
-import { createPatient } from '@/app/dashboard/actions'
+import { useState, useRef } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   open: boolean
@@ -16,26 +16,54 @@ const GRADES = [
 ]
 
 export function NewPatientModal({ open, onClose }: Props) {
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
   if (!open) return null
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
-    const formData = new FormData(e.currentTarget)
+    setIsPending(true)
 
-    startTransition(async () => {
-      const result = await createPatient(formData)
-      if (result?.error) {
-        setError(result.error)
-      } else {
-        formRef.current?.reset()
-        onClose()
-      }
+    const formData = new FormData(e.currentTarget)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      setError('No autenticado')
+      setIsPending(false)
+      return
+    }
+
+    const payload = {
+      psychologist_id: user.id,
+      full_name:  formData.get('full_name') as string,
+      rut:        (formData.get('rut') as string) || null,
+      birth_date: formData.get('birth_date') as string,
+      gender:     (formData.get('gender') as string) || null,
+      school:     (formData.get('school') as string) || null,
+      grade:      (formData.get('grade') as string) || null,
+      city:       (formData.get('city') as string) || 'Chile',
+      notes:      (formData.get('notes') as string) || null,
+    }
+
+    const res = await fetch('/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     })
+    const result = await res.json()
+
+    setIsPending(false)
+    if (result.error) {
+      setError(result.error)
+    } else {
+      formRef.current?.reset()
+      onClose()
+      window.location.reload()
+    }
   }
 
   return (
