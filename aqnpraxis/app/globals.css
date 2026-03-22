@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --stone-50:  #fafaf9;
+  --stone-100: #f5f5f4;
+  --stone-200: #e7e5e4;
+  --stone-300: #d6d3d1;
+  --stone-600: #57534e;
+  --stone-700: #44403c;
+  --stone-800: #292524;
+  --stone-900: #1c1917;
+
+  --teal-500:  #14b8a6;
+  --teal-600:  #0d9488;
+  --teal-700:  #0f766e;
+  --teal-50:   #f0fdfa;
+  --teal-100:  #ccfbf1;
+
+  --font-serif: 'Lora', Georgia, serif;
+  --font-sans:  'DM Sans', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--stone-50);
+  color: var(--stone-800);
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+/* Auth card animations */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.5s ease both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+
+/* Input focus ring personalizado */
+input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--teal-500);
+}
+
+/* ── Estilos de impresión (Informe WISC-V) ── */
+@media print {
+  body { background: white !important; }
+
+  /* Ocultar toolbar sticky */
+  .sticky { display: none !important; }
+
+  /* Evitar cortes dentro de secciones */
+  .rounded-2xl { break-inside: avoid; }
+
+  /* Asegurar colores en impresión */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Márgenes de página */
+  @page {
+    margin: 1.5cm 2cm;
+    size: A4 portrait;
+  }
+}

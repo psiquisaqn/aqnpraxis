@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * PsyEval / AQN Praxis — Motor PECA
  * Prueba de Evaluación de Conducta Adaptativa
@@ -138,7 +137,69 @@ export function scorePeca(responses: PecaResponses): PecaResult {
   }
 }
 
-export const PECA_ITEMS: Array<{num:number; left:string; right:string; fs:number}> = []
- export function validatePecaResponses(r: Record<number, number>): boolean {
- return Object.keys(r).length > 0
+// ─── Ítems para el cuestionario (leftPhrase / rightPhrase) ──────────
+export const PECA_ITEMS: Array<{
+  num: number
+  leftPhrase: string
+  rightPhrase: string
+}> = [
+  { num:1,  leftPhrase:'Usa oraciones completas al hablar',           rightPhrase:'Le cuesta expresarse con oraciones' },
+  { num:2,  leftPhrase:'Sigue instrucciones de varios pasos',         rightPhrase:'Solo sigue instrucciones simples' },
+  { num:3,  leftPhrase:'Interrumpe conversaciones frecuentemente',    rightPhrase:'Escucha antes de hablar' },
+  { num:4,  leftPhrase:'Habla de manera inapropiada en público',      rightPhrase:'Adapta su lenguaje al contexto' },
+  { num:5,  leftPhrase:'Tiene problemas para comunicarse',            rightPhrase:'Se comunica con facilidad' },
+  { num:6,  leftPhrase:'No comprende chistes ni ironías',             rightPhrase:'Entiende el lenguaje figurado' },
+  { num:7,  leftPhrase:'Dice cosas ofensivas sin darse cuenta',       rightPhrase:'Considera el impacto de sus palabras' },
+  { num:8,  leftPhrase:'Se viste solo/a sin ayuda',                   rightPhrase:'Necesita ayuda para vestirse' },
+  { num:9,  leftPhrase:'Tiene dificultades con su higiene personal',  rightPhrase:'Mantiene buena higiene personal' },
+  { num:10, leftPhrase:'Puede prepararse alimentos simples',          rightPhrase:'No puede preparar alimentos solo/a' },
+  { num:11, leftPhrase:'Cuida sus pertenencias',                      rightPhrase:'Pierde u olvida sus cosas' },
+  { num:12, leftPhrase:'Reconoce cuando necesita ayuda médica',       rightPhrase:'No identifica cuándo necesita atención médica' },
+  { num:13, leftPhrase:'Mantiene orden en su espacio personal',       rightPhrase:'Su espacio personal está desorganizado' },
+  { num:14, leftPhrase:'Maneja su tiempo con eficacia',               rightPhrase:'Tiene dificultades para manejar su tiempo' },
+  { num:15, leftPhrase:'Puede usar transporte público solo/a',        rightPhrase:'Necesita acompañamiento para transportarse' },
+  { num:16, leftPhrase:'Realiza las tareas del hogar asignadas',      rightPhrase:'Evita o no cumple tareas del hogar' },
+  { num:17, leftPhrase:'Organiza sus materiales escolares',           rightPhrase:'Pierde u olvida materiales escolares' },
+  { num:18, leftPhrase:'Habla mal de otros a sus espaldas',           rightPhrase:'Mantiene confidencialidad con sus pares' },
+  { num:19, leftPhrase:'Inicia conversaciones con otros',             rightPhrase:'Espera que otros inicien conversación' },
+  { num:20, leftPhrase:'Sabe pedir disculpas cuando se equivoca',     rightPhrase:'Le cuesta reconocer sus errores' },
+  { num:21, leftPhrase:'Ayuda a otros cuando lo necesitan',           rightPhrase:'Generalmente no ofrece ayuda' },
+  { num:22, leftPhrase:'Reacciona agresivamente ante conflictos',     rightPhrase:'Resuelve conflictos de forma pacífica' },
+  { num:23, leftPhrase:'Respeta las normas grupales',                 rightPhrase:'Desafía las normas del grupo' },
+  { num:24, leftPhrase:'Mantiene amistades duraderas',                rightPhrase:'Sus amistades son breves o superficiales' },
+  { num:25, leftPhrase:'Participa activamente en grupos',             rightPhrase:'Se aísla o evita participar en grupos' },
+  { num:26, leftPhrase:'Copia las respuestas de otros en evaluaciones', rightPhrase:'Trabaja de forma independiente en evaluaciones' },
+  { num:27, leftPhrase:'Lee con comprensión para su nivel',           rightPhrase:'Tiene dificultades de comprensión lectora' },
+  { num:28, leftPhrase:'Resuelve problemas matemáticos básicos',      rightPhrase:'No resuelve operaciones básicas' },
+  { num:29, leftPhrase:'Entiende el valor del dinero',                rightPhrase:'No comprende el valor del dinero' },
+  { num:30, leftPhrase:'Tiene dificultades para escribir',            rightPhrase:'Escribe con fluidez para su nivel' },
+  { num:31, leftPhrase:'Identifica riesgos en su entorno',            rightPhrase:'No identifica situaciones de riesgo' },
+  { num:32, leftPhrase:'No pide permiso antes de tomar decisiones',   rightPhrase:'Consulta antes de tomar decisiones importantes' },
+  { num:33, leftPhrase:'Sabe cómo actuar en una emergencia',          rightPhrase:'No sabe qué hacer en una emergencia' },
+  { num:34, leftPhrase:'No respeta semáforos ni señales de tránsito', rightPhrase:'Respeta las normas de tránsito' },
+  { num:35, leftPhrase:'Se pierde en lugares nuevos',                 rightPhrase:'Se orienta bien en lugares desconocidos' },
+  { num:36, leftPhrase:'Usa servicios de la comunidad (banco, farmacia)', rightPhrase:'No sabe usar servicios de la comunidad' },
+  { num:37, leftPhrase:'Planifica actividades con anticipación',      rightPhrase:'Actúa sin planificación previa' },
+  { num:38, leftPhrase:'Se distrae con facilidad durante actividades', rightPhrase:'Se concentra bien en las actividades' },
+  { num:39, leftPhrase:'Participa en actividades de ocio',            rightPhrase:'No participa en actividades recreativas' },
+  { num:40, leftPhrase:'Tiene hobbies o intereses definidos',         rightPhrase:'No tiene intereses o hobbies claros' },
+  { num:41, leftPhrase:'Disfruta actividades con otros',              rightPhrase:'Prefiere estar solo/a siempre' },
+  { num:42, leftPhrase:'Elige libremente sus actividades recreativas', rightPhrase:'Espera que le digan qué hacer en su tiempo libre' },
+  { num:43, leftPhrase:'Sus actividades recreativas son siempre las mismas', rightPhrase:'Varía sus actividades de ocio' },
+  { num:44, leftPhrase:'Usa tecnología para entretenerse adecuadamente', rightPhrase:'No sabe usar tecnología para el ocio' },
+  { num:45, leftPhrase:'Regula el tiempo dedicado al ocio',           rightPhrase:'No regula cuánto tiempo dedica al ocio' },
+]
+
+// ─── Validación de respuestas ────────────────────────────────────────
+export function validatePecaResponses(responses: Record<number, number>): {
+  valid: boolean
+  missing: number[]
+  invalid: number[]
+} {
+  const allItems = Array.from({ length: 45 }, (_, i) => i + 1)
+  const missing = allItems.filter((i) => responses[i] === undefined)
+  const invalid = Object.entries(responses)
+    .filter(([, v]) => v < 1 || v > 4 || !Number.isInteger(v))
+    .map(([k]) => Number(k))
+  return { valid: missing.length === 0 && invalid.length === 0, missing, invalid }
 }

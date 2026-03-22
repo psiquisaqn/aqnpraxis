@@ -1,5 +1,3 @@
-// @ts-nocheck
-// @ts-nocheck
 /**
  * /peca/[sessionId] — Cuestionario PECA autoadministrado
  *
@@ -14,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { PECA_ITEMS } from '@/lib/peca/engine'
+import { CancelSessionButton } from '@/components/CancelSession'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

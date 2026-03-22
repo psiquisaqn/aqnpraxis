@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * PsyEval — Motor de scoring WISC-V Chile
  * Convierte puntajes directos (PD) a puntajes escala (PE),
