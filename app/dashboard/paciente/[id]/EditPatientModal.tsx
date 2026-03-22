@@ -56,7 +56,7 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
         notes:      (formData.get('notes') as string) || null,
       }
 
-      const res = await fetch(\`/api/patients/\${patient.id}\`, {
+      const res = await fetch('/api/patients/' + patient.id, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -68,18 +68,17 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
   }
 
   return (
-    <>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center p-4 animate-fade-in"
+      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+      onClick={onClose}
+    >
       <div
-        className="fixed inset-0 z-40 flex items-center justify-center p-4 animate-fade-in"
-        style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
-        onClick={onClose}
+        className="w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl flex flex-col"
+        style={{ background: 'white', maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-          style={{ background: 'white', maxHeight: '90vh' }}
-          onClick={e => e.stopPropagation()}
-        >
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--stone-100)' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--stone-100)' }}>
           <h2 className="text-base font-semibold" style={{ color: 'var(--stone-800)', fontFamily: 'var(--font-serif)' }}>
             Editar paciente
           </h2>
@@ -88,14 +87,12 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
           </button>
         </div>
 
-        <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto">
           <Field label="Nombre completo *" name="full_name" type="text" defaultValue={patient.full_name} required />
-
           <div className="grid grid-cols-2 gap-3">
             <Field label="RUT" name="rut" type="text" defaultValue={patient.rut} placeholder="12.345.678-9" />
             <Field label="Fecha de nacimiento *" name="birth_date" type="date" defaultValue={patient.birth_date} required />
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="block text-sm font-medium" style={{ color: 'var(--stone-700)' }}>Género</label>
@@ -114,19 +111,15 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
               </select>
             </div>
           </div>
-
           <Field label="Establecimiento" name="school" type="text" defaultValue={patient.school} placeholder="Ej. Colegio San Francisco" />
           <Field label="Ciudad" name="city" type="text" defaultValue={patient.city ?? 'Chile'} />
-
           <div className="space-y-1.5">
             <label className="block text-sm font-medium" style={{ color: 'var(--stone-700)' }}>Notas</label>
             <textarea name="notes" rows={3} defaultValue={patient.notes ?? ''} className="w-full px-3 py-2.5 rounded-xl text-sm border resize-none" style={{ borderColor: 'var(--stone-200)', color: 'var(--stone-800)', background: 'white' }} />
           </div>
-
           {error && (
             <div className="rounded-lg px-4 py-3 text-sm" style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' }}>{error}</div>
           )}
-
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm border font-medium" style={{ borderColor: 'var(--stone-200)', color: 'var(--stone-600)', background: 'white' }}>
               Cancelar
@@ -137,9 +130,7 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
           </div>
         </form>
       </div>
-        </div>
-      </div>
-    </>
+    </div>
   )
 }
 

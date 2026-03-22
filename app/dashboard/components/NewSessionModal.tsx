@@ -43,23 +43,26 @@ export function NewSessionModal({ patientId, onClose }: Props) {
         setError(result.error)
       } else {
         onClose()
-        if (selected === 'peca')          router.push(`/peca/${result.sessionId}`)
-        else if (selected === 'beck_bdi2')    router.push(`/bdi2/${result.sessionId}`)
-        else if (selected === 'coopersmith')  router.push(`/coopersmith/${result.sessionId}`)
-        else                                  router.push(`/session/${result.sessionId}`)
+        if (selected === 'peca')             router.push('/peca/' + result.sessionId)
+        else if (selected === 'beck_bdi2')   router.push('/bdi2/' + result.sessionId)
+        else if (selected === 'coopersmith') router.push('/coopersmith/' + result.sessionId)
+        else                                 router.push('/session/' + result.sessionId)
       }
     })
   }
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 animate-fade-in"
-        style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
-        onClick={onClose}
-      />
-      <div className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden"
-        style={{ background: 'white' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--stone-100)' }}>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center p-4 animate-fade-in"
+      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl flex flex-col"
+        style={{ background: 'white', maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--stone-100)' }}>
           <h2 className="text-base font-semibold" style={{ color: 'var(--stone-800)', fontFamily: 'var(--font-serif)' }}>
             Iniciar evaluación
           </h2>
@@ -71,7 +74,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
           </button>
         </div>
 
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 overflow-y-auto">
           <p className="text-sm mb-4" style={{ color: 'var(--stone-500)' }}>
             Selecciona el instrumento de evaluación:
           </p>
@@ -81,9 +84,9 @@ export function NewSessionModal({ patientId, onClose }: Props) {
               <button key={t.id} type="button" onClick={() => setSelected(t.id)}
                 className="w-full text-left rounded-xl p-4 border transition-all duration-150"
                 style={{
-                  borderColor: selected === t.id ? t.color : 'var(--stone-200)',
-                  background:  selected === t.id ? `${t.color}08` : 'white',
-                  outline:     selected === t.id ? `2px solid ${t.color}` : 'none',
+                  borderColor:   selected === t.id ? t.color : 'var(--stone-200)',
+                  background:    selected === t.id ? t.color + '08' : 'white',
+                  outline:       selected === t.id ? '2px solid ' + t.color : 'none',
                   outlineOffset: '-1px',
                 }}>
                 <div className="flex items-start gap-3">
@@ -95,8 +98,8 @@ export function NewSessionModal({ patientId, onClose }: Props) {
                     <span className="text-sm font-semibold" style={{ color: 'var(--stone-800)' }}>{t.name}</span>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--stone-500)' }}>{t.full}</p>
                     <div className="flex gap-3 mt-1.5">
-                      <span className="text-xs" style={{ color: 'var(--stone-400)' }}>⏱ {t.time}</span>
-                      <span className="text-xs" style={{ color: 'var(--stone-400)' }}>· {t.age}</span>
+                      <span className="text-xs" style={{ color: 'var(--stone-400)' }}>{'⏱ ' + t.time}</span>
+                      <span className="text-xs" style={{ color: 'var(--stone-400)' }}>{'· ' + t.age}</span>
                     </div>
                   </div>
                 </div>
@@ -120,16 +123,14 @@ export function NewSessionModal({ patientId, onClose }: Props) {
             <button type="button" onClick={handleStart} disabled={!selected || isPending}
               className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
               style={{
-                background: !selected || isPending ? 'var(--stone-300)' : 'var(--teal-600)',
-                cursor:     !selected || isPending ? 'not-allowed' : 'pointer',
+                background: (!selected || isPending) ? 'var(--stone-300)' : 'var(--teal-600)',
+                cursor:     (!selected || isPending) ? 'not-allowed' : 'pointer',
               }}>
               {isPending ? 'Iniciando...' : 'Comenzar sesión'}
             </button>
           </div>
         </div>
       </div>
-        </div>
-      </div>
-    </>
+    </div>
   )
 }
