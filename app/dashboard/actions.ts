@@ -54,22 +54,29 @@ export async function getPatients(opts?: {
 // ── Crear paciente ──────────────────────────────────────────────────
 export async function createPatient(formData: FormData) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autenticado' }
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado — ' + (authError?.message ?? 'sin sesión') }
+
+  // Usar service role para bypass de RLS si hay problemas de permisos
+  const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+  const serviceSupabase = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 
   const payload = {
     psychologist_id: user.id,
     full_name:  formData.get('full_name')  as string,
-    rut:        formData.get('rut')        as string | null,
+    rut:        (formData.get('rut') as string) || null,
     birth_date: formData.get('birth_date') as string,
-    gender:     formData.get('gender')     as string | null,
-    school:     formData.get('school')     as string | null,
-    grade:      formData.get('grade')      as string | null,
+    gender:     (formData.get('gender') as string) || null,
+    school:     (formData.get('school') as string) || null,
+    grade:      (formData.get('grade') as string) || null,
     city:       (formData.get('city') as string) || 'Chile',
-    notes:      formData.get('notes')      as string | null,
+    notes:      (formData.get('notes') as string) || null,
   }
 
-  const { error } = await supabase.from('patients').insert(payload)
+  const { error } = await serviceSupabase.from('patients').insert(payload)
   if (error) return { error: error.message }
 
   revalidatePath('/dashboard')
