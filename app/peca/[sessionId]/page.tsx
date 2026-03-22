@@ -272,7 +272,7 @@ export default function PecaQuestionnaire() {
                   : 'bg-slate-100 text-slate-300 cursor-not-allowed'
               }`}
             >
-              {pageAnswered ? 'Siguiente →' : `Responde todas las preguntas (${pageItems.filter(i => !responses[i.id]).length} restantes)`}
+              {pageAnswered ? 'Siguiente →' : `Responde todas las preguntas (${pageItems.filter(i => !responses[i.num]).length} restantes)`}
             </button>
           ) : (
             <button
