@@ -148,7 +148,7 @@ export class Wisc5Engine {
       .single()
 
     if (error || !data) return null
-    return data.scaled_score
+    return (data as any).scaled_score
   }
 
   /**
@@ -167,13 +167,14 @@ export class Wisc5Engine {
       .single()
 
     if (error || !data) return null
+    const d = data as any
 
     return {
-      score: data.composite_score,
-      percentile: data.percentile,
-      ci90: [data.ci90_lo, data.ci90_hi],
-      ci95: [data.ci95_lo, data.ci95_hi],
-      classification: getClassification(data.composite_score),
+      score: d.composite_score,
+      percentile: d.percentile,
+      ci90: [d.ci90_lo, d.ci90_hi],
+      ci95: [d.ci95_lo, d.ci95_hi],
+      classification: getClassification(d.composite_score),
     }
   }
 

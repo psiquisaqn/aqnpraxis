@@ -77,7 +77,7 @@ export function IndicesTable({ rows }: Props) {
                       className="text-xs font-medium px-2 py-1 rounded-lg"
                       style={{
                         color: CLASSIFICATION_COLOR[result.classification] ?? 'var(--stone-600)',
-                        background: `${CLASSIFICATION_COLOR[result.classification]}15` ?? 'var(--stone-100)',
+                        background: `${CLASSIFICATION_COLOR[result.classification] ?? '#374151'}15`,
                       }}
                     >
                       {result.classification}

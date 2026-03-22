@@ -58,12 +58,16 @@ export function NewSessionModal({ patientId, onClose }: Props) {
     startTransition(async () => {
       const result = await createSession(patientId, selected)
       if ('error' in result) {
-        setError(result.error)
+        setError(result.error ?? null)
       } else {
         onClose()
         // Redirigir al módulo correspondiente
         if (selected === 'peca') {
           router.push(`/peca/${result.sessionId}`)
+        } else if (selected === 'beck_bdi2') {
+          router.push(`/bdi2/${result.sessionId}`)
+        } else if (selected === 'coopersmith') {
+          router.push(`/coopersmith/${result.sessionId}`)
         } else {
           router.push(`/session/${result.sessionId}`)
         }

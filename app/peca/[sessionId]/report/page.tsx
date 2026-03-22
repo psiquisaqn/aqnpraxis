@@ -66,7 +66,7 @@ export default function PecaReportPage() {
             responses[i] = data[key] as number
           }
         }
-        const scored = scorePeca(responses)
+        const scored = scorePeca(responses as Partial<Record<number, 1|2|3|4>>)
         setResult(scored)
         setPatientName((data.session as any)?.patient?.full_name ?? '')
         const d = (data.session as any)?.started_at

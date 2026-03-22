@@ -116,7 +116,7 @@ export default function PecaQuestionnaire() {
 
   const totalPages  = Math.ceil(PECA_ITEMS.length / ITEMS_PER_PAGE)
   const pageItems   = PECA_ITEMS.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE)
-  const pageAnswered = pageItems.every(item => responses[item.id] !== undefined)
+  const pageAnswered = pageItems.every(item => responses[item.num] !== undefined)
   const totalAnswered = Object.keys(responses).length
   const progress    = Math.round((totalAnswered / 45) * 100)
   const isLastPage  = page === totalPages - 1
@@ -243,10 +243,10 @@ export default function PecaQuestionnaire() {
       <div className="max-w-2xl mx-auto px-6 pb-6 space-y-4">
         {pageItems.map(item => (
           <PecaItemCard
-            key={item.id}
+            key={item.num}
             item={item}
-            value={responses[item.id]}
-            onChange={val => handleResponse(item.id, val)}
+            value={responses[item.num]}
+            onChange={val => handleResponse(item.num, val)}
           />
         ))}
       </div>
