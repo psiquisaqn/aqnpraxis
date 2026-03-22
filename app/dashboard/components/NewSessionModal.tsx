@@ -128,6 +128,8 @@ export function NewSessionModal({ patientId, onClose }: Props) {
           </div>
         </div>
       </div>
+        </div>
+      </div>
     </>
   )
 }

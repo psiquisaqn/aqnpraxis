@@ -122,6 +122,8 @@ export function CancelSessionModal({ open, onConfirm, onClose, isPending }: Prop
           </button>
         </div>
       </div>
+        </div>
+      </div>
     </>
   )
 }

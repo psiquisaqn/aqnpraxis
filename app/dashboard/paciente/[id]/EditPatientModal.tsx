@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
-import { updatePatient } from './actions'
+import { createClient } from '@/lib/supabase/client'
 
 const GRADES = [
   'Pre-Kínder', 'Kínder',
@@ -40,8 +40,29 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
     setError(null)
     const formData = new FormData(e.currentTarget)
     startTransition(async () => {
-      const result = await updatePatient(patient.id, formData)
-      if (result?.error) setError(result.error)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('No autenticado'); return }
+
+      const payload = {
+        psychologist_id: user.id,
+        full_name:  formData.get('full_name') as string,
+        rut:        (formData.get('rut') as string) || null,
+        birth_date: formData.get('birth_date') as string,
+        gender:     (formData.get('gender') as string) || null,
+        school:     (formData.get('school') as string) || null,
+        grade:      (formData.get('grade') as string) || null,
+        city:       (formData.get('city') as string) || 'Chile',
+        notes:      (formData.get('notes') as string) || null,
+      }
+
+      const res = await fetch(\`/api/patients/\${patient.id}\`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const result = await res.json()
+      if (result.error) setError(result.error)
       else onClose()
     })
   }
@@ -49,14 +70,15 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 animate-fade-in"
+        className="fixed inset-0 z-40 flex items-center justify-center p-4 animate-fade-in"
         style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
         onClick={onClose}
-      />
-      <div
-        className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden"
-        style={{ background: 'white' }}
       >
+        <div
+          className="w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+          style={{ background: 'white', maxHeight: '90vh' }}
+          onClick={e => e.stopPropagation()}
+        >
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--stone-100)' }}>
           <h2 className="text-base font-semibold" style={{ color: 'var(--stone-800)', fontFamily: 'var(--font-serif)' }}>
             Editar paciente
@@ -114,6 +136,8 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
             </button>
           </div>
         </form>
+      </div>
+        </div>
       </div>
     </>
   )
