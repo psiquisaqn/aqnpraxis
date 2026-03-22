@@ -40,18 +40,18 @@ export function NewPatientModal({ open, onClose }: Props) {
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay — also centers the modal */}
       <div
-        className="fixed inset-0 z-40 animate-fade-in"
+        className="fixed inset-0 z-40 flex items-center justify-center p-4 animate-fade-in"
         style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
         onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div
-        className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ background: 'white', maxHeight: '90vh' }}
       >
+        {/* Modal */}
+        <div
+          className="w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+          style={{ background: 'white', maxHeight: '90vh' }}
+          onClick={e => e.stopPropagation()}
+        >
         {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4 border-b"
@@ -166,6 +166,7 @@ export function NewPatientModal({ open, onClose }: Props) {
             </button>
           </div>
         </form>
+        </div>
       </div>
     </>
   )
