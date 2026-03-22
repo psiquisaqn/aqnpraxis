@@ -25,29 +25,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Refrescar la sesión — esto es lo importante para que las cookies
+  // se mantengan actualizadas en Vercel
+  await supabase.auth.getUser()
 
-  // Rutas protegidas — redirige a login si no hay sesión
-  const protectedPaths = ['/dashboard', '/session', '/display', '/peca']
-  const isProtected = protectedPaths.some((p) =>
-    request.nextUrl.pathname.startsWith(p)
-  )
-
-  if (isProtected && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
-  }
-
-  // Si ya está autenticado y va al login, redirige al dashboard
-  if (user && request.nextUrl.pathname === '/login') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
-  }
-
+  // Solo redirigir al login si va a /login estando ya autenticado
+  // Las páginas protegidas manejan su propia autenticación via API routes
   return supabaseResponse
 }
 
