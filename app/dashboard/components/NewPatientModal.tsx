@@ -49,7 +49,7 @@ export function NewPatientModal({ open, onClose }: Props) {
 
       {/* Modal */}
       <div
-        className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden"
+        className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg animate-fade-up rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }}
         style={{ background: 'white' }}
       >
         {/* Header */}
@@ -75,7 +75,7 @@ export function NewPatientModal({ open, onClose }: Props) {
         </div>
 
         {/* Form */}
-        <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {/* Nombre */}
           <FormField label="Nombre completo *" name="full_name" type="text" placeholder="Ej. Valentina Rojas" required />
 
