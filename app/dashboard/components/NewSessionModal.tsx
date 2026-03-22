@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { createSession } from '@/app/dashboard/actions'
+import { createClient } from '@/lib/supabase/client'
 
 const TESTS = [
   {
