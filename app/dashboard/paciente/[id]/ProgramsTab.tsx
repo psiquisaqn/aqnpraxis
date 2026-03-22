@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { enrollProgram, completeActivitySession } from './actions'
+import { createClient } from '@/lib/supabase/client'
 
 interface ActivitySession {
   id: string
@@ -15,6 +15,7 @@ interface ActivitySession {
 interface Props {
   patientId: string
   activities: ActivitySession[]
+  onRefresh?: () => void
 }
 
 const PROGRAMS = [
@@ -55,7 +56,7 @@ const STATUS_LABEL: Record<string, string> = {
   skipped:     'Omitida',
 }
 
-export function ProgramsTab({ patientId, activities }: Props) {
+export function ProgramsTab({ patientId, activities, onRefresh }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [enrollError, setEnrollError] = useState<string | null>(null)
@@ -66,15 +67,33 @@ export function ProgramsTab({ patientId, activities }: Props) {
   const handleEnroll = (code: string) => {
     setEnrollError(null)
     startTransition(async () => {
-      const result = await enrollProgram(patientId, code)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const res = await fetch('/api/activity-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patient_id: patientId, psychologist_id: user.id, program_code: code }),
+      })
+      const result = await res.json()
       if (result.error) setEnrollError(result.error)
-      else setExpanded(code)
+      else { setExpanded(code); onRefresh?.() }
     })
   }
 
   const handleComplete = (sessionId: string) => {
     startTransition(async () => {
-      await completeActivitySession(sessionId, patientId)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await fetch('/api/activity-sessions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sessionId, psychologist_id: user.id }),
+      })
+      onRefresh?.()
     })
   }
 
