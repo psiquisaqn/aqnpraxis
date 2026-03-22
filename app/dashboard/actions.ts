@@ -2,8 +2,16 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import type { Patient } from '@/types'
 import { calcAge } from '@/lib/utils'
+
+function getServiceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // ── Listar pacientes con última sesión ──────────────────────────────
 export async function getPatients(opts?: {
@@ -54,30 +62,25 @@ export async function getPatients(opts?: {
 // ── Crear paciente ──────────────────────────────────────────────────
 export async function createPatient(formData: FormData) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'No autenticado — ' + (authError?.message ?? 'sin sesión') }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
 
-  // Usar service role para bypass de RLS si hay problemas de permisos
-  const { createClient: createServiceClient } = await import('@supabase/supabase-js')
-  const serviceSupabase = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const db = getServiceClient()
 
   const payload = {
     psychologist_id: user.id,
     full_name:  formData.get('full_name')  as string,
-    rut:        (formData.get('rut') as string) || null,
+    rut:        (formData.get('rut')       as string) || null,
     birth_date: formData.get('birth_date') as string,
-    gender:     (formData.get('gender') as string) || null,
-    school:     (formData.get('school') as string) || null,
-    grade:      (formData.get('grade') as string) || null,
-    city:       (formData.get('city') as string) || 'Chile',
-    notes:      (formData.get('notes') as string) || null,
+    gender:     (formData.get('gender')    as string) || null,
+    school:     (formData.get('school')    as string) || null,
+    grade:      (formData.get('grade')     as string) || null,
+    city:       (formData.get('city')      as string) || 'Chile',
+    notes:      (formData.get('notes')     as string) || null,
   }
 
-  const { error } = await serviceSupabase.from('patients').insert(payload)
-  if (error) return { error: 'DB Error: ' + error.message + ' | Code: ' + error.code + ' | Details: ' + error.details }
+  const { error } = await db.from('patients').insert(payload)
+  if (error) return { error: error.message }
 
   revalidatePath('/dashboard')
   return { success: true }
@@ -89,18 +92,20 @@ export async function updatePatient(id: string, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
+  const db = getServiceClient()
+
   const payload = {
     full_name:  formData.get('full_name')  as string,
-    rut:        formData.get('rut')        as string | null,
+    rut:        (formData.get('rut')       as string) || null,
     birth_date: formData.get('birth_date') as string,
-    gender:     formData.get('gender')     as string | null,
-    school:     formData.get('school')     as string | null,
-    grade:      formData.get('grade')      as string | null,
-    city:       (formData.get('city') as string) || 'Chile',
-    notes:      formData.get('notes')      as string | null,
+    gender:     (formData.get('gender')    as string) || null,
+    school:     (formData.get('school')    as string) || null,
+    grade:      (formData.get('grade')     as string) || null,
+    city:       (formData.get('city')      as string) || 'Chile',
+    notes:      (formData.get('notes')     as string) || null,
   }
 
-  const { error } = await supabase
+  const { error } = await db
     .from('patients')
     .update(payload)
     .eq('id', id)
@@ -117,7 +122,9 @@ export async function archivePatient(id: string, archive: boolean) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  const { error } = await supabase
+  const db = getServiceClient()
+
+  const { error } = await db
     .from('patients')
     .update({ is_archived: archive })
     .eq('id', id)
@@ -134,8 +141,9 @@ export async function createSession(patientId: string, testId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  // Obtener fecha de nacimiento para calcular edad
-  const { data: patient } = await supabase
+  const db = getServiceClient()
+
+  const { data: patient } = await db
     .from('patients')
     .select('birth_date')
     .eq('id', patientId)
@@ -143,7 +151,7 @@ export async function createSession(patientId: string, testId: string) {
 
   const age = patient ? calcAge(patient.birth_date) : { years: 0, months: 0, days: 0 }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('sessions')
     .insert({
       psychologist_id: user.id,
@@ -161,5 +169,3 @@ export async function createSession(patientId: string, testId: string) {
   if (error || !data) return { error: error?.message ?? 'Error al crear sesión' }
   return { sessionId: data.id }
 }
-
-
