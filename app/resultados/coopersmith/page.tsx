@@ -1,9 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreCoopersmith, COOPER_KEY, type CooperResult } from '@/lib/coopersmith/engine'
@@ -13,7 +12,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export default function CoopersmithReportPage() {
+function CoopersmithReportPageInner() {
   const router    = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
@@ -184,5 +183,13 @@ function Error({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="mt-3 text-sm" style={{ color: 'var(--teal-600)' }}>← Volver</button>
       </div>
     </div>
+  )
+}
+
+export default function CoopersmithReportPage() {
+  return (
+    <Suspense fallback={null}>
+      <CoopersmithReportPageInner />
+    </Suspense>
   )
 }

@@ -1,9 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { IndexProfile } from '@/app/session/[sessionId]/report/IndexProfile'
 import { ScoresTable } from '@/app/session/[sessionId]/report/ScoresTable'
 import { IndicesTable } from '@/app/session/[sessionId]/report/IndicesTable'
@@ -110,7 +109,7 @@ function formatDate(iso?: string) {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
-export default function ReportPage() {
+function ReportPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
@@ -349,5 +348,13 @@ export default function ReportPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReportPageInner />
+    </Suspense>
   )
 }

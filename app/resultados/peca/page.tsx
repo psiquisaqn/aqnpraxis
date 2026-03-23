@@ -1,9 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scorePeca, DIMENSIONS, AAMR_SETS, type PecaResult, type SupportIntensity } from '@/lib/peca/engine'
@@ -40,7 +39,7 @@ function DimensionBar({ label, p2, intensity }: { label: string; p2: number; int
   )
 }
 
-export default function PecaReportPage() {
+function PecaReportPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
@@ -241,5 +240,13 @@ function Footer() {
         Generado por AQN Praxis · Ps. Antonio Baeza H. · Psiquis AQN
       </p>
     </div>
+  )
+}
+
+export default function PecaReportPage() {
+  return (
+    <Suspense fallback={null}>
+      <PecaReportPageInner />
+    </Suspense>
   )
 }

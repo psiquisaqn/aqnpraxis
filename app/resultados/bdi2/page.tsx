@@ -1,9 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreBdi2, BDI2_ITEMS, BDI2_SEVERITY_COLORS, type BdiResult } from '@/lib/bdi2/engine'
@@ -50,7 +49,7 @@ function SeverityGauge({ score, severity }: { score: number; severity: string })
   )
 }
 
-export default function BdiReportPage() {
+function BdiReportPageInner() {
   const router    = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
@@ -255,5 +254,13 @@ function Error({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="mt-3 text-sm" style={{ color: 'var(--teal-600)' }}>← Volver</button>
       </div>
     </div>
+  )
+}
+
+export default function BdiReportPage() {
+  return (
+    <Suspense fallback={null}>
+      <BdiReportPageInner />
+    </Suspense>
   )
 }
