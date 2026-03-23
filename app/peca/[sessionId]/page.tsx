@@ -149,7 +149,7 @@ export default function PecaQuestionnaire() {
         body: JSON.stringify({ sessionId, responses }),
       })
       // Redirigir a pantalla de finalización
-      router.push(`/peca/${sessionId}/done`)
+      router.push('/resultados/peca?session=' + sessionId)
     } catch {
       setSubmitting(false)
     }
