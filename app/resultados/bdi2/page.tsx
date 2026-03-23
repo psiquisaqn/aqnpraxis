@@ -9,7 +9,7 @@ import { scoreBdi2, BDI2_ITEMS, BDI2_SEVERITY_COLORS, type BdiResult } from '@/l
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 function SeverityGauge({ score, severity }: { score: number; severity: string }) {

@@ -9,7 +9,7 @@ import { scorePeca, DIMENSIONS, AAMR_SETS, type PecaResult, type SupportIntensit
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 // ── Colores por intensidad ──────────────────────────────────────────
