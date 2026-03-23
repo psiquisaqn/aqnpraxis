@@ -52,13 +52,10 @@ function PecaReportPageInner() {
 
   useEffect(() => {
     if (!sessionId) return
-    supabase
-      .from('peca_scores')
-      .select('*, session:sessions(started_at, patient:patients(full_name))')
-      .eq('session_id', sessionId)
-      .single()
-      .then(({ data }) => {
-        if (!data) { setLoading(false); return }
+    fetch('/api/scores/peca?session=' + sessionId)
+      .then(r => r.json())
+      .then((data) => {
+        if (!data || data.error) { setLoading(false); return }
         // Reconstruir respuestas desde columnas p01..p45
         const responses: Record<number, number> = {}
         for (let i = 1; i <= 45; i++) {

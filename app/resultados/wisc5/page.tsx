@@ -121,7 +121,7 @@ function ReportPageInner() {
 
   useEffect(() => {
     if (!sessionId) return
-    fetch(`/api/wisc5/session?sessionId=${sessionId}`)
+    fetch('/api/wisc5/session?sessionId=' + sessionId)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setError(data.error)

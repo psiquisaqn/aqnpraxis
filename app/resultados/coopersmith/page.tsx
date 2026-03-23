@@ -25,13 +25,10 @@ function CoopersmithReportPageInner() {
 
   useEffect(() => {
     if (!sessionId) return
-    supabase
-      .from('coopersmith_scores')
-      .select('*, session:sessions(started_at, patient:patients(full_name))')
-      .eq('session_id', sessionId)
-      .single()
-      .then(({ data }) => {
-        if (!data) { setLoading(false); return }
+    fetch('/api/scores/coopersmith?session=' + sessionId)
+      .then(r => r.json())
+      .then((data) => {
+        if (!data || data.error) { setLoading(false); return }
         // Reconstruir respuestas desde columnas r01..r58
         const resp: Record<number, 'igual' | 'diferente'> = {}
         for (let i = 1; i <= 58; i++) {

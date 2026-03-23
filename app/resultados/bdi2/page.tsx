@@ -63,13 +63,10 @@ function BdiReportPageInner() {
 
   useEffect(() => {
     if (!sessionId) return
-    supabase
-      .from('bdi2_scores')
-      .select('*, session:sessions(started_at, patient:patients(full_name))')
-      .eq('session_id', sessionId)
-      .single()
-      .then(({ data }) => {
-        if (!data) { setLoading(false); return }
+    fetch('/api/scores/bdi2?session=' + sessionId)
+      .then(r => r.json())
+      .then((data) => {
+        if (!data || data.error) { setLoading(false); return }
         // Reconstruir respuestas desde columnas i01..i21
         const resp: Record<number, number> = {}
         for (let i = 1; i <= 21; i++) {
