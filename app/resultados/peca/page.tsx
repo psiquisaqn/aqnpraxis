@@ -3,14 +3,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scorePeca, DIMENSIONS, AAMR_SETS, type PecaResult, type SupportIntensity } from '@/lib/peca/engine'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 // ── Colores por intensidad ──────────────────────────────────────────
 const INTENSITY_STYLE: Record<SupportIntensity, { bg: string; text: string; bar: string }> = {
@@ -51,6 +46,7 @@ function PecaReportPageInner() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('sessionId:', sessionId)
     if (!sessionId) return
     fetch('/api/scores/peca?session=' + sessionId)
       .then(r => r.json())
