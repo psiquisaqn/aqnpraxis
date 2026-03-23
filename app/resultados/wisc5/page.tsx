@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { IndexProfile } from './IndexProfile'
-import { ScoresTable } from './ScoresTable'
-import { IndicesTable } from './IndicesTable'
+import { IndexProfile } from '@/app/session/[sessionId]/report/IndexProfile'
+import { ScoresTable } from '@/app/session/[sessionId]/report/ScoresTable'
+import { IndicesTable } from '@/app/session/[sessionId]/report/IndicesTable'
 import type { WiscScoringResult, SubtestCode, CompositeResult } from '@/lib/wisc5/engine'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 
