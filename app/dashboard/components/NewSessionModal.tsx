@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const TESTS = [
   { id: 'wisc5_cl',    name: 'WISC-V Chile',  full: 'Escala de Inteligencia de Wechsler para Niños — 5ª Ed.', time: '~65–80 min', age: '6 a 16 años 11 meses', color: 'var(--teal-600)' },
-  { id: 'peca',        name: 'PECA',           full: 'Prueba de Evaluación Cognitiva para el Aprendizaje',     time: '~30–45 min', age: 'Edad escolar',           color: '#7c3aed' },
+  { id: 'peca_aqn',        name: 'PECA',           full: 'Prueba de Evaluación Cognitiva para el Aprendizaje',     time: '~30–45 min', age: 'Edad escolar',           color: '#7c3aed' },
   { id: 'beck_bdi2',   name: 'BDI-II',         full: 'Inventario de Depresión de Beck — 2ª Ed.',               time: '~10 min',    age: '≥ 13 años',              color: '#b45309' },
   { id: 'coopersmith', name: 'Coopersmith',    full: 'Inventario de Autoestima de Coopersmith',                time: '~15 min',    age: '≥ 8 años',               color: '#0369a1' },
 ]
@@ -43,7 +43,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
         setError(result.error)
       } else {
         onClose()
-        if (selected === 'peca')             router.push('/peca/' + result.sessionId)
+        if (selected === 'peca_aqn')             router.push('/peca/' + result.sessionId)
         else if (selected === 'beck_bdi2')   router.push('/bdi2/' + result.sessionId)
         else if (selected === 'coopersmith') router.push('/coopersmith/' + result.sessionId)
         else                                 router.push('/session/' + result.sessionId)
