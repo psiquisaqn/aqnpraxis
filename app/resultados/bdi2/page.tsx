@@ -3,14 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreBdi2, BDI2_ITEMS, BDI2_SEVERITY_COLORS, type BdiResult } from '@/lib/bdi2/engine'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 function SeverityGauge({ score, severity }: { score: number; severity: string }) {
   const color = BDI2_SEVERITY_COLORS[severity as keyof typeof BDI2_SEVERITY_COLORS] ?? '#374151'
@@ -256,7 +250,7 @@ function Error({ onBack }: { onBack: () => void }) {
 
 export default function BdiReportPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<Spinner />}>
       <BdiReportPageInner />
     </Suspense>
   )
