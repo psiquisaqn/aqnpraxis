@@ -50,6 +50,23 @@ export async function getPatientFull(patientId: string) {
   }
 }
 
+// ── Eliminar sesión ─────────────────────────────────────────────────
+export async function deleteSession(sessionId: string, patientId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { error } = await supabase
+    .from('sessions')
+    .delete()
+    .eq('id', sessionId)
+    .eq('psychologist_id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath(`/dashboard/paciente/${patientId}`)
+  return { success: true }
+}
+
 // ── Actualizar datos del paciente ───────────────────────────────────
 export async function updatePatient(patientId: string, formData: FormData) {
   const supabase = await createClient()

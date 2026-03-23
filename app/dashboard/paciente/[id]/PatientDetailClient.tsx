@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { SessionsTab } from './SessionsTab'
 import { ProgramsTab } from './ProgramsTab'
 import { ReportsTab } from './ReportsTab'
-import { EditPatientModal } from './EditPatientModal'
+import { deleteSession } from './actions'
 import { NewSessionModal } from '@/app/dashboard/components/NewSessionModal'
 
 const GENDER_LABEL: Record<string, string> = {
@@ -170,7 +170,7 @@ export function PatientDetailClient({ patientId }: Props) {
           ))}
         </div>
 
-        {tab === 'sessions' && <SessionsTab sessions={sessions} />}
+        {tab === 'sessions' && <SessionsTab sessions={sessions} patientId={patient.id} onDelete={async (sessionId) => { await deleteSession(sessionId, patient.id); await loadData() }} />}
         {tab === 'programs' && (
           <ProgramsTab
             patientId={patient.id}
