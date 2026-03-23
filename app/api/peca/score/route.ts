@@ -1,22 +1,15 @@
-// @ts-nocheck
-/**
- * POST /api/peca/score
- *
- * Recibe las respuestas del cuestionario PECA, calcula todos los
- * factores y subescalas, persiste en Supabase y notifica al psicólogo.
- */
-
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient }              from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { scorePeca, validatePecaResponses } from '@/lib/peca/engine'
 
-const supabaseUrl        = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const db = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
-    const { sessionId, responses } = body as {
+    const { sessionId, responses } = await req.json() as {
       sessionId: string
       responses: Record<number, number>
     }
@@ -25,102 +18,62 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'sessionId y responses son requeridos' }, { status: 400 })
     }
 
-    // Validar respuestas
     const validation = validatePecaResponses(responses)
-    if (!validation) {
-      return NextResponse.json({
-        error: 'Respuestas inválidas',
-        missing: [],
-        invalid: [],
-      }, { status: 400 })
+    if (!validation.valid) {
+      return NextResponse.json({ error: 'Respuestas incompletas', missing: validation.missing }, { status: 400 })
     }
 
-    // Calcular scoring
     const result = scorePeca(responses as any)
 
-    // Persistir en Supabase
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Columnas p01..p45
+    const itemCols = Object.fromEntries(
+      Object.entries(responses).map(([k, v]) => [`p${String(k).padStart(2, '0')}`, v])
+    )
 
-    const { error } = await supabase.from('peca_scores').upsert({
+    const dimMap = Object.fromEntries(result.dimensions.map(d => [d.code, d]))
+
+    const { error } = await db.from('peca_scores').upsert({
       session_id: sessionId,
-
-      // Respuestas brutas
-      ...Object.fromEntries(
-        Object.entries(responses).map(([k, v]) => [`p${String(k).padStart(2,'0')}`, v])
-      ),
-
-      // Factores principales
-      hcon: result.mainFactors.HCON.score,
-      hsoc: result.mainFactors.HSOC.score,
-      hpra: result.mainFactors.HPRA.score,
-      hcon_level: result.mainFactors.HCON.level,
-      hsoc_level: result.mainFactors.HSOC.level,
-      hpra_level: result.mainFactors.HPRA.level,
-
+      ...itemCols,
+      // Factores AAMR
+      hcon: result.aamrSets.find(s => s.code === 'conceptual')?.p2 ?? null,
+      hsoc: result.aamrSets.find(s => s.code === 'social')?.p2 ?? null,
+      hpra: result.aamrSets.find(s => s.code === 'practical')?.p2 ?? null,
+      hcon_level: (result.aamrSets.find(s => s.code === 'conceptual')?.needsSupport ? 'requiere_apoyo' : 'buen_nivel'),
+      hsoc_level: (result.aamrSets.find(s => s.code === 'social')?.needsSupport ? 'requiere_apoyo' : 'buen_nivel'),
+      hpra_level: (result.aamrSets.find(s => s.code === 'practical')?.needsSupport ? 'requiere_apoyo' : 'buen_nivel'),
       // Subescalas
-      score_com: result.subfactors.com?.score,
-      score_acu: result.subfactors.acu?.score,
-      score_avd: result.subfactors.avd?.score,
-      score_hs:  result.subfactors.hs?.score,
-      score_haf: result.subfactors.haf?.score,
-      score_uco: result.subfactors.uco?.score,
-      score_adi: result.subfactors.adi?.score,
-      score_css: result.subfactors.css?.score,
-      score_aor: result.subfactors.aor?.score,
-
-      // Niveles subescalas
-      level_com: result.subfactors.com?.level,
-      level_acu: result.subfactors.acu?.level,
-      level_avd: result.subfactors.avd?.level,
-      level_hs:  result.subfactors.hs?.level,
-      level_haf: result.subfactors.haf?.level,
-      level_uco: result.subfactors.uco?.level,
-      level_adi: result.subfactors.adi?.level,
-      level_css: result.subfactors.css?.level,
-      level_aor: result.subfactors.aor?.level,
-
-      // Participación global
-      participation_level:       result.participationLevel,
-      participation_level_label: result.participationLevelLabel,
-      participation_description: result.participationDescription,
-
-      completed_items: result.completedItems,
-      calculated_at:   new Date().toISOString(),
+      score_com: dimMap.com?.p2 ?? null,
+      score_acu: dimMap.aut?.p2 ?? null,
+      score_avd: dimMap.avi?.p2 ?? null,
+      score_hs:  dimMap.hs?.p2 ?? null,
+      score_haf: dimMap.haf?.p2 ?? null,
+      score_uco: dimMap.uco?.p2 ?? null,
+      score_adi: dimMap.adi?.p2 ?? null,
+      score_css: dimMap.css?.p2 ?? null,
+      score_aor: dimMap.aor?.p2 ?? null,
+      // Nivel de participación
+      participation_level: result.participationLevel,
+      participation_level_label: result.participationNeeds ? 'requiere_apoyo' : 'buen_nivel',
+      participation_description: result.participationText,
+      completed_items: result.answeredItems,
+      calculated_at: new Date().toISOString(),
     }, { onConflict: 'session_id' })
 
     if (error) {
-      console.error('Error guardando PECA:', error)
-      return NextResponse.json({ error: 'Error al guardar resultados' }, { status: 500 })
+      console.error('PECA score error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Notificar al psicólogo via Realtime
-    const { data: session } = await supabase
-      .from('sessions')
-      .select('realtime_channel')
-      .eq('id', sessionId)
-      .single()
+    // Marcar sesión como completada
+    await db.from('sessions').update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+    }).eq('id', sessionId)
 
-    if (session?.realtime_channel) {
-      await supabase
-        .channel(session.realtime_channel)
-        .send({
-          type: 'broadcast',
-          event: 'peca_completed',
-          payload: result,
-        })
-    }
-
-    // Actualizar estado de la sesión
-    await supabase
-      .from('sessions')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', sessionId)
-
-    return NextResponse.json(result)
-
-  } catch (err) {
+    return NextResponse.json({ success: true, sessionId })
+  } catch (err: any) {
     console.error('Error en /api/peca/score:', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
-
