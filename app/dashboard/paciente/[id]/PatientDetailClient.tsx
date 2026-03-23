@@ -7,6 +7,7 @@ import { SessionsTab } from './SessionsTab'
 import { ProgramsTab } from './ProgramsTab'
 import { ReportsTab } from './ReportsTab'
 import { deleteSession } from './actions'
+import { EditPatientModal } from './EditPatientModal'
 import { NewSessionModal } from '@/app/dashboard/components/NewSessionModal'
 
 const GENDER_LABEL: Record<string, string> = {
@@ -92,16 +93,16 @@ export function PatientDetailClient({ patientId }: Props) {
                     {patient.full_name}
                   </h1>
                   <p className="text-sm mt-0.5" style={{ color: 'var(--stone-500)' }}>
-                    {ageY} años {ageM} meses
-                    {patient.gender && ` · ${GENDER_LABEL[patient.gender] ?? patient.gender}`}
-                    {patient.grade && ` · ${patient.grade}`}
+                    {ageY} aÃ±os {ageM} meses
+                    {patient.gender && ` Â· ${GENDER_LABEL[patient.gender] ?? patient.gender}`}
+                    {patient.grade && ` Â· ${patient.grade}`}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button onClick={() => setNewSessionOpen(true)}
                     className="text-sm font-medium px-4 py-2 rounded-xl text-white"
                     style={{ background: 'var(--teal-600)' }}>
-                    + Nueva evaluación
+                    + Nueva evaluaciÃ³n
                   </button>
                   <button onClick={() => setEditOpen(true)}
                     className="text-sm font-medium px-4 py-2 rounded-xl border"
@@ -113,9 +114,9 @@ export function PatientDetailClient({ patientId }: Props) {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                 {[
-                  { label: 'RUT',           value: patient.rut ?? '—' },
+                  { label: 'RUT',           value: patient.rut ?? 'â€”' },
                   { label: 'Nacimiento',    value: new Date(patient.birth_date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) },
-                  { label: 'Establecimiento', value: patient.school ?? '—' },
+                  { label: 'Establecimiento', value: patient.school ?? 'â€”' },
                   { label: 'Ciudad',        value: patient.city ?? 'Chile' },
                 ].map((item) => (
                   <div key={item.label}>
@@ -141,7 +142,7 @@ export function PatientDetailClient({ patientId }: Props) {
               {patient.notes && (
                 <div className="mt-4 px-4 py-3 rounded-xl text-sm"
                   style={{ background: 'var(--stone-50)', color: 'var(--stone-600)', border: '1px solid var(--stone-100)' }}>
-                  <span className="font-medium text-xs uppercase tracking-wide" style={{ color: 'var(--stone-400)' }}>Notas · </span>
+                  <span className="font-medium text-xs uppercase tracking-wide" style={{ color: 'var(--stone-400)' }}>Notas Â· </span>
                   {patient.notes}
                 </div>
               )}
