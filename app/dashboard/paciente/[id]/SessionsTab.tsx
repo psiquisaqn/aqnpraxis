@@ -90,7 +90,7 @@ export function SessionsTab({ sessions, patientId, onDelete }: {
                 </span>
                 {s.age_years !== undefined && (
                   <span className="text-xs" style={{ color: 'var(--stone-400)' }}>
-· Edad: {s.age_years}a {s.age_months}m
+{'\u00B7'} Edad: {s.age_years}a {s.age_months}m
                   </span>
                 )}
               </div>
