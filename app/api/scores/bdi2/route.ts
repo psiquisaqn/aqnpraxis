@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await db
     .from('bdi2_scores')
-    .select('*, session:sessions(started_at, patient:patients(full_name))')
+    .select('*, session:sessions(started_at, patient:patients(id, full_name))')
     .eq('session_id', sessionId)
     .single()
 

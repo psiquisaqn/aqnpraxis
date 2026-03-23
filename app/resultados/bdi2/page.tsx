@@ -51,6 +51,7 @@ function BdiReportPageInner() {
   const contentRef = useRef<HTMLDivElement>(null)
   const [result, setResult]         = useState<BdiResult | null>(null)
   const [responses, setResponses]   = useState<Record<number, number>>({})
+  const [patientId, setPatientId]     = useState('')
   const [patientName, setPatientName] = useState('')
   const [evalDate, setEvalDate]     = useState('')
   const [loading, setLoading]       = useState(true)
@@ -70,6 +71,7 @@ function BdiReportPageInner() {
         setResponses(resp)
         setResult(scoreBdi2(resp as any))
         setPatientName((data.session as any)?.patient?.full_name ?? '')
+        setPatientId((data.session as any)?.patient?.id ?? '')
         const d = (data.session as any)?.started_at
         if (d) setEvalDate(new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }))
         setLoading(false)
@@ -85,9 +87,9 @@ function BdiReportPageInner() {
     <div className="min-h-screen" style={{ background: 'var(--stone-100)' }}>
       {/* Toolbar */}
       <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--stone-500)' }}>
+        <button onClick={() => router.push(patientId ? `/dashboard/paciente/${patientId}` : '/dashboard')} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--stone-500)' }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Volver
+          Volver a ficha
         </button>
         <div className="flex-1" />
         <span className="text-xs" style={{ color: 'var(--stone-400)' }}>BDI-II — Inventario de Depresión de Beck</span>
