@@ -48,7 +48,7 @@ export default function CoopersmithSessionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, responses }),
       })
-      if (res.ok) router.push(`/coopersmith/${sessionId}/report`)
+      if (res.ok) router.push('/resultados/coopersmith?session=' + sessionId)
     } finally {
       setSaving(false)
     }

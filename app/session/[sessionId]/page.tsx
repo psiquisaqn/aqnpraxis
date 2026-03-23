@@ -233,7 +233,7 @@ export default function ScoringPanel() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
     })
-    router.push('/session/' + sessionId + '/report')
+    router.push('/resultados/wisc5?session=' + sessionId)
   }, [sessionId, router, sendSessionControl])
 
   const activeConfig = SUBTESTS.find(s => s.code === activeSubtest)!

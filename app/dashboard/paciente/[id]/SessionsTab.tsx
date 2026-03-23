@@ -84,7 +84,7 @@ export function SessionsTab({ sessions }: { sessions: Session[] }) {
             <div className="shrink-0">
               {s.status === 'in_progress' ? (
                 <Link
-                  href={s.test_id === 'peca' ? `/peca/${s.id}` : `/session/${s.id}`}
+                  href={s.test_id === 'peca_aqn' ? `/peca/${s.id}` : s.test_id === 'beck_bdi2' ? `/bdi2/${s.id}` : s.test_id === 'coopersmith' ? `/coopersmith/${s.id}` : `/session/${s.id}`}
                   className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
                   style={{ background: 'var(--teal-600)' }}
                 >
@@ -92,7 +92,7 @@ export function SessionsTab({ sessions }: { sessions: Session[] }) {
                 </Link>
               ) : s.status === 'completed' ? (
                 <Link
-                  href={`/session/${s.id}`}
+                  href={s.test_id === 'peca_aqn' ? '/resultados/peca?session=' + s.id : s.test_id === 'beck_bdi2' ? '/resultados/bdi2?session=' + s.id : s.test_id === 'coopersmith' ? '/resultados/coopersmith?session=' + s.id : '/resultados/wisc5?session=' + s.id}
                   className="text-xs font-medium px-3 py-1.5 rounded-lg border"
                   style={{ color: 'var(--stone-600)', borderColor: 'var(--stone-200)', background: 'white' }}
                 >

@@ -77,7 +77,7 @@ export default function BdiSessionPage() {
         body: JSON.stringify({ sessionId, responses }),
       })
       if (res.ok) {
-        router.push(`/bdi2/${sessionId}/report`)
+        router.push('/resultados/bdi2?session=' + sessionId)
       }
     } finally {
       setSaving(false)
