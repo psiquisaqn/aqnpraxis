@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { CancelSessionButton } from '@/components/CancelSession'
@@ -11,8 +11,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const ITEMS_PER_PAGE = 10
-
 export default function CoopersmithSessionPage() {
   const params    = useParams()
   const router    = useRouter()
@@ -20,14 +18,40 @@ export default function CoopersmithSessionPage() {
 
   const [responses, setResponses]     = useState<CooperResponses>({})
   const [patientName, setPatientName] = useState('')
-  const [page, setPage]               = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0)
   const [saving, setSaving]           = useState(false)
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const totalPages = Math.ceil(COOPERSMITH_ITEMS.length / ITEMS_PER_PAGE)
-  const pageItems  = COOPERSMITH_ITEMS.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE)
-  const completed  = Object.keys(responses).length
-  const pct        = Math.round((completed / 58) * 100)
-  const allDone    = completed === 58
+  // Detectar tamaño de pantalla
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const isMobile = windowWidth < 768
+  const isTablet = windowWidth >= 768 && windowWidth < 1024
+
+  // Determinar cuántos ítems mostrar por página
+  const getItemsPerPage = () => {
+    if (isMobile) return 1
+    if (isTablet) return 4
+    return 10
+  }
+
+  const itemsPerPage = getItemsPerPage()
+  const totalPages = Math.ceil(COOPERSMITH_ITEMS.length / itemsPerPage)
+  const currentPage = Math.floor(currentIndex / itemsPerPage)
+  
+  const pageItems = COOPERSMITH_ITEMS.slice(
+    currentPage * itemsPerPage, 
+    (currentPage + 1) * itemsPerPage
+  )
+  
+  const completed = Object.keys(responses).length
+  const pct = Math.round((completed / 58) * 100)
+  const allDone = completed === 58
 
   useEffect(() => {
     if (!sessionId) return
@@ -37,6 +61,10 @@ export default function CoopersmithSessionPage() {
 
   const handleResponse = (item: number, val: CooperResponse) => {
     setResponses((prev) => ({ ...prev, [item]: val }))
+    // En móvil, avanzar automáticamente después de responder
+    if (isMobile && currentIndex < COOPERSMITH_ITEMS.length - 1) {
+      setTimeout(() => setCurrentIndex(prev => prev + 1), 300)
+    }
   }
 
   const handleSubmit = async () => {
@@ -56,104 +84,160 @@ export default function CoopersmithSessionPage() {
 
   const partial = completed > 0 ? scoreCoopersmith(responses) : null
 
+  // Navegación
+  const goNext = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentIndex((currentPage + 1) * itemsPerPage)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const goPrev = () => {
+    if (currentPage > 0) {
+      setCurrentIndex((currentPage - 1) * itemsPerPage)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const goToQuestion = (index: number) => {
+    setCurrentIndex(index)
+    if (isMobile) setSidebarOpen(false)
+  }
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--stone-50)' }}>
-      {/* Header */}
-      <header className="border-b px-6 py-3 flex items-center gap-4" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-        <div className="flex-1">
-          <div className="font-medium text-sm" style={{ color: 'var(--stone-800)' }}>{patientName || 'Cargando…'}</div>
-          <div className="text-xs" style={{ color: 'var(--stone-400)' }}>Coopersmith SEI — Inventario de Autoestima · {completed}/58 ítems</div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--stone-100)' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: 'var(--teal-500)' }} />
-            </div>
-            <span className="text-xs" style={{ color: 'var(--stone-500)' }}>{pct}%</span>
+      {/* Header mejorado */}
+      <header className="sticky top-0 z-20 border-b px-4 py-2 flex items-center gap-3" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm truncate" style={{ color: 'var(--stone-800)' }}>
+            {patientName || 'Cargando…'}
           </div>
-          <button
-            onClick={handleSubmit}
-            disabled={!allDone || saving}
-            className="text-xs font-medium px-4 py-2 rounded-xl text-white"
-            style={{ background: allDone && !saving ? 'var(--teal-600)' : 'var(--stone-300)', cursor: allDone && !saving ? 'pointer' : 'not-allowed' }}
-          >
-            {saving ? 'Calculando…' : 'Ver resultados'}
-          </button>
+          <div className="text-xs flex items-center gap-2" style={{ color: 'var(--stone-400)' }}>
+            <span>Coopersmith SEI</span>
+            <span>•</span>
+            <span>{completed}/58</span>
+            <div className="flex-1 max-w-24">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--stone-100)' }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: 'var(--teal-500)' }} />
+              </div>
+            </div>
+          </div>
         </div>
+        
+        {/* Botón para abrir sidebar en móvil */}
+        {isMobile && (
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-lg"
+            style={{ background: sidebarOpen ? 'var(--stone-100)' : 'transparent' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: 'var(--stone-600)' }}>
+              <path d="M4 5h12M4 10h12M4 15h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+        )}
+        
+        <button
+          onClick={handleSubmit}
+          disabled={!allDone || saving}
+          className="text-xs font-medium px-3 py-1.5 rounded-xl text-white whitespace-nowrap"
+          style={{ background: allDone && !saving ? 'var(--teal-600)' : 'var(--stone-300)' }}
+        >
+          {saving ? 'Calculando…' : allDone ? 'Ver resultados' : `${58 - completed} restantes`}
+        </button>
         <CancelSessionButton sessionId={sessionId} />
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Panel central */}
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-2xl mx-auto">
-            {/* Instrucción */}
-            {page === 0 && (
-              <div className="mb-5 px-4 py-3 rounded-xl text-sm" style={{ background: 'rgba(13,148,136,0.06)', border: '1px solid rgba(13,148,136,0.15)', color: 'var(--stone-700)' }}>
-                Lee cada frase y marca si es <strong>"Igual que yo"</strong> o <strong>"No es como yo"</strong>.
+      <div className="flex flex-1 relative">
+        {/* Panel principal */}
+        <main className={`flex-1 transition-all ${isMobile && sidebarOpen ? 'blur-sm pointer-events-none' : ''}`}>
+          <div className="max-w-3xl mx-auto px-4 py-6">
+            {/* Indicador de progreso visual */}
+            <div className="mb-4 flex justify-between items-center text-xs" style={{ color: 'var(--stone-400)' }}>
+              <span>Pregunta {currentIndex + 1} de {COOPERSMITH_ITEMS.length}</span>
+              <div className="flex gap-1">
+                {!isMobile && Array.from({ length: Math.min(58, totalPages) }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentIndex(i * itemsPerPage)}
+                    className="h-1 rounded-full transition-all"
+                    style={{
+                      width: currentPage === i ? '16px' : '6px',
+                      background: currentPage === i ? 'var(--teal-500)' : 'var(--stone-300)'
+                    }}
+                  />
+                ))}
               </div>
-            )}
+            </div>
 
-            <div className="space-y-2">
+            {/* Preguntas */}
+            <div className="space-y-3">
               {pageItems.map((item) => {
                 const resp = responses[item.num]
+                const isCurrent = isMobile && item.num === currentIndex + 1
+                
                 return (
                   <div
                     key={item.num}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all"
+                    className={`rounded-xl border transition-all ${
+                      isMobile && !isCurrent ? 'hidden' : ''
+                    }`}
                     style={{
-                      background:   resp ? 'white' : 'var(--stone-50)',
-                      borderColor:  resp ? 'var(--stone-200)' : 'var(--stone-100)',
+                      background: resp ? 'white' : 'var(--stone-50)',
+                      borderColor: resp ? 'var(--stone-200)' : 'var(--stone-100)',
                     }}
                   >
-                    <span className="text-xs font-mono w-5 shrink-0" style={{ color: 'var(--stone-400)' }}>{item.num}</span>
-                    <p className="flex-1 text-sm" style={{ color: 'var(--stone-700)' }}>{item.text}</p>
-                    <div className="flex gap-2 shrink-0">
-                      {(['igual', 'diferente'] as CooperResponse[]).map((val) => (
-                        <button
-                          key={val}
-                          onClick={() => handleResponse(item.num, val)}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-all"
-                          style={{
-                            background:  resp === val ? (val === 'igual' ? 'var(--teal-600)' : 'var(--stone-700)') : 'white',
-                            color:       resp === val ? 'white' : 'var(--stone-500)',
-                            borderColor: resp === val ? 'transparent' : 'var(--stone-200)',
-                          }}
-                        >
-                          {val === 'igual' ? 'Igual que yo' : 'No es como yo'}
-                        </button>
-                      ))}
+                    <div className="p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-xs font-mono w-6 shrink-0" style={{ color: 'var(--stone-400)' }}>
+                          {item.num}
+                        </span>
+                        <p className="flex-1 text-sm leading-relaxed" style={{ color: 'var(--stone-700)' }}>
+                          {item.text}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 mt-3 ml-9">
+                        {(['igual', 'diferente'] as CooperResponse[]).map((val) => (
+                          <button
+                            key={val}
+                            onClick={() => handleResponse(item.num, val)}
+                            className="flex-1 text-sm font-medium py-2.5 rounded-lg border transition-all"
+                            style={{
+                              background: resp === val ? (val === 'igual' ? 'var(--teal-600)' : 'var(--stone-700)') : 'white',
+                              color: resp === val ? 'white' : 'var(--stone-500)',
+                              borderColor: resp === val ? 'transparent' : 'var(--stone-200)',
+                            }}
+                          >
+                            {val === 'igual' ? '✓ Igual que yo' : '✗ No es como yo'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )
               })}
             </div>
 
-            {/* Paginación */}
-            <div className="flex items-center justify-between mt-6">
+            {/* Navegación entre páginas */}
+            <div className="flex items-center justify-between gap-3 mt-6">
               <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="text-sm px-4 py-2 rounded-xl border"
-                style={{ color: 'var(--stone-500)', borderColor: 'var(--stone-200)', background: 'white', opacity: page === 0 ? 0.4 : 1 }}
+                onClick={goPrev}
+                disabled={currentPage === 0}
+                className="flex-1 text-sm py-2.5 rounded-xl border"
+                style={{ color: 'var(--stone-500)', borderColor: 'var(--stone-200)', background: 'white', opacity: currentPage === 0 ? 0.4 : 1 }}
               >
                 ← Anterior
               </button>
-              <div className="flex gap-1.5">
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPage(i)}
-                    className="h-1.5 rounded-full transition-all"
-                    style={{ width: page === i ? '24px' : '8px', background: page === i ? 'var(--teal-500)' : 'var(--stone-300)' }}
-                  />
-                ))}
-              </div>
+              {!isMobile && (
+                <div className="text-xs" style={{ color: 'var(--stone-400)' }}>
+                  Página {currentPage + 1} de {totalPages}
+                </div>
+              )}
               <button
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                disabled={page === totalPages - 1}
-                className="text-sm px-4 py-2 rounded-xl border"
-                style={{ color: 'var(--stone-500)', borderColor: 'var(--stone-200)', background: 'white', opacity: page === totalPages - 1 ? 0.4 : 1 }}
+                onClick={goNext}
+                disabled={currentPage === totalPages - 1}
+                className="flex-1 text-sm py-2.5 rounded-xl border"
+                style={{ color: 'var(--stone-500)', borderColor: 'var(--stone-200)', background: 'white', opacity: currentPage === totalPages - 1 ? 0.4 : 1 }}
               >
                 Siguiente →
               </button>
@@ -161,27 +245,83 @@ export default function CoopersmithSessionPage() {
           </div>
         </main>
 
-        {/* Sidebar derecho */}
-        <aside className="w-52 border-l p-4 flex flex-col gap-4" style={{ background: 'white', borderColor: 'var(--stone-100)' }}>
+        {/* Sidebar - en móvil es un overlay deslizable */}
+        <aside className={`
+          ${isMobile ? `
+            fixed top-0 right-0 h-full w-72 z-30 transform transition-transform duration-300 ease-in-out shadow-xl
+            ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
+          ` : 'w-64 border-l relative'}
+          flex flex-col gap-4 p-4
+        `} style={{ background: 'white', borderColor: 'var(--stone-100)' }}>
+          {isMobile && (
+            <div className="flex justify-between items-center pb-3 border-b" style={{ borderColor: 'var(--stone-100)' }}>
+              <span className="font-medium text-sm">Progreso</span>
+              <button onClick={() => setSidebarOpen(false)} className="p-1">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: 'var(--stone-400)' }}>
+                  <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+          )}
+          
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--stone-400)' }}>Puntaje parcial</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--stone-400)' }}>
+              Puntaje parcial
+            </div>
             {partial ? (
-              <div>
-                <div className="text-3xl font-bold" style={{ color: partial.levelColor, fontFamily: 'var(--font-serif)' }}>{partial.totalScaled}</div>
-                <div className="text-xs font-medium mt-0.5" style={{ color: partial.levelColor }}>{partial.levelLabel}</div>
-                <div className="text-xs mt-1" style={{ color: 'var(--stone-400)' }}>{completed}/58 ítems</div>
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" style={{ color: partial.levelColor, fontFamily: 'var(--font-serif)' }}>
+                  {partial.totalScaled}
+                </div>
+                <div className="text-xs font-medium mt-0.5" style={{ color: partial.levelColor }}>
+                  {partial.levelLabel}
+                </div>
+                <div className="text-xs mt-2" style={{ color: 'var(--stone-400)' }}>
+                  {completed}/58 ítems
+                </div>
               </div>
             ) : (
-              <div className="text-3xl font-light" style={{ color: 'var(--stone-300)' }}>—</div>
+              <div className="text-3xl font-light text-center py-2" style={{ color: 'var(--stone-300)' }}>—</div>
             )}
           </div>
 
           {partial && partial.lieScaleInvalid && (
             <div className="rounded-xl px-3 py-2 text-xs" style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}>
-              <strong>⚠ Escala de mentira:</strong> {partial.lieScaleRaw}/8. La validez del protocolo puede estar comprometida.
+              <strong>⚠ Escala de mentira:</strong> {partial.lieScaleRaw}/8
+            </div>
+          )}
+
+          {/* Mini índice de preguntas (solo escritorio/tablet) */}
+          {!isMobile && (
+            <div className="mt-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--stone-400)' }}>
+                Índice rápido
+              </div>
+              <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
+                {COOPERSMITH_ITEMS.map((item) => (
+                  <button
+                    key={item.num}
+                    onClick={() => goToQuestion(item.num - 1)}
+                    className="text-xs w-7 h-7 rounded flex items-center justify-center transition-all"
+                    style={{
+                      background: responses[item.num] ? 'var(--teal-100)' : 'var(--stone-100)',
+                      color: responses[item.num] ? 'var(--teal-700)' : 'var(--stone-500)',
+                      fontWeight: currentIndex + 1 === item.num ? 'bold' : 'normal',
+                      border: currentIndex + 1 === item.num ? '1px solid var(--teal-500)' : 'none'
+                    }}
+                  >
+                    {item.num}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </aside>
+
+        {/* Overlay para móvil cuando sidebar está abierto */}
+        {isMobile && sidebarOpen && (
+          <div className="fixed inset-0 bg-black/30 z-20" onClick={() => setSidebarOpen(false)} />
+        )}
       </div>
     </div>
   )
