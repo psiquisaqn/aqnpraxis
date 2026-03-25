@@ -3,9 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
-import { scoreCoopersmith, COOPER_KEY, type CooperResult } from '@/lib/coopersmith/engine'
+import { scoreCoopersmith, type CooperResult } from '@/lib/coopersmith/engine'
 
 function CoopersmithReportPageInner() {
   const router    = useRouter()
@@ -15,6 +14,7 @@ function CoopersmithReportPageInner() {
   const contentRef = useRef<HTMLDivElement>(null)
   const [result, setResult]           = useState<CooperResult | null>(null)
   const [patientName, setPatientName] = useState('')
+  const [patientId, setPatientId]     = useState('')
   const [evalDate, setEvalDate]       = useState('')
   const [loading, setLoading]         = useState(true)
 
@@ -24,7 +24,6 @@ function CoopersmithReportPageInner() {
       .then(r => r.json())
       .then((data) => {
         if (!data || data.error) { setLoading(false); return }
-        // Reconstruir respuestas desde columnas r01..r58
         const resp: Record<number, 'igual' | 'diferente'> = {}
         for (let i = 1; i <= 58; i++) {
           const key = `r${String(i).padStart(2, '0')}` as keyof typeof data
@@ -34,6 +33,7 @@ function CoopersmithReportPageInner() {
         }
         setResult(scoreCoopersmith(resp))
         setPatientName((data.session as any)?.patient?.full_name ?? '')
+        setPatientId((data.session as any)?.patient?.id ?? '')
         const d = (data.session as any)?.started_at
         if (d) setEvalDate(new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }))
         setLoading(false)
@@ -47,7 +47,6 @@ function CoopersmithReportPageInner() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--stone-100)' }}>
-      {/* Toolbar */}
       <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
         <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--stone-500)' }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -55,19 +54,27 @@ function CoopersmithReportPageInner() {
         </button>
         <div className="flex-1" />
         <span className="text-xs" style={{ color: 'var(--stone-400)' }}>Coopersmith SEI — Inventario de Autoestima</span>
+        {patientId && (
+          <button 
+            onClick={() => router.push(`/dashboard/paciente/${patientId}`)} 
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border"
+            style={{ color: 'var(--stone-600)', borderColor: 'var(--stone-200)' }}
+          >
+            Ver ficha del paciente
+          </button>
+        )}
         <button onClick={() => window.print()} className="text-xs font-medium px-3 py-1.5 rounded-lg border" style={{ color: 'var(--stone-600)', borderColor: 'var(--stone-200)' }}>
           Imprimir
         </button>
         {result && (
           <PdfDownloadButton
             contentRef={contentRef}
-            meta={{ sessionId, patientId: '', testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }}
+            meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }}
           />
         )}
       </div>
 
       <div ref={contentRef} className="max-w-3xl mx-auto px-6 py-8 space-y-6">
-        {/* Encabezado */}
         <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -80,7 +87,6 @@ function CoopersmithReportPageInner() {
             </div>
           </div>
 
-          {/* Puntaje total */}
           <div className="mt-5 px-5 py-4 rounded-xl" style={{ background: 'var(--stone-50)', border: '1px solid var(--stone-100)' }}>
             <div className="flex items-center gap-6 mb-3">
               <div>
@@ -93,7 +99,6 @@ function CoopersmithReportPageInner() {
                   </div>
                 </div>
               </div>
-              {/* Barra de nivel */}
               <div className="flex-1">
                 <div className="flex h-2 rounded-full overflow-hidden">
                   {[
@@ -126,7 +131,6 @@ function CoopersmithReportPageInner() {
           )}
         </div>
 
-        {/* Subescalas */}
         <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
           <h2 className="text-sm font-semibold uppercase tracking-widest mb-5" style={{ color: 'var(--stone-400)' }}>Subescalas</h2>
           <div className="space-y-4">
@@ -167,6 +171,7 @@ function Spinner() {
     </div>
   )
 }
+
 function Error({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
