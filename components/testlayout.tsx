@@ -44,13 +44,11 @@ export function TestLayout({
   }, [])
 
   const isMobile = windowWidth < 768
-  const isTablet = windowWidth >= 768 && windowWidth < 1024
   const pct = Math.round((completed / totalItems) * 100)
   const allDone = completed === totalItems
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {/* Header */}
       <header className="sticky top-0 z-20 border-b px-4 py-2 flex items-center gap-3 bg-white border-gray-200">
         <button
           onClick={() => router.back()}
@@ -100,12 +98,10 @@ export function TestLayout({
       </header>
 
       <div className="flex flex-1 relative">
-        {/* Main content */}
         <main className={`flex-1 transition-all ${isMobile && sidebarOpen ? 'blur-sm pointer-events-none' : ''}`}>
           {children}
         </main>
 
-        {/* Sidebar */}
         <aside className={`
           ${isMobile ? `
             fixed top-0 right-0 h-full w-72 z-30 transform transition-transform duration-300 ease-in-out shadow-xl bg-white
@@ -123,7 +119,6 @@ export function TestLayout({
               </button>
             </div>
           )}
-          
           {sidebarContent}
         </aside>
 
