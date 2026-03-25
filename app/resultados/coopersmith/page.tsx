@@ -7,11 +7,6 @@ import { createClient } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreCoopersmith, COOPER_KEY, type CooperResult } from '@/lib/coopersmith/engine'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 function CoopersmithReportPageInner() {
   const router    = useRouter()
   const searchParams = useSearchParams()
