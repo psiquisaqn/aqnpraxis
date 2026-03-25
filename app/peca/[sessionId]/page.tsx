@@ -1,308 +1,221 @@
-/**
- * /peca/[sessionId] — Cuestionario PECA autoadministrado
- *
- * El evaluado responde directamente los 45 ítems en su dispositivo.
- * Diseño limpio, intuitivo y sin jerga técnica.
- * Al finalizar, envía las respuestas al motor y redirige al psicólogo.
- */
-
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import { PECA_ITEMS } from '@/lib/peca/engine'
-import { CancelSessionButton } from '@/components/CancelSession'
+import { TestLayout } from '@/components/TestLayout'
+import { PaginationNav } from '@/components/PaginationNav'
+import { QuickIndex } from '@/components/QuickIndex'
+import { useTestNavigation } from '@/hooks/useTestNavigation'
+import { PECA_ITEMS, scorePeca, type PecaResponses } from '@/lib/peca/engine'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const ITEMS_PER_PAGE = 5
+const TOTAL_ITEMS = 45
 
-type Responses = Record<number, number>
+const RESPONSE_OPTIONS = [
+  { value: 1, label: '1 - Siempre la izquierda', position: 'left' },
+  { value: 2, label: '2 - Generalmente la izquierda', position: 'left' },
+  { value: 3, label: '3 - Generalmente la derecha', position: 'right' },
+  { value: 4, label: '4 - Siempre la derecha', position: 'right' },
+]
 
-// ─── Componente de ítem ───────────────────────────────────────
-
-function PecaItemCard({
-  item,
-  value,
-  onChange,
-}: {
-  item: typeof PECA_ITEMS[0]
-  value?: number
-  onChange: (val: number) => void
-}) {
-  return (
-    <div className={`rounded-2xl border p-5 transition-all duration-200 ${
-      value ? 'border-slate-200 bg-white shadow-sm' : 'border-slate-100 bg-slate-50'
-    }`}>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        {/* Frase izquierda */}
-        <p className={`text-sm leading-relaxed text-right transition-colors ${
-          value && value <= 2 ? 'text-slate-800 font-medium' : 'text-slate-500'
-        }`}>
-          {item.leftPhrase}
-        </p>
-
-        {/* Botones 1–2–3–4 */}
-        <div className="flex gap-2 flex-shrink-0">
-          {[1, 2, 3, 4].map(n => (
-            <button
-              key={n}
-              onClick={() => onChange(n)}
-              className={`w-10 h-10 rounded-full text-sm font-semibold transition-all duration-150
-                ${value === n
-                  ? n <= 2
-                    ? 'bg-slate-800 text-white scale-110'
-                    : 'bg-indigo-600 text-white scale-110'
-                  : 'bg-white border border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600'
-                }`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-
-        {/* Frase derecha */}
-        <p className={`text-sm leading-relaxed transition-colors ${
-          value && value >= 3 ? 'text-slate-800 font-medium' : 'text-slate-500'
-        }`}>
-          {item.rightPhrase}
-        </p>
-      </div>
-
-      {/* Indicador visual de tendencia */}
-      {value && (
-        <div className="mt-3 flex items-center gap-1 justify-center">
-          <div className={`h-1 rounded-full transition-all duration-300 ${
-            value === 1 ? 'w-20 bg-slate-600' :
-            value === 2 ? 'w-10 bg-slate-400' :
-            value === 3 ? 'w-10 bg-indigo-400' :
-            'w-20 bg-indigo-600'
-          }`} />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Página principal ─────────────────────────────────────────
-
-export default function PecaQuestionnaire() {
-  const params    = useParams()
-  const router    = useRouter()
+export default function PecaSessionPage() {
+  const params = useParams()
+  const router = useRouter()
   const sessionId = params.sessionId as string
 
-  const [responses, setResponses]   = useState<Responses>({})
-  const [page, setPage]             = useState(0)
-  const [submitting, setSubmitting] = useState(false)
+  const [responses, setResponses] = useState<PecaResponses>({})
   const [patientName, setPatientName] = useState('')
-  const [started, setStarted]       = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  // Cargar nombre del paciente
+  const {
+    isMobile,
+    isTablet,
+    itemsPerPage,
+    totalPages,
+    currentPage,
+    currentIndex,
+    startIndex,
+    endIndex,
+    goNext,
+    goPrev,
+    goToIndex,
+    handleAnswer
+  } = useTestNavigation({
+    totalItems: TOTAL_ITEMS,
+    mobileItemsPerPage: 1,
+    tabletItemsPerPage: 5,
+    desktopItemsPerPage: 10
+  })
+
+  const pageItems = PECA_ITEMS.slice(startIndex, endIndex)
+  const completed = Object.keys(responses).length
+  const allDone = completed === TOTAL_ITEMS
+
   useEffect(() => {
     if (!sessionId) return
-    supabase
-      .from('sessions')
-      .select('patient:patients(full_name)')
-      .eq('id', sessionId)
-      .single()
-      .then(({ data }) => {
-        setPatientName((data?.patient as any)?.full_name ?? '')
-      })
+    supabase.from('sessions').select('patient:patients(full_name)').eq('id', sessionId).single()
+      .then(({ data }) => { if (data) setPatientName((data.patient as any)?.full_name ?? '') })
   }, [sessionId])
 
-  const totalPages  = Math.ceil(PECA_ITEMS.length / ITEMS_PER_PAGE)
-  const pageItems   = PECA_ITEMS.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE)
-  const pageAnswered = pageItems.every(item => responses[item.num] !== undefined)
-  const totalAnswered = Object.keys(responses).length
-  const progress    = Math.round((totalAnswered / 45) * 100)
-  const isLastPage  = page === totalPages - 1
-
-  const handleResponse = (itemId: number, value: number) => {
-    setResponses(prev => ({ ...prev, [itemId]: value }))
-  }
-
-  const handleNext = () => {
-    if (page < totalPages - 1) {
-      setPage(p => p + 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }
-
-  const handlePrev = () => {
-    if (page > 0) {
-      setPage(p => p - 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
+  const handleResponse = (itemNum: number, value: number) => {
+    setResponses(prev => ({ ...prev, [itemNum]: value as 1 | 2 | 3 | 4 }))
+    handleAnswer()
   }
 
   const handleSubmit = async () => {
-    if (Object.keys(responses).length < 45) return
-    setSubmitting(true)
+    if (!allDone) return
+    setSaving(true)
     try {
-      await fetch('/api/peca/score', {
+      const res = await fetch('/api/peca/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, responses }),
       })
-      // Redirigir a pantalla de finalización
-      router.push('/resultados/peca?session=' + sessionId)
-    } catch {
-      setSubmitting(false)
+      if (res.ok) router.push('/resultados/peca?session=' + sessionId)
+    } finally {
+      setSaving(false)
     }
   }
 
-  // ─── Pantalla de inicio ──────────────────────────────────────
+  const partial = completed > 0 ? scorePeca(responses) : null
 
-  if (!started) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="max-w-lg w-full bg-white rounded-3xl shadow-sm border border-slate-100 p-10 text-center">
-          {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <span className="font-serif text-lg font-normal text-slate-800">
-              Psiquis <strong className="tracking-wider">AQN</strong>
-            </span>
-            <div className="flex gap-1">
-              <div className="w-2.5 h-2.5 bg-slate-800" />
-              <div className="w-2.5 h-2.5 border-[1.5px] border-slate-800" />
-            </div>
+  const sidebarContent = (
+    <>
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wider mb-2 text-gray-400">
+          Progreso
+        </div>
+        <div className="text-center py-2">
+          <div className="text-4xl font-bold text-blue-600">
+            {completed}/{TOTAL_ITEMS}
           </div>
-
-          <h1 className="text-2xl font-light text-slate-800 mb-2 font-serif">
-            Cuestionario de Conducta Adaptativa
-          </h1>
-          {patientName && (
-            <p className="text-sm text-slate-400 mb-8">Preparado para {patientName}</p>
-          )}
-
-          <div className="bg-slate-50 rounded-2xl p-5 text-left mb-8 space-y-3">
-            <p className="text-sm text-slate-600 leading-relaxed">
-              A continuación verás <strong>45 preguntas</strong>. En cada una hay dos frases contrapuestas. Elige la opción que más se acerque a cómo eres tú:
-            </p>
-            <div className="flex items-center gap-3 text-sm text-slate-500">
-              <div className="flex gap-1.5">
-                {[1,2,3,4].map(n => (
-                  <div key={n} className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border ${
-                    n<=2 ? 'border-slate-300 text-slate-500' : 'border-indigo-200 text-indigo-400'
-                  }`}>{n}</div>
-                ))}
-              </div>
-              <p><strong>1–2</strong> te identificas con la frase izquierda · <strong>3–4</strong> con la frase derecha</p>
-            </div>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              No hay respuestas correctas ni incorrectas. Responde según cómo eres tú habitualmente, no como te gustaría ser.
-            </p>
+          <div className="text-xs mt-2 text-gray-400">
+            {Math.round((completed / TOTAL_ITEMS) * 100)}% completado
           </div>
-
-          <button
-            onClick={() => setStarted(true)}
-            className="w-full bg-slate-900 text-white rounded-xl py-3.5 text-sm font-medium hover:bg-slate-700 transition-colors"
-          >
-            Comenzar cuestionario
-          </button>
         </div>
       </div>
-    )
-  }
 
-  // ─── Cuestionario ─────────────────────────────────────────────
+      {partial && partial.participationNeeds && (
+        <div className="rounded-lg px-3 py-2 text-xs bg-yellow-50 border border-yellow-200 text-yellow-800">
+          <strong>⚠ Requiere apoyos:</strong> Nivel de participación bajo.
+        </div>
+      )}
+
+      {!isMobile && (
+        <QuickIndex
+          totalItems={TOTAL_ITEMS}
+          currentIndex={currentIndex}
+          responses={responses}
+          onSelect={goToIndex}
+        />
+      )}
+    </>
+  )
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header fijo */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-slate-100 z-10">
-        <div className="max-w-2xl mx-auto px-6 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-slate-400 font-medium">
-              PECA · Preguntas {page * ITEMS_PER_PAGE + 1}–{Math.min((page + 1) * ITEMS_PER_PAGE, 45)} de 45
-            </span>
-            <span className="text-xs text-slate-400">{progress}% completado</span>
-          </div>
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-slate-800 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Instrucción de página */}
-      <div className="max-w-2xl mx-auto px-6 pt-8 pb-2">
-        <p className="text-xs text-center text-slate-400 mb-6">
-          Elige <strong>1</strong> o <strong>2</strong> si te identificas con la frase de la izquierda ·
-          Elige <strong>3</strong> o <strong>4</strong> si te identificas con la de la derecha
-        </p>
-      </div>
-
-      {/* Ítems */}
-      <div className="max-w-2xl mx-auto px-6 pb-6 space-y-4">
-        {pageItems.map(item => (
-          <PecaItemCard
-            key={item.num}
-            item={item}
-            value={responses[item.num]}
-            onChange={val => handleResponse(item.num, val)}
-          />
-        ))}
-      </div>
-
-      {/* Navegación */}
-      <div className="max-w-2xl mx-auto px-6 pb-12">
-        <div className="flex gap-3">
-          {page > 0 && (
-            <button
-              onClick={handlePrev}
-              className="flex-1 py-3 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50 transition-colors"
-            >
-              ← Anterior
-            </button>
-          )}
-          {!isLastPage ? (
-            <button
-              onClick={handleNext}
-              disabled={!pageAnswered}
-              className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
-                pageAnswered
-                  ? 'bg-slate-900 text-white hover:bg-slate-700'
-                  : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-              }`}
-            >
-              {pageAnswered ? 'Siguiente →' : `Responde todas las preguntas (${pageItems.filter(i => !responses[i.num]).length} restantes)`}
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={totalAnswered < 45 || submitting}
-              className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
-                totalAnswered >= 45 && !submitting
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                  : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-              }`}
-            >
-              {submitting ? 'Enviando…' : totalAnswered < 45 ? `Faltan ${45 - totalAnswered} preguntas` : '✓ Enviar respuestas'}
-            </button>
+    <TestLayout
+      sessionId={sessionId}
+      patientName={patientName}
+      testName="PECA"
+      testCode="peca"
+      totalItems={TOTAL_ITEMS}
+      completed={completed}
+      currentIndex={currentIndex}
+      onNavigate={goToIndex}
+      onSubmit={handleSubmit}
+      saving={saving}
+      sidebarContent={sidebarContent}
+    >
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="mb-4 flex justify-between items-center text-xs text-gray-400">
+          <span>Ítem {currentIndex + 1} de {TOTAL_ITEMS}</span>
+          {!isMobile && (
+            <div className="flex gap-1">
+              {Array.from({ length: Math.min(TOTAL_ITEMS, totalPages) }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goToIndex(i * itemsPerPage)}
+                  className="h-1 rounded-full transition-all"
+                  style={{
+                    width: currentPage === i ? '16px' : '6px',
+                    background: currentPage === i ? '#3B82F6' : '#E5E7EB'
+                  }}
+                />
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Indicadores de página */}
-        <div className="flex justify-center gap-1.5 mt-5">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i)}
-              className={`h-1.5 rounded-full transition-all ${
-                i === page ? 'w-6 bg-slate-800' :
-                i < page ? 'w-3 bg-slate-400' : 'w-3 bg-slate-200'
-              }`}
-            />
-          ))}
+        <div className="space-y-3">
+          {pageItems.map((item) => {
+            const resp = responses[item.num]
+            const isCurrent = isMobile && item.num === currentIndex + 1
+            
+            return (
+              <div
+                key={item.num}
+                className={`rounded-lg border transition-all ${isMobile && !isCurrent ? 'hidden' : ''}`}
+                style={{
+                  background: resp !== undefined ? 'white' : '#F9FAFB',
+                  borderColor: resp !== undefined ? '#E5E7EB' : '#F3F4F6',
+                }}
+              >
+                <div className="p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-xs font-mono w-6 shrink-0 text-gray-400">
+                      {item.num}
+                    </span>
+                    <div className="flex-1">
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-700">{item.leftPhrase}</span>
+                        <span className="text-gray-500 mx-2">← →</span>
+                        <span className="text-gray-700">{item.rightPhrase}</span>
+                      </div>
+                      <div className="relative mt-4">
+                        <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                          <span>Siempre izquierda</span>
+                          <span>Generalmente izquierda</span>
+                          <span>Generalmente derecha</span>
+                          <span>Siempre derecha</span>
+                        </div>
+                        <div className="flex gap-1">
+                          {RESPONSE_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              onClick={() => handleResponse(item.num, opt.value)}
+                              className="flex-1 text-xs font-medium py-2 rounded-lg border transition-all"
+                              style={{
+                                background: resp === opt.value ? '#3B82F6' : 'white',
+                                color: resp === opt.value ? 'white' : '#6B7280',
+                                borderColor: resp === opt.value ? 'transparent' : '#E5E7EB',
+                              }}
+                            >
+                              {opt.value}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
+
+        <PaginationNav
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrev={goPrev}
+          onNext={goNext}
+          isMobile={isMobile}
+        />
       </div>
-    </div>
+    </TestLayout>
   )
 }
