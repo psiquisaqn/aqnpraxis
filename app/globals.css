@@ -3,96 +3,83 @@
 @tailwind utilities;
 
 :root {
-  --stone-50:  #fafaf9;
-  --stone-100: #f5f5f4;
-  --stone-200: #e7e5e4;
-  --stone-300: #d6d3d1;
-  --stone-600: #57534e;
-  --stone-700: #44403c;
-  --stone-800: #292524;
-  --stone-900: #1c1917;
-
-  --teal-500:  #14b8a6;
-  --teal-600:  #0d9488;
-  --teal-700:  #0f766e;
-  --teal-50:   #f0fdfa;
-  --teal-100:  #ccfbf1;
-
-  --font-serif: 'Lora', Georgia, serif;
-  --font-sans:  'DM Sans', system-ui, sans-serif;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  scroll-behavior: smooth;
+  --primary: #3B82F6;
+  --primary-hover: #2563EB;
+  --primary-light: #EFF6FF;
+  --secondary: #6B7280;
+  --background: #FFFFFF;
+  --surface: #F9FAFB;
+  --border: #E5E7EB;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
 }
 
 body {
-  font-family: var(--font-sans);
-  background-color: var(--stone-50);
-  color: var(--stone-800);
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-.font-serif {
-  font-family: var(--font-serif);
+/* Botón primario */
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  transition: all 0.2s ease;
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
 }
 
-.font-sans {
-  font-family: var(--font-sans);
+/* Botón secundario */
+.btn-secondary {
+  background: white;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover {
+  background: var(--surface);
 }
 
-/* Auth card animations */
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
+/* Tarjetas */
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* Animaciones */
+@keyframes spin {
   to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: rotate(360deg);
   }
 }
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
-.animate-fade-up {
-  animation: fadeUp 0.5s ease both;
+/* Transiciones */
+.transition-smooth {
+  transition: all 0.2s ease-in-out;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease both;
+/* Scrollbar personalizada (opcional) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-/* Input focus ring personalizado */
-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--teal-500);
+::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-radius: 4px;
 }
-
-/* ── Estilos de impresión (Informe WISC-V) ── */
-@media print {
-  body { background: white !important; }
-
-  /* Ocultar toolbar sticky */
-  .sticky { display: none !important; }
-
-  /* Evitar cortes dentro de secciones */
-  .rounded-2xl { break-inside: avoid; }
-
-  /* Asegurar colores en impresión */
-  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-
-  /* Márgenes de página */
-  @page {
-    margin: 1.5cm 2cm;
-    size: A4 portrait;
-  }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
 }
