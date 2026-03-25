@@ -1,245 +1,219 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import { PdfDownloadButton } from '@/components/PdfDownloadButton'
-import { scorePeca, DIMENSIONS, AAMR_SETS, type PecaResult, type SupportIntensity } from '@/lib/peca/engine'
+import { TestResultsLayout } from '@/components/TestResultsLayout'
+import { scorePeca, type PecaResult, DIMENSIONS, AAMR_SETS } from '@/lib/peca/engine'
 
-
-// ── Colores por intensidad ──────────────────────────────────────────
-const INTENSITY_STYLE: Record<SupportIntensity, { bg: string; text: string; bar: string }> = {
-  en_buen_nivel: { bg: 'rgba(20,184,166,0.09)',  text: '#0f766e', bar: '#14b8a6' },
-  intermitente:  { bg: 'rgba(234,179,8,0.10)',   text: '#92400e', bar: '#f59e0b' },
-  limitado:      { bg: 'rgba(249,115,22,0.10)',  text: '#9a3412', bar: '#f97316' },
-  extenso:       { bg: 'rgba(239,68,68,0.10)',   text: '#991b1b', bar: '#ef4444' },
-  generalizado:  { bg: 'rgba(139,92,246,0.10)',  text: '#5b21b6', bar: '#8b5cf6' },
-}
-
-function DimensionBar({ label, p2, intensity }: { label: string; p2: number; intensity: SupportIntensity }) {
-  const style = INTENSITY_STYLE[intensity]
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs w-52 shrink-0 truncate" style={{ color: 'var(--stone-600)' }}>{label}</span>
-      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--stone-100)' }}>
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${p2 * 100}%`, background: style.bar }}
-        />
-      </div>
-      <span className="text-xs w-20 shrink-0 text-right font-medium px-2 py-0.5 rounded-full" style={{ background: style.bg, color: style.text }}>
-        {(p2 * 100).toFixed(0)}%
-      </span>
-    </div>
-  )
-}
-
-function PecaReportPageInner() {
-  const router = useRouter()
+function PecaResultsPageInner() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
 
-  const contentRef = useRef<HTMLDivElement>(null)
   const [result, setResult] = useState<PecaResult | null>(null)
   const [patientName, setPatientName] = useState('')
+  const [patientId, setPatientId] = useState('')
   const [evalDate, setEvalDate] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    console.log('sessionId:', sessionId)
     if (!sessionId) return
     fetch('/api/scores/peca?session=' + sessionId)
       .then(r => r.json())
       .then((data) => {
         if (!data || data.error) { setLoading(false); return }
-        // Reconstruir respuestas desde columnas p01..p45
-        const responses: Record<number, number> = {}
+        
+        // Reconstruir respuestas
+        const resp: Record<number, 1 | 2 | 3 | 4> = {}
         for (let i = 1; i <= 45; i++) {
-          const key = `p${String(i).padStart(2, '0')}` as keyof typeof data
+          const key = `item_${i}` as keyof typeof data
           if (data[key] !== null && data[key] !== undefined) {
-            responses[i] = data[key] as number
+            resp[i] = data[key] as 1 | 2 | 3 | 4
           }
         }
-        const scored = scorePeca(responses as Partial<Record<number, 1|2|3|4>>)
+        
+        const scored = scorePeca(resp)
         setResult(scored)
         setPatientName((data.session as any)?.patient?.full_name ?? '')
+        setPatientId((data.session as any)?.patient?.id ?? '')
         const d = (data.session as any)?.started_at
         if (d) setEvalDate(new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }))
         setLoading(false)
       })
+      .catch(() => setLoading(false))
   }, [sessionId])
 
-  if (loading) return <LoadingScreen />
-  if (!result)  return <ErrorScreen onBack={() => router.back()} />
+  if (loading) return <Spinner />
+  if (!result) return <Error />
+
+  const getIntensityColor = (intensity: string) => {
+    switch (intensity) {
+      case 'Generalizado': return '#A32D2D'
+      case 'Extenso': return '#993C1D'
+      case 'Limitado': return '#854F0B'
+      case 'Intermitente': return '#3B6D11'
+      default: return '#166534'
+    }
+  }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--stone-100)' }}>
-      {/* Toolbar */}
-      <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--stone-500)' }}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Volver
-        </button>
-        <div className="flex-1" />
-        <span className="text-xs" style={{ color: 'var(--stone-400)' }}>PECA — Conducta Adaptativa</span>
-        <button onClick={() => window.print()} className="text-xs font-medium px-3 py-1.5 rounded-lg border" style={{ color: 'var(--stone-600)', borderColor: 'var(--stone-200)' }}>
-          Imprimir
-        </button>
-        {result && (
-          <PdfDownloadButton
-            contentRef={contentRef}
-            meta={{ sessionId, patientId: '', testId: 'peca_aqn', patientName }}
-          />
-        )}
+    <TestResultsLayout
+      patientName={patientName}
+      patientId={patientId}
+      testName="PECA - Prueba de Evaluación de Conducta Adaptativa"
+      testCode="PECA"
+      evalDate={evalDate}
+      pdfMeta={{
+        sessionId,
+        patientId,
+        testId: 'peca',
+        patientName,
+        content: result
+      }}
+    >
+      {/* Nivel de participación */}
+      <div className="mt-5 px-5 py-4 rounded-xl bg-gray-50 border border-gray-100">
+        <div className="flex flex-col sm:flex-row items-center gap-6 mb-3">
+          <div className="text-center sm:text-left">
+            <p className="text-xs font-medium uppercase tracking-widest mb-1 text-gray-400">
+              Participación general
+            </p>
+            <div className="flex items-baseline gap-3">
+              <span className="text-4xl font-bold" style={{ 
+                fontFamily: 'var(--font-serif)', 
+                color: result.participationNeeds ? '#A32D2D' : '#166534' 
+              }}>
+                {Math.round(result.participationLevel * 100)}%
+              </span>
+              <div>
+                <div className="text-sm font-semibold" style={{ 
+                  color: result.participationNeeds ? '#A32D2D' : '#166534' 
+                }}>
+                  {result.participationNeeds ? 'Requiere apoyos' : 'En buen nivel'}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex-1">
+            <div className="flex h-2 rounded-full overflow-hidden">
+              {[
+                { max: 0.3, color: '#A32D2D', label: 'Extenso' },
+                { max: 0.5, color: '#993C1D', label: 'Limitado' },
+                { max: 0.75, color: '#854F0B', label: 'Intermitente' },
+                { max: 1, color: '#166534', label: 'Buen nivel' },
+              ].map((range) => (
+                <div
+                  key={range.label}
+                  className="flex-1"
+                  style={{ background: `${range.color}30` }}
+                />
+              ))}
+            </div>
+            <div className="relative mt-1">
+              <div
+                className="absolute w-3 h-3 rounded-full border-2 border-white shadow -translate-x-1/2"
+                style={{ left: `${result.participationLevel * 100}%`, top: 0, 
+                  background: result.participationNeeds ? '#A32D2D' : '#166534' }}
+              />
+            </div>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed text-gray-600">
+          {result.participationText}
+        </p>
       </div>
 
-      <div ref={contentRef} className="max-w-3xl mx-auto px-6 py-8 space-y-6">
-        {/* Encabezado */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded" style={{ background: 'rgba(124,58,237,0.08)', color: '#7c3aed' }}>PECA</span>
-              <h1 className="text-2xl font-medium mt-2" style={{ fontFamily: 'var(--font-serif)', color: 'var(--stone-900)' }}>{patientName || 'Paciente'}</h1>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--stone-400)' }}>Prueba de Evaluación de Conducta Adaptativa</p>
-            </div>
-            <div className="text-right text-sm" style={{ color: 'var(--stone-400)' }}>
-              <div>Fecha de evaluación</div>
-              <div className="font-medium" style={{ color: 'var(--stone-700)' }}>{evalDate || '—'}</div>
-            </div>
-          </div>
-
-          {/* Nivel de participación */}
-          <div className="mt-5 px-5 py-4 rounded-xl" style={{ background: 'var(--stone-50)', border: '1px solid var(--stone-100)' }}>
-            <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: 'var(--stone-400)' }}>Nivel de participación global</p>
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'var(--stone-200)' }}>
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${result.participationLevel * 100}%`, background: result.participationNeeds ? '#f97316' : '#14b8a6' }}
-                />
-              </div>
-              <span className="text-2xl font-bold shrink-0" style={{ color: result.participationNeeds ? '#9a3412' : '#0f766e', fontFamily: 'var(--font-serif)' }}>
-                {(result.participationLevel * 100).toFixed(0)}%
-              </span>
-            </div>
-            <p className="text-xs mt-3 leading-relaxed" style={{ color: 'var(--stone-600)' }}>{result.participationText}</p>
-          </div>
-        </div>
-
-        {/* Conjuntos AAMR */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-          <h2 className="text-sm font-semibold uppercase tracking-widest mb-5" style={{ color: 'var(--stone-400)' }}>Dominios AAMR</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {result.aamrSets.map((s) => {
-              const color = s.needsSupport ? '#f97316' : '#14b8a6'
-              const bg    = s.needsSupport ? 'rgba(249,115,22,0.08)' : 'rgba(20,184,166,0.08)'
-              return (
-                <div key={s.code} className="rounded-xl p-4 border" style={{ borderColor: 'var(--stone-100)', background: bg }}>
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color }}>{s.label}</p>
-                  <p className="text-2xl font-bold mt-1" style={{ color, fontFamily: 'var(--font-serif)' }}>
-                    {(s.p2 * 100).toFixed(0)}%
-                  </p>
-                  <p className="text-xs mt-1 font-medium" style={{ color }}>{s.demandLabel}</p>
-                  <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--stone-500)', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {s.descriptionText}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Perfil de dimensiones */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-          <h2 className="text-sm font-semibold uppercase tracking-widest mb-5" style={{ color: 'var(--stone-400)' }}>Perfil por dimensión</h2>
-          <div className="space-y-3">
-            {result.dimensions.map((d) => (
-              <DimensionBar key={d.code} label={d.label} p2={d.p2} intensity={d.intensity} />
-            ))}
-          </div>
-          {/* Leyenda */}
-          <div className="flex flex-wrap gap-3 mt-5 pt-4 border-t" style={{ borderColor: 'var(--stone-100)' }}>
-            {(Object.entries(INTENSITY_STYLE) as [SupportIntensity, typeof INTENSITY_STYLE[SupportIntensity]][]).map(([key, style]) => (
-              <div key={key} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ background: style.bar }} />
-                <span className="text-xs capitalize" style={{ color: 'var(--stone-500)' }}>
-                  {key === 'en_buen_nivel' ? 'Buen nivel' : key.charAt(0).toUpperCase() + key.slice(1)}
+      {/* Dimensiones */}
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-widest mb-4 text-gray-400">
+          Dimensiones Adaptativas
+        </h2>
+        <div className="space-y-4">
+          {result.dimensions.map((dim) => (
+            <div key={dim.code}>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm font-medium text-gray-700">{dim.label}</span>
+                <span className="text-sm font-bold" style={{ color: getIntensityColor(dim.intensityLabel) }}>
+                  {dim.intensityLabel}
                 </span>
               </div>
-            ))}
-          </div>
+              <div className="h-2 rounded-full overflow-hidden bg-gray-100">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${dim.p2 * 100}%`, background: getIntensityColor(dim.intensityLabel) }}
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {dim.itemsAnswered}/{dim.itemsTotal} ítems · Puntaje: {Math.round(dim.rawScore * 10) / 10}
+              </p>
+            </div>
+          ))}
         </div>
-
-        {/* Tabla detallada */}
-        <div className="rounded-2xl border overflow-hidden" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-          <table className="w-full text-sm">
-            <thead style={{ background: 'var(--stone-50)' }}>
-              <tr style={{ borderBottom: '1px solid var(--stone-200)' }}>
-                {['Dimensión', 'Ítems', '% Logro', 'Intensidad de apoyo'].map((h) => (
-                  <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold" style={{ color: 'var(--stone-500)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.dimensions.map((d, i) => {
-                const style = INTENSITY_STYLE[d.intensity]
-                return (
-                  <tr key={d.code} style={{ borderBottom: i < result.dimensions.length - 1 ? '1px solid var(--stone-100)' : 'none' }}>
-                    <td className="px-4 py-3 font-medium" style={{ color: 'var(--stone-700)' }}>{d.label}</td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--stone-400)' }}>{d.itemsAnswered}/{d.itemsTotal}</td>
-                    <td className="px-4 py-3 font-semibold" style={{ color: style.text }}>{(d.p2 * 100).toFixed(0)}%</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: style.bg, color: style.text }}>
-                        {d.intensityLabel}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <Footer />
       </div>
+
+      {/* Conjuntos AAMR */}
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-widest mb-4 text-gray-400">
+          Conjuntos AAMR
+        </h2>
+        <div className="space-y-4">
+          {result.aamrSets.map((set) => (
+            <div key={set.code}>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm font-medium text-gray-700">{set.label}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                  background: set.needsSupport ? '#FEF3C7' : '#D1FAE5',
+                  color: set.needsSupport ? '#92400E' : '#065F46'
+                }}>
+                  {set.demandLabel}
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden bg-gray-100">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${set.p2 * 100}%`, background: set.needsSupport ? '#F59E0B' : '#10B981' }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                {set.descriptionText}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </TestResultsLayout>
+  )
+}
+
+function Spinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-8 h-8 rounded-full border-2 animate-spin border-blue-500 border-t-transparent" />
     </div>
   )
 }
 
-function LoadingScreen() {
+function Error() {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--teal-500)', borderTopColor: 'transparent' }} />
-        <p className="text-sm" style={{ color: 'var(--stone-500)' }}>Cargando resultados…</p>
-      </div>
-    </div>
-  )
-}
-function ErrorScreen({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
-        <p className="text-sm font-medium" style={{ color: 'var(--stone-700)' }}>No se encontraron resultados</p>
-        <button onClick={onBack} className="mt-3 text-sm" style={{ color: 'var(--teal-600)' }}>← Volver</button>
+        <p className="text-sm text-gray-600">No se encontraron resultados</p>
+        <button
+          onClick={() => window.history.back()}
+          className="mt-3 text-sm text-blue-600 hover:text-blue-700"
+        >
+          ← Volver
+        </button>
       </div>
     </div>
   )
 }
-function Footer() {
-  return (
-    <div className="text-center py-4">
-      <p className="text-xs" style={{ color: 'var(--stone-400)' }}>
-        Generado por AQN Praxis · Ps. Antonio Baeza H. · Psiquis AQN
-      </p>
-    </div>
-  )
-}
 
-export default function PecaReportPage() {
+export default function PecaResultsPage() {
   return (
-    <Suspense fallback={null}>
-      <PecaReportPageInner />
+    <Suspense fallback={<Spinner />}>
+      <PecaResultsPageInner />
     </Suspense>
   )
 }
