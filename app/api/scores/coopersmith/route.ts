@@ -8,14 +8,19 @@ const db = createClient(
 
 export async function GET(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get('session')
-  if (!sessionId) return NextResponse.json({ error: 'session requerido' }, { status: 400 })
+  if (!sessionId) {
+    return NextResponse.json({ error: 'session requerido' }, { status: 400 })
+  }
 
   const { data, error } = await db
     .from('coopersmith_scores')
-    .select('*, session:sessions(started_at, patient:patients(full_name))')
+    .select('*, session:sessions(started_at, patient:patients(id, full_name))')
     .eq('session_id', sessionId)
     .single()
 
-  if (error || !data) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+  if (error || !data) {
+    return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+  }
+
   return NextResponse.json(data)
 }
