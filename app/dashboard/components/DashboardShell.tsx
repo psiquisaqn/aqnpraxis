@@ -101,13 +101,17 @@ export function DashboardShell({ profile, children }: Props) {
         {/* Header con logo y botón cerrar en móvil */}
         <div className="flex items-center justify-between px-4 border-b border-gray-200 h-[60px]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-600">
-              <svg width="16" height="16" viewBox="0 0 22 22" fill="none">
-                <circle cx="11" cy="11" r="2" fill="white"/>
-                <path d="M11 6v5.5l3.5 2" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-blue-600 overflow-hidden">
+                <img 
+                  src="/isotipopsiquisaqn.png" 
+                  alt="AQN Praxis" 
+                  className="w-full h-full object-cover"
+                  style={{ mixBlendMode: 'screen' }}
+                />
+              </div>
+              <span className="font-semibold text-xs text-gray-800">AQN Praxis</span>
             </div>
-            <span className="font-semibold text-sm text-gray-800">AQN Praxis</span>
           </div>
           {isMobile && (
             <button
