@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { PatientList } from './components/PatientList'
 import { StatsBar } from './components/StatsBar'
+import { Greeting } from './components/Greeting'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,19 +46,16 @@ export default async function DashboardPage() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).length
 
-  const hour = now.getHours()
-  const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
-  const userName = profile?.full_name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'psicólogo'
+  // Obtener nombre (primero y segundo nombre)
+  const fullName = profile?.full_name ?? ''
+  const firstName = fullName.split(' ')[0] || ''
+  const secondName = fullName.split(' ')[1] || ''
+  const displayName = firstName && secondName ? `${firstName} ${secondName}` : firstName || user?.email?.split('@')[0] || 'psicólogo'
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
       <div className="mb-6 md:mb-8">
-        <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
-          {greeting}, colega{' '}
-          <span className="text-blue-600">
-            {userName}
-          </span>
-        </h1>
+        <Greeting userName={displayName.toUpperCase()} />
         <StatsBar
           totalPatients={patients.length}
           activeSessions={activeSessions}
