@@ -51,12 +51,19 @@ export default function DualControlPage() {
 
   // Sincronización en tiempo real
   const { sendMessage } = useRealtime(dualSessionId, (payload) => {
+    console.log('Mensaje recibido en control:', payload)
     if (payload.type === 'sync_response') {
       console.log('Respuesta recibida:', payload)
+    }
+    if (payload.type === 'display_ready') {
+      console.log('Display listo, enviando contenido inicial...')
+      // Cuando el display está listo, enviar el ítem actual
+      // Esto se manejará desde el componente CoopersmithControl
     }
   })
 
   const updatePatientScreen = async (content: any) => {
+    console.log('Enviando a display:', content)
     sendMessage({
       type: 'update_display',
       content
@@ -77,6 +84,15 @@ export default function DualControlPage() {
     if (error) {
       console.error('Error saving response:', error)
     }
+  }
+
+  const sendTestMessage = () => {
+    console.log('Enviando mensaje de prueba al display')
+    updatePatientScreen({
+      type: 'test',
+      message: 'Hola desde control',
+      timestamp: new Date().toISOString()
+    })
   }
 
   if (loading) {
@@ -121,12 +137,20 @@ export default function DualControlPage() {
                 Test: {currentTest === 'coopersmith' ? 'Coopersmith SEI' : currentTest}
               </p>
             </div>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              Salir
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={sendTestMessage}
+                className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-medium transition-colors"
+              >
+                Probar display
+              </button>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Salir
+              </button>
+            </div>
           </div>
         </div>
 

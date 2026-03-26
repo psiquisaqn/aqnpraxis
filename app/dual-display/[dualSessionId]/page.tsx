@@ -10,23 +10,45 @@ export default function DualDisplayPage() {
 
   const [currentDisplay, setCurrentDisplay] = useState<any>(null)
   const [waiting, setWaiting] = useState(true)
+  const [lastMessage, setLastMessage] = useState<string>('')
 
-  // Escuchar comandos del psicólogo
-  useRealtime(dualSessionId, (payload) => {
+  console.log('Display page mounted for session:', dualSessionId)
+
+  const { sendMessage } = useRealtime(dualSessionId, (payload) => {
+    console.log('🔔 MENSAJE RECIBIDO EN DISPLAY:', payload)
+    setLastMessage(JSON.stringify(payload))
+    
     if (payload.type === 'update_display') {
+      console.log('📺 Actualizando display con:', payload.content)
       setCurrentDisplay(payload.content)
       setWaiting(false)
+    } else {
+      console.log('⚠️ Tipo de mensaje no reconocido:', payload.type)
     }
   })
 
   useEffect(() => {
+    console.log('Display: Esperando mensajes...')
+    
     const timer = setTimeout(() => {
+      console.log('Display: Tiempo de espera agotado')
       setWaiting(false)
     }, 10000)
     return () => clearTimeout(timer)
   }, [])
 
-  // Renderizar según tipo de test
+  // Forzar envío de mensaje de prueba al cargar
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log('Display: Enviando mensaje de prueba al control')
+      sendMessage({
+        type: 'display_ready',
+        message: 'Display listo'
+      })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [sendMessage])
+
   const renderDisplay = () => {
     if (!currentDisplay) return null
 
@@ -35,7 +57,6 @@ export default function DualDisplayPage() {
         const progress = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 58)) * 100
         return (
           <div className="text-center">
-            {/* Barra de progreso */}
             <div className="mb-6">
               <div className="flex justify-between text-sm text-gray-500 mb-1">
                 <span>Progreso</span>
@@ -48,7 +69,6 @@ export default function DualDisplayPage() {
                 />
               </div>
             </div>
-
             <div className="text-sm text-gray-400 mb-4">
               Ítem {currentDisplay.item} de {currentDisplay.totalItems || 58}
             </div>
@@ -94,6 +114,11 @@ export default function DualDisplayPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
       <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
+        {/* Estado de conexión */}
+        <div className="text-xs text-center text-gray-400 mb-4">
+          ID: {dualSessionId.slice(0, 8)}... | {lastMessage ? 'Último mensaje' : 'Esperando...'}
+        </div>
+
         {waiting && !currentDisplay ? (
           <div className="text-center">
             <div className="text-5xl mb-4">🔍</div>
