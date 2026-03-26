@@ -98,25 +98,20 @@ export function DashboardShell({ profile, children }: Props) {
           ${isMobile ? 'w-64 shadow-xl' : 'w-64'}
         `}
       >
-        {/* Header con logo y botón cerrar en móvil */}
-        <div className="flex items-center justify-between px-4 border-b border-gray-200 h-[60px]">
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-12 rounded-lg flex items-center justify-center shrink-0 bg-blue-600 overflow-hidden p-1">
-                <img 
-                  src="/isotipopsiquisaqn.png" 
-                  alt="AQN Praxis" 
-                  className="w-full h-auto object-contain"
-                  style={{ mixBlendMode: 'screen' }}
-                />
-              </div>
-              <span className="font-semibold text-xs text-gray-800">AQN Praxis</span>
-            </div>
+        {/* Header con logo - solo la imagen */}
+        <div className="flex items-center justify-between px-4 border-b border-gray-200 py-3">
+          <div className="w-full flex justify-center">
+            <img 
+              src="/isotipoaqnpraxis.png" 
+              alt="AQN Praxis" 
+              className="w-auto h-10 object-contain"
+              style={{ filter: 'brightness(0) saturate(100%) invert(35%) sepia(98%) saturate(748%) hue-rotate(200deg) brightness(95%) contrast(95%)' }}
+            />
           </div>
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(false)}
-              className="p-1 rounded-lg hover:bg-gray-100"
+              className="p-1 rounded-lg hover:bg-gray-100 absolute right-4"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-500">
                 <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
