@@ -46,17 +46,17 @@ export default async function DashboardPage() {
   }).length
 
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
 
-  return (
-    <div className="px-4 py-4 md:px-6 md:py-8 max-w-7xl mx-auto">
-      <div className="mb-4 md:mb-6">
-        <h1 className="text-lg md:text-2xl font-medium mb-2 text-gray-900">
-          {greeting},{' '}
-          <span className="text-blue-600">
-            {profile?.full_name?.split(' ')[0] ?? 'psicólogo/a'}
-          </span>
-        </h1>
+return (
+  <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
+    <div className="mb-6 md:mb-8">
+      <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
+        {greeting},{' '}
+        <span className="text-blue-600">
+          colega
+        </span>
+      </h1>
         <StatsBar
           totalPatients={patients.length}
           activeSessions={activeSessions}
