@@ -10,10 +10,10 @@ interface Props {
 }
 
 const STATUS_COLORS = {
-  completed:   { bg: 'rgba(20,184,166,0.1)',  text: 'var(--teal-700)' },
-  in_progress: { bg: 'rgba(234,179,8,0.12)',   text: '#854d0e' },
-  scheduled:   { bg: 'rgba(99,102,241,0.1)',   text: '#4338ca' },
-  cancelled:   { bg: 'rgba(239,68,68,0.1)',    text: '#991b1b' },
+  completed:   { bg: '#EFF6FF',  text: '#3B82F6' },
+  in_progress: { bg: '#FEF3C7',  text: '#D97706' },
+  scheduled:   { bg: '#EFF6FF',  text: '#3B82F6' },
+  cancelled:   { bg: '#FEE2E2',  text: '#DC2626' },
 }
 
 const GENDER_ICON = {
@@ -28,45 +28,30 @@ export function PatientCard({ patient, onNewSession }: Props) {
   const statusColor = s ? STATUS_COLORS[s.status] : null
 
   return (
-    <div
-      className="group bg-white rounded-2xl border transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 overflow-hidden"
-      style={{ borderColor: 'var(--stone-200)' }}
-    >
+    <div className="group bg-white rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 overflow-hidden">
       {/* Cabecera */}
-      <div className="px-5 pt-5 pb-4">
+      <div className="px-4 pt-4 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             {/* Avatar inicial */}
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-semibold text-sm"
-              style={{
-                background: 'var(--stone-100)',
-                color: 'var(--stone-700)',
-              }}
-            >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-semibold text-sm bg-gray-100 text-gray-700">
               {patient.full_name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <h3
-                className="font-semibold text-sm truncate leading-tight"
-                style={{ color: 'var(--stone-800)' }}
-              >
+              <h3 className="font-semibold text-sm truncate leading-tight text-gray-800">
                 {patient.full_name}
               </h3>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-xs" style={{ color: 'var(--stone-500)' }}>
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <span className="text-xs text-gray-500">
                   {patient.age_years} a {patient.age_months} m
                 </span>
                 {patient.gender && (
-                  <span className="text-xs" style={{ color: 'var(--stone-400)' }}>
+                  <span className="text-xs text-gray-400">
                     · {GENDER_ICON[patient.gender as keyof typeof GENDER_ICON]}
                   </span>
                 )}
                 {patient.school && (
-                  <span
-                    className="text-xs truncate max-w-[100px]"
-                    style={{ color: 'var(--stone-400)' }}
-                  >
+                  <span className="text-xs text-gray-400 truncate max-w-[120px]">
                     · {patient.school}
                   </span>
                 )}
@@ -76,10 +61,7 @@ export function PatientCard({ patient, onNewSession }: Props) {
 
           {/* Contador de sesiones */}
           <div className="shrink-0 text-right">
-            <span
-              className="text-xs font-medium px-2 py-0.5 rounded-full"
-              style={{ background: 'var(--stone-100)', color: 'var(--stone-600)' }}
-            >
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
               {patient.session_count ?? 0} ses.
             </span>
           </div>
@@ -87,15 +69,9 @@ export function PatientCard({ patient, onNewSession }: Props) {
 
         {/* Última sesión */}
         {s ? (
-          <div
-            className="mt-3 flex items-center justify-between rounded-xl px-3 py-2"
-            style={{ background: 'var(--stone-50)', border: '1px solid var(--stone-100)' }}
-          >
-            <div className="flex items-center gap-2">
-              <span
-                className="text-xs font-semibold"
-                style={{ color: 'var(--stone-700)' }}
-              >
+          <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-gray-700">
                 {TEST_LABELS[s.test_id] ?? s.test_id}
               </span>
               {statusColor && (
@@ -110,40 +86,30 @@ export function PatientCard({ patient, onNewSession }: Props) {
             {s.status === 'in_progress' && (
               <Link
                 href={`/session/${s.id}`}
-                className="text-xs font-medium transition-colors"
-                style={{ color: 'var(--teal-600)' }}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
               >
                 Continuar →
               </Link>
             )}
           </div>
         ) : (
-          <p className="mt-3 text-xs" style={{ color: 'var(--stone-400)' }}>
+          <p className="mt-3 text-xs text-gray-400">
             Sin evaluaciones registradas
           </p>
         )}
       </div>
 
       {/* Acciones */}
-      <div
-        className="px-5 py-3 flex items-center gap-2 border-t"
-        style={{ borderColor: 'var(--stone-100)', background: 'var(--stone-50)' }}
-      >
+      <div className="px-4 py-3 flex items-center gap-2 border-t border-gray-100 bg-gray-50">
         <button
           onClick={() => onNewSession(patient.id)}
-          className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-all duration-150 text-white"
-          style={{ background: 'var(--teal-600)' }}
+          className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700"
         >
           + Nueva evaluación
         </button>
         <Link
           href={`/dashboard/paciente/${patient.id}`}
-          className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-all duration-150"
-          style={{
-            color: 'var(--stone-600)',
-            borderColor: 'var(--stone-200)',
-            background: 'white',
-          }}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
         >
           Ver ficha
         </Link>
