@@ -15,6 +15,7 @@ export default function DualControlPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentTest, setCurrentTest] = useState<string>('')
+  const [sessionId, setSessionId] = useState<string>('')
 
   const supabase = createClient()
 
@@ -40,6 +41,7 @@ export default function DualControlPage() {
       } else {
         setSessionData(data)
         setCurrentTest(data.session.test_id)
+        setSessionId(data.session.id)
       }
       setLoading(false)
     }
@@ -133,6 +135,7 @@ export default function DualControlPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <CoopersmithControl
               dualSessionId={dualSessionId}
+              sessionId={sessionId}
               onUpdatePatient={updatePatientScreen}
               onSaveResponse={saveResponse}
             />

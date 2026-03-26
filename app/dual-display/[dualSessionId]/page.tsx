@@ -32,10 +32,25 @@ export default function DualDisplayPage() {
 
     switch (currentDisplay.type) {
       case 'coopersmith':
+        const progress = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 58)) * 100
         return (
           <div className="text-center">
+            {/* Barra de progreso */}
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Progreso</span>
+                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 58}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
             <div className="text-sm text-gray-400 mb-4">
-              Ítem {currentDisplay.item} de 58
+              Ítem {currentDisplay.item} de {currentDisplay.totalItems || 58}
             </div>
             <div className="text-2xl font-medium text-gray-800 mb-6 leading-relaxed">
               {currentDisplay.text}
@@ -55,8 +70,8 @@ export default function DualDisplayPage() {
               ))}
             </div>
             {currentDisplay.selected && (
-              <p className="text-xs text-gray-400 mt-6">
-                ✓ Respuesta registrada
+              <p className="text-xs text-green-600 mt-6 flex items-center justify-center gap-1">
+                <span>✓</span> Respuesta registrada
               </p>
             )}
           </div>

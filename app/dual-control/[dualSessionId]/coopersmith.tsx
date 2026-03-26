@@ -1,20 +1,26 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { COOPERSMITH_ITEMS, type CooperResponse } from '@/lib/coopersmith/engine'
+import { finishEvaluation } from './finish'
 
 interface CoopersmithControlProps {
   dualSessionId: string
+  sessionId: string
   onUpdatePatient: (content: any) => void
   onSaveResponse: (item: number, value: CooperResponse) => void
 }
 
-export function CoopersmithControl({ dualSessionId, onUpdatePatient, onSaveResponse }: CoopersmithControlProps) {
+export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse }: CoopersmithControlProps) {
+  const router = useRouter()
   const [currentItem, setCurrentItem] = useState(1)
   const [responses, setResponses] = useState<Record<number, CooperResponse>>({})
   const [completed, setCompleted] = useState(0)
+  const [finishing, setFinishing] = useState(false)
 
   const currentItemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
+  const allDone = completed === 58
 
   const handleResponse = (value: CooperResponse) => {
     const newResponses = { ...responses, [currentItem]: value }
@@ -28,21 +34,24 @@ export function CoopersmithControl({ dualSessionId, onUpdatePatient, onSaveRespo
       item: currentItem,
       text: currentItemData?.text,
       options: ['Igual que yo', 'No es como yo'],
-      selected: value
+      selected: value,
+      totalCompleted: Object.keys(newResponses).length,
+      totalItems: 58
     })
   }
 
   const goToNext = () => {
     if (currentItem < 58) {
       setCurrentItem(currentItem + 1)
-      // Mostrar siguiente ítem en pantalla del paciente
       const nextItem = COOPERSMITH_ITEMS.find(item => item.num === currentItem + 1)
       onUpdatePatient({
         type: 'coopersmith',
         item: currentItem + 1,
         text: nextItem?.text,
         options: ['Igual que yo', 'No es como yo'],
-        selected: responses[currentItem + 1]
+        selected: responses[currentItem + 1],
+        totalCompleted: completed,
+        totalItems: 58
       })
     }
   }
@@ -56,7 +65,9 @@ export function CoopersmithControl({ dualSessionId, onUpdatePatient, onSaveRespo
         item: currentItem - 1,
         text: prevItem?.text,
         options: ['Igual que yo', 'No es como yo'],
-        selected: responses[currentItem - 1]
+        selected: responses[currentItem - 1],
+        totalCompleted: completed,
+        totalItems: 58
       })
     }
   }
@@ -69,7 +80,20 @@ export function CoopersmithControl({ dualSessionId, onUpdatePatient, onSaveRespo
       item: num,
       text: item?.text,
       options: ['Igual que yo', 'No es como yo'],
-      selected: responses[num]
+      selected: responses[num],
+      totalCompleted: completed,
+      totalItems: 58
+    })
+  }
+
+  const handleFinish = async () => {
+    if (!allDone) return
+    setFinishing(true)
+    await finishEvaluation({
+      dualSessionId,
+      sessionId,
+      responses,
+      router
     })
   }
 
@@ -97,6 +121,11 @@ export function CoopersmithControl({ dualSessionId, onUpdatePatient, onSaveRespo
           <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">
             Ítem {currentItem}/58
           </span>
+          {currentResponse && (
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+              Respondido
+            </span>
+          )}
         </div>
         <p className="text-gray-800 text-base leading-relaxed mb-4">
           {currentItemData?.text}
@@ -142,6 +171,17 @@ export function CoopersmithControl({ dualSessionId, onUpdatePatient, onSaveRespo
           Siguiente →
         </button>
       </div>
+
+      {/* Botón finalizar */}
+      {allDone && (
+        <button
+          onClick={handleFinish}
+          disabled={finishing}
+          className="w-full py-3 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+        >
+          {finishing ? 'Finalizando...' : '✓ Finalizar evaluación'}
+        </button>
+      )}
 
       {/* Índice rápido */}
       <div className="mt-4">
