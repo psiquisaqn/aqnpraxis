@@ -101,11 +101,11 @@ export function DashboardShell({ profile, children }: Props) {
         {/* Header con logo */}
         <div className="flex items-center justify-between px-4 border-b border-gray-200 py-3">
           <div className="w-full flex justify-center">
-           <img 
+          <img 
   src="/isotipoaqnpraxis.png" 
   alt="AQN Praxis" 
   className="w-auto h-10 object-contain"
-  style={{ filter: 'sepia(0.2) hue-rotate(180deg) saturate(1.2)' }}
+  style={{ filter: 'brightness(0.9) sepia(1) hue-rotate(170deg) saturate(3)' }}
 />
           </div>
           {isMobile && (
