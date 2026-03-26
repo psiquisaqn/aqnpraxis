@@ -88,7 +88,7 @@ export function DashboardShell({ profile, children }: Props) {
         </svg>
       </button>
 
-      {/* Sidebar - overlay en móvil, fijo en desktop */}
+      {/* Sidebar */}
       <aside
         className={`
           fixed md:sticky top-0 left-0 h-screen z-40
@@ -98,23 +98,14 @@ export function DashboardShell({ profile, children }: Props) {
           ${isMobile ? 'w-64 shadow-xl' : 'w-64'}
         `}
       >
-        {/* Header con logo - opción 1 */}
+        {/* Header con logo */}
         <div className="flex items-center justify-between px-4 border-b border-gray-200 py-3">
           <div className="w-full flex justify-center">
-            <div className="relative w-auto h-10">
-              <img 
-                src="/isotipoaqnpraxis.png" 
-                alt="AQN Praxis" 
-                className="w-auto h-10 object-contain absolute top-0 left-0"
-                style={{ filter: 'brightness(0) invert(1)' }}
-              />
-              <img 
-                src="/isotipoaqnpraxis.png" 
-                alt="AQN Praxis" 
-                className="w-auto h-10 object-contain relative"
-                style={{ mixBlendMode: 'multiply', filter: 'brightness(0) saturate(100%) invert(35%) sepia(98%) saturate(748%) hue-rotate(200deg)' }}
-              />
-            </div>
+            <img 
+              src="/isotipoaqnpraxis.png" 
+              alt="AQN Praxis" 
+              className="w-auto h-10 object-contain"
+            />
           </div>
           {isMobile && (
             <button
