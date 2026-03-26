@@ -19,7 +19,6 @@ export default function DualControlPage() {
 
   const supabase = createClient()
 
-  // Cargar datos de la sesión dual
   useEffect(() => {
     const loadSession = async () => {
       const { data, error } = await supabase
@@ -49,16 +48,13 @@ export default function DualControlPage() {
     loadSession()
   }, [dualSessionId])
 
-  // Sincronización en tiempo real
   const { sendMessage } = useRealtime(dualSessionId, (payload) => {
     console.log('Mensaje recibido en control:', payload)
     if (payload.type === 'sync_response') {
       console.log('Respuesta recibida:', payload)
     }
     if (payload.type === 'display_ready') {
-      console.log('Display listo, enviando contenido inicial...')
-      // Cuando el display está listo, enviar el ítem actual
-      // Esto se manejará desde el componente CoopersmithControl
+      console.log('Display listo')
     }
   })
 
@@ -71,7 +67,6 @@ export default function DualControlPage() {
   }
 
   const saveResponse = async (item: number, value: string) => {
-    // Guardar respuesta en Supabase
     const { error } = await supabase
       .from('dual_session_tests')
       .upsert({
@@ -90,7 +85,7 @@ export default function DualControlPage() {
     console.log('Enviando mensaje de prueba al display')
     updatePatientScreen({
       type: 'test',
-      message: 'Hola desde control',
+      message: 'Mensaje de prueba',
       timestamp: new Date().toISOString()
     })
   }
@@ -125,7 +120,6 @@ export default function DualControlPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
           <div className="flex items-center justify-between">
             <div>
@@ -154,7 +148,6 @@ export default function DualControlPage() {
           </div>
         </div>
 
-        {/* Controles según el test */}
         {currentTest === 'coopersmith' ? (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <CoopersmithControl
