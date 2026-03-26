@@ -22,6 +22,22 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
   const currentItemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
   const allDone = completed === 58
 
+  // Enviar el primer ítem al cargar
+  useEffect(() => {
+    const firstItem = COOPERSMITH_ITEMS.find(item => item.num === 1)
+    if (firstItem) {
+      onUpdatePatient({
+        type: 'coopersmith',
+        item: 1,
+        text: firstItem.text,
+        options: ['Igual que yo', 'No es como yo'],
+        selected: responses[1],
+        totalCompleted: 0,
+        totalItems: 58
+      })
+    }
+  }, []) // Solo se ejecuta una vez al montar
+
   const handleResponse = (value: CooperResponse) => {
     const newResponses = { ...responses, [currentItem]: value }
     setResponses(newResponses)
