@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/useRealtime'
+import { CoopersmithControl } from './coopersmith'
 
 export default function DualControlPage() {
   const params = useParams()
@@ -49,7 +50,6 @@ export default function DualControlPage() {
   // Sincronización en tiempo real
   const { sendMessage } = useRealtime(dualSessionId, (payload) => {
     if (payload.type === 'sync_response') {
-      // Actualizar respuestas
       console.log('Respuesta recibida:', payload)
     }
   })
@@ -59,6 +59,22 @@ export default function DualControlPage() {
       type: 'update_display',
       content
     })
+  }
+
+  const saveResponse = async (item: number, value: string) => {
+    // Guardar respuesta en Supabase
+    const { error } = await supabase
+      .from('dual_session_tests')
+      .upsert({
+        dual_session_id: dualSessionId,
+        test_id: currentTest,
+        current_item: item,
+        responses: { [item]: value }
+      }, { onConflict: 'dual_session_id' })
+
+    if (error) {
+      console.error('Error saving response:', error)
+    }
   }
 
   if (loading) {
@@ -91,6 +107,7 @@ export default function DualControlPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-2xl mx-auto">
+        {/* Header */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
           <div className="flex items-center justify-between">
             <div>
@@ -99,7 +116,7 @@ export default function DualControlPage() {
                 Paciente: {sessionData.session?.patient?.full_name}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Test: {currentTest} | ID: {dualSessionId}
+                Test: {currentTest === 'coopersmith' ? 'Coopersmith SEI' : currentTest}
               </p>
             </div>
             <button
@@ -111,29 +128,35 @@ export default function DualControlPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-          <div className="text-4xl mb-3">🎮</div>
-          <p className="text-gray-500 mb-4">
-            Evaluación dual - Test {currentTest}
-          </p>
-          
-          <div className="bg-blue-50 rounded-lg p-4 text-left mb-4">
-            <p className="text-sm text-blue-700 font-medium mb-2">Controles:</p>
-            <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
-              <li>Navegación entre ítems</li>
-              <li>Registro de respuestas</li>
-              <li>Sincronización con pantalla del paciente</li>
-              <li>Finalización de la evaluación</li>
-            </ul>
+        {/* Controles según el test */}
+        {currentTest === 'coopersmith' ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <CoopersmithControl
+              dualSessionId={dualSessionId}
+              onUpdatePatient={updatePatientScreen}
+              onSaveResponse={saveResponse}
+            />
           </div>
-
-          <button
-            onClick={() => updatePatientScreen({ message: 'Preparando evaluación...' })}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
-          >
-            Probar sincronización
-          </button>
-        </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+            <div className="text-4xl mb-3">🎮</div>
+            <p className="text-gray-500 mb-4">
+              Evaluación dual - Test {currentTest}
+            </p>
+            <div className="bg-yellow-50 rounded-lg p-4 text-left">
+              <p className="text-sm text-yellow-700">
+                ⚠️ Este test aún no está implementado en modo dual.
+                Próximamente se agregará soporte para {currentTest}.
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+            >
+              Volver al dashboard
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
