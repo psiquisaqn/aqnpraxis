@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { COOPERSMITH_ITEMS, type CooperResponse } from '@/lib/coopersmith/engine'
 import { finishEvaluation } from './finish'
@@ -18,27 +18,58 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
   const [responses, setResponses] = useState<Record<number, CooperResponse>>({})
   const [completed, setCompleted] = useState(0)
   const [finishing, setFinishing] = useState(false)
+  const [displayReady, setDisplayReady] = useState(false)
+  
+  const firstItemSent = useRef(false)
 
   const currentItemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
   const allDone = completed === 58
 
-  // Enviar el primer ítem después de un pequeño retraso para asegurar que la pantalla de display esté lista
+  // Función para enviar el ítem actual al display
+  const sendCurrentItemToDisplay = () => {
+    const itemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
+    if (itemData) {
+      console.log('Enviando ítem al display:', currentItem)
+      onUpdatePatient({
+        type: 'coopersmith',
+        item: currentItem,
+        text: itemData.text,
+        options: ['Igual que yo', 'No es como yo'],
+        selected: responses[currentItem],
+        totalCompleted: completed,
+        totalItems: 58
+      })
+    }
+  }
+
+  // Escuchar mensaje de display listo
+  useEffect(() => {
+    // Escuchar el mensaje de display_ready a través de una función global
+    const handleDisplayReady = () => {
+      console.log('Display listo, enviando ítem inicial...')
+      setDisplayReady(true)
+    }
+    
+    window.addEventListener('display_ready', handleDisplayReady)
+    return () => window.removeEventListener('display_ready', handleDisplayReady)
+  }, [])
+
+  // Enviar ítem cuando display está listo o cuando cambia currentItem
+  useEffect(() => {
+    if (displayReady) {
+      sendCurrentItemToDisplay()
+    }
+  }, [displayReady, currentItem, completed])
+
+  // También enviar después de 2 segundos si no se ha recibido señal de display
   useEffect(() => {
     const timer = setTimeout(() => {
-      const firstItem = COOPERSMITH_ITEMS.find(item => item.num === 1)
-      if (firstItem) {
-        console.log('Enviando primer ítem a display:', firstItem.num)
-        onUpdatePatient({
-          type: 'coopersmith',
-          item: 1,
-          text: firstItem.text,
-          options: ['Igual que yo', 'No es como yo'],
-          selected: responses[1],
-          totalCompleted: 0,
-          totalItems: 58
-        })
+      if (!firstItemSent.current) {
+        console.log('Timeout: enviando ítem inicial automáticamente')
+        sendCurrentItemToDisplay()
+        firstItemSent.current = true
       }
-    }, 1000) // Esperar 1 segundo
+    }, 2000)
     return () => clearTimeout(timer)
   }, [])
 
@@ -48,11 +79,12 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
     setCompleted(Object.keys(newResponses).length)
     onSaveResponse(currentItem, value)
 
-    // Actualizar pantalla del paciente
+    // Actualizar pantalla del paciente con la respuesta seleccionada
+    const itemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
     onUpdatePatient({
       type: 'coopersmith',
       item: currentItem,
-      text: currentItemData?.text,
+      text: itemData?.text,
       options: ['Igual que yo', 'No es como yo'],
       selected: value,
       totalCompleted: Object.keys(newResponses).length,

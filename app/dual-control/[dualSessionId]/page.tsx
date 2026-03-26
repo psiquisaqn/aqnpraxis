@@ -54,7 +54,9 @@ export default function DualControlPage() {
       console.log('Respuesta recibida:', payload)
     }
     if (payload.type === 'display_ready') {
-      console.log('Display listo')
+      console.log('Display listo, enviando evento al componente...')
+      // Disparar evento para que CoopersmithControl envíe el ítem
+      window.dispatchEvent(new CustomEvent('display_ready'))
     }
   })
 
