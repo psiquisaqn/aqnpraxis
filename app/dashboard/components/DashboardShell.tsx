@@ -102,11 +102,11 @@ export function DashboardShell({ profile, children }: Props) {
         <div className="flex items-center justify-between px-4 border-b border-gray-200 h-[60px]">
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-center gap-1">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-blue-600 overflow-hidden">
+              <div className="w-12 rounded-lg flex items-center justify-center shrink-0 bg-blue-600 overflow-hidden p-1">
                 <img 
                   src="/isotipopsiquisaqn.png" 
                   alt="AQN Praxis" 
-                  className="w-full h-full object-cover"
+                  className="w-full h-auto object-contain"
                   style={{ mixBlendMode: 'screen' }}
                 />
               </div>
