@@ -45,19 +45,18 @@ export default async function DashboardPage() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).length
 
-  const now = new Date()
-const hour = now.getHours()
-const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const hour = now.getHours()
+  const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
 
-return (
-  <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
-    <div className="mb-6 md:mb-8">
-      <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
-        {greeting}, colega{' '}
-        <span className="text-blue-600">
-          {profile?.full_name?.split(' ')[0] ?? ''}
-        </span>
-      </h1>
+  return (
+    <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
+          {greeting}, colega{' '}
+          <span className="text-blue-600">
+            {profile?.full_name?.split(' ')[0] ?? ''}
+          </span>
+        </h1>
         <StatsBar
           totalPatients={patients.length}
           activeSessions={activeSessions}
@@ -66,7 +65,7 @@ return (
         />
       </div>
 
-      <div className="mb-4 md:mb-6 flex items-center gap-4">
+      <div className="mb-6 flex items-center gap-4">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
           Pacientes activos
         </h2>
