@@ -11,13 +11,11 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Obtener la URL base desde los headers
   const headersList = headers()
   const host = headersList.get('host') || ''
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
   const baseUrl = `${protocol}://${host}`
 
-  // Obtener pacientes usando la API interna
   const response = await fetch(`${baseUrl}/api/patients?psychologist_id=${user.id}`, {
     cache: 'no-store',
   })
@@ -27,7 +25,6 @@ export default async function DashboardPage() {
     patients = await response.json()
   }
 
-  // Resto del código igual...
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name, plan')
@@ -52,9 +49,9 @@ export default async function DashboardPage() {
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
 
   return (
-    <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
+    <div className="px-4 py-4 md:px-6 md:py-8 max-w-7xl mx-auto">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-lg md:text-2xl font-medium mb-2 text-gray-900">
           {greeting},{' '}
           <span className="text-blue-600">
             {profile?.full_name?.split(' ')[0] ?? 'psicólogo/a'}
@@ -68,7 +65,7 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-4 md:mb-6 flex items-center gap-4">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
           Pacientes activos
         </h2>

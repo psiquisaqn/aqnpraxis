@@ -86,7 +86,7 @@ export function PatientList({ patients: initialPatients }: Props) {
   return (
     <>
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
-        <div className="relative flex-1 max-w-full sm:max-w-sm">
+        <div className="relative flex-1">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
             className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
           >
@@ -103,7 +103,7 @@ export function PatientList({ patients: initialPatients }: Props) {
         </div>
         <button 
           onClick={() => setNewPatientOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shrink-0"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="1.75" strokeLinecap="round"/>
@@ -115,7 +115,7 @@ export function PatientList({ patients: initialPatients }: Props) {
       {filtered.length === 0 ? (
         <EmptyState search={search} onNew={() => setNewPatientOpen(true)} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {filtered.map((p) => (
             <PatientCard key={p.id} patient={p} onNewSession={(id) => setSessionPatientId(id)} />
           ))}
