@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getPatients } from './actions'
 import { PatientList } from './components/PatientList'
 import { StatsBar } from './components/StatsBar'
 
@@ -9,16 +8,53 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  
+  console.log('=== Dashboard Debug ===')
+  console.log('User ID:', user?.id)
+  
   if (!user) redirect('/login')
 
-  const [patients, profileResult, sessionsResult] = await Promise.all([
-    getPatients({ archived: false }),
-    supabase.from('profiles').select('full_name, plan').eq('id', user.id).single(),
-    supabase.from('sessions').select('id, status, created_at').eq('psychologist_id', user.id),
-  ])
+  // Consulta directa de pacientes con manejo de error
+  const { data: patientsData, error: patientsError } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('psychologist_id', user.id)
+    .eq('archived', false)
 
-  const profile = profileResult.data
-  const sessions = sessionsResult.data ?? []
+  if (patientsError) {
+    console.error('Error fetching patients:', patientsError)
+  } else {
+    console.log('Patients found:', patientsData?.length)
+  }
+
+  const patients = patientsData ?? []
+
+  // Consulta de perfil
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('full_name, plan')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError) {
+    console.error('Error fetching profile:', profileError)
+  } else {
+    console.log('Profile found:', profile?.full_name)
+  }
+
+  // Consulta de sesiones
+  const { data: sessionsData, error: sessionsError } = await supabase
+    .from('sessions')
+    .select('id, status, created_at')
+    .eq('psychologist_id', user.id)
+
+  if (sessionsError) {
+    console.error('Error fetching sessions:', sessionsError)
+  } else {
+    console.log('Sessions found:', sessionsData?.length)
+  }
+
+  const sessions = sessionsData ?? []
 
   const activeSessions = sessions.filter((s) => s.status === 'in_progress').length
   const now = new Date()
@@ -27,6 +63,12 @@ export default async function DashboardPage() {
     const d = new Date(s.created_at)
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).length
+
+  console.log('Stats:', {
+    totalPatients: patients.length,
+    activeSessions,
+    completedThisMonth
+  })
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
