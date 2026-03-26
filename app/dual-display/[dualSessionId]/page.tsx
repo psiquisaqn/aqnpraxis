@@ -11,19 +11,19 @@ export default function DualDisplayPage() {
   const [currentDisplay, setCurrentDisplay] = useState<any>(null)
   const [waiting, setWaiting] = useState(true)
   const [lastMessage, setLastMessage] = useState<string>('')
+  const [messageCount, setMessageCount] = useState(0)
 
   console.log('Display page mounted for session:', dualSessionId)
 
   const { sendMessage } = useRealtime(dualSessionId, (payload) => {
-    console.log('🔔 MENSAJE RECIBIDO EN DISPLAY:', payload)
+    console.log('🔔 MENSAJE RECIBIDO:', payload)
     setLastMessage(JSON.stringify(payload))
+    setMessageCount(prev => prev + 1)
     
     if (payload.type === 'update_display') {
       console.log('📺 Actualizando display con:', payload.content)
       setCurrentDisplay(payload.content)
       setWaiting(false)
-    } else {
-      console.log('⚠️ Tipo de mensaje no reconocido:', payload.type)
     }
   })
 
@@ -33,11 +33,11 @@ export default function DualDisplayPage() {
     const timer = setTimeout(() => {
       console.log('Display: Tiempo de espera agotado')
       setWaiting(false)
-    }, 10000)
+    }, 30000)
     return () => clearTimeout(timer)
   }, [])
 
-  // Forzar envío de mensaje de prueba al cargar
+  // Enviar mensaje de que está listo
   useEffect(() => {
     const timer = setTimeout(() => {
       console.log('Display: Enviando mensaje de prueba al control')
@@ -45,7 +45,7 @@ export default function DualDisplayPage() {
         type: 'display_ready',
         message: 'Display listo'
       })
-    }, 500)
+    }, 1000)
     return () => clearTimeout(timer)
   }, [sendMessage])
 
@@ -114,9 +114,14 @@ export default function DualDisplayPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
       <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
-        {/* Estado de conexión */}
-        <div className="text-xs text-center text-gray-400 mb-4">
-          ID: {dualSessionId.slice(0, 8)}... | {lastMessage ? 'Último mensaje' : 'Esperando...'}
+        {/* Panel de debug visible */}
+        <div className="mb-4 p-2 bg-gray-100 rounded-lg text-xs">
+          <div className="font-mono">
+            <div>🔌 ID: {dualSessionId.slice(0, 8)}...</div>
+            <div>📨 Mensajes: {messageCount}</div>
+            <div>📦 Último: {lastMessage.slice(0, 50) || 'ninguno'}</div>
+            <div>⏳ Estado: {waiting ? 'Esperando...' : 'Conectado'}</div>
+          </div>
         </div>
 
         {waiting && !currentDisplay ? (
