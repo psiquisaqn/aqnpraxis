@@ -98,15 +98,24 @@ export function DashboardShell({ profile, children }: Props) {
           ${isMobile ? 'w-64 shadow-xl' : 'w-64'}
         `}
       >
-        {/* Header con logo */}
+        {/* Header con logo - máscara */}
         <div className="flex items-center justify-between px-4 border-b border-gray-200 py-3">
           <div className="w-full flex justify-center">
-<img 
-  src="/isotipoaqnpraxis.png" 
-  alt="AQN Praxis" 
-  className="w-auto h-10 object-contain"
-  style={{ filter: 'brightness(0) saturate(100%) invert(35%) sepia(98%) saturate(748%) hue-rotate(200deg) brightness(95%) contrast(95%)' }}
-/>
+            <div 
+              className="w-auto h-10"
+              style={{ 
+                background: 'white',
+                maskImage: `url(/isotipoaqnpraxis.png)`,
+                maskSize: 'contain',
+                maskRepeat: 'no-repeat',
+                maskPosition: 'center',
+                WebkitMaskImage: `url(/isotipoaqnpraxis.png)`,
+                WebkitMaskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                backgroundColor: '#3B82F6'
+              }}
+            />
           </div>
           {isMobile && (
             <button
