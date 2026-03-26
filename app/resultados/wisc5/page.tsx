@@ -109,6 +109,16 @@ function formatDate(iso?: string) {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
+function getCITColor(score: number): string {
+  if (score >= 130) return '#1E40AF'      // Muy superior
+  if (score >= 120) return '#2563EB'      // Superior
+  if (score >= 110) return '#3B82F6'      // Promedio alto
+  if (score >= 90)  return '#10B981'      // Promedio
+  if (score >= 80)  return '#F59E0B'      // Promedio bajo
+  if (score >= 70)  return '#F97316'      // Limítrofe
+  return '#EF4444'                         // Extremadamente bajo
+}
+
 function ReportPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -133,10 +143,10 @@ function ReportPageInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--teal-500)', borderTopColor: 'transparent' }} />
-          <p className="text-sm" style={{ color: 'var(--stone-500)' }}>Cargando resultados…</p>
+          <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin border-blue-500" />
+          <p className="text-sm text-gray-500">Cargando resultados…</p>
         </div>
       </div>
     )
@@ -144,10 +154,12 @@ function ReportPageInner() {
 
   if (error || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <p className="text-sm font-medium" style={{ color: 'var(--stone-700)' }}>No se pudo cargar la sesión</p>
-          <button onClick={() => router.back()} className="mt-3 text-sm" style={{ color: 'var(--teal-600)' }}>← Volver</button>
+          <p className="text-sm font-medium text-gray-700">No se pudo cargar la sesión</p>
+          <button onClick={() => router.back()} className="mt-3 text-sm text-blue-600 hover:text-blue-700">
+            ← Volver
+          </button>
         </div>
       </div>
     )
@@ -156,8 +168,8 @@ function ReportPageInner() {
   const db = session.wisc5_scores
   if (!db) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
-        <p className="text-sm" style={{ color: 'var(--stone-500)' }}>Esta sesión no tiene puntajes registrados.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Esta sesión no tiene puntajes registrados.</p>
       </div>
     )
   }
@@ -177,16 +189,12 @@ function ReportPageInner() {
   const patient = session.patient
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--stone-100)' }}>
+    <div className="min-h-screen bg-gray-50">
       {/* Toolbar fijo */}
-      <div
-        className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3"
-        style={{ background: 'white', borderColor: 'var(--stone-200)' }}
-      >
+      <div className="sticky top-0 z-20 border-b px-4 py-3 flex items-center gap-3 bg-white border-gray-200">
         <button
-          onClick={() => router.push('/dashboard')}
-          className="flex items-center gap-1.5 text-sm transition-colors"
-          style={{ color: 'var(--stone-500)' }}
+          onClick={() => router.push(`/dashboard/paciente/${patient.id}`)}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -196,14 +204,13 @@ function ReportPageInner() {
 
         <div className="flex-1" />
 
-        <span className="text-xs" style={{ color: 'var(--stone-400)' }}>
+        <span className="text-xs text-gray-400">
           WISC-V · {session.age_group}
         </span>
 
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition-all"
-          style={{ color: 'var(--stone-600)', borderColor: 'var(--stone-200)', background: 'white' }}
+          className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
         >
           Imprimir
         </button>
@@ -221,33 +228,24 @@ function ReportPageInner() {
       </div>
 
       {/* Contenido principal */}
-      <div ref={printRef} className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+      <div ref={printRef} className="max-w-4xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6">
 
         {/* Encabezado del informe */}
-        <div
-          className="rounded-2xl border p-6"
-          style={{ background: 'white', borderColor: 'var(--stone-200)' }}
-        >
-          <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="rounded-xl border border-gray-200 bg-white p-5 md:p-6">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4 flex-wrap">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span
-                  className="text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded"
-                  style={{ background: 'var(--teal-50)', color: 'var(--teal-700)' }}
-                >
+                <span className="text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded bg-blue-50 text-blue-600">
                   WISC-V Chile
                 </span>
-                <span className="text-xs" style={{ color: 'var(--stone-400)' }}>
+                <span className="text-xs text-gray-400">
                   {session.age_group}
                 </span>
               </div>
-              <h1
-                className="text-2xl font-medium"
-                style={{ fontFamily: 'var(--font-serif)', color: 'var(--stone-900)' }}
-              >
+              <h1 className="text-xl md:text-2xl font-medium text-gray-900">
                 {patient.full_name}
               </h1>
-              <div className="flex flex-wrap gap-4 mt-2 text-sm" style={{ color: 'var(--stone-500)' }}>
+              <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
                 <span>{session.age_years} años {session.age_months} meses {session.age_days} días</span>
                 {patient.gender && <span>· {GENDER_LABEL[patient.gender] ?? patient.gender}</span>}
                 {patient.school && <span>· {patient.school}</span>}
@@ -255,15 +253,15 @@ function ReportPageInner() {
                 {patient.rut    && <span>· RUT: {patient.rut}</span>}
               </div>
             </div>
-            <div className="text-right text-sm" style={{ color: 'var(--stone-400)' }}>
+            <div className="text-right text-sm text-gray-400">
               <div>Fecha de evaluación</div>
-              <div className="font-medium" style={{ color: 'var(--stone-700)' }}>
+              <div className="font-medium text-gray-700">
                 {formatDate(session.started_at)}
               </div>
               {session.completed_at && (
                 <>
                   <div className="mt-1">Fecha de término</div>
-                  <div className="font-medium" style={{ color: 'var(--stone-700)' }}>
+                  <div className="font-medium text-gray-700">
                     {formatDate(session.completed_at)}
                   </div>
                 </>
@@ -273,52 +271,62 @@ function ReportPageInner() {
 
           {/* CIT destacado */}
           {scoring.CIT && (
-            <div
-              className="mt-5 px-5 py-4 rounded-xl flex items-center gap-6"
-              style={{ background: 'var(--stone-50)', border: '1px solid var(--stone-100)' }}
-            >
-              <div>
-                <p className="text-xs font-medium uppercase tracking-widest mb-0.5" style={{ color: 'var(--stone-400)' }}>
-                  Cociente Intelectual Total
-                </p>
-                <div className="flex items-baseline gap-3">
-                  <span
-                    className="text-5xl font-bold"
-                    style={{
-                      fontFamily: 'var(--font-serif)',
-                      color: scoring.CIT.score >= 110 ? '#1d4ed8' : scoring.CIT.score >= 90 ? '#1c1917' : scoring.CIT.score >= 80 ? '#92400e' : '#991b1b',
-                    }}
-                  >
-                    {scoring.CIT.score}
-                  </span>
-                  <div>
-                    <div className="text-sm font-semibold" style={{ color: 'var(--stone-700)' }}>
-                      {scoring.CIT.classification}
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--stone-400)' }}>
-                      Percentil {scoring.CIT.percentile}
+            <div className="mt-5 px-5 py-4 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest mb-0.5 text-gray-400">
+                    Cociente Intelectual Total
+                  </p>
+                  <div className="flex items-baseline gap-3">
+                    <span
+                      className="text-5xl font-bold"
+                      style={{
+                        fontFamily: 'var(--font-serif)',
+                        color: getCITColor(scoring.CIT.score),
+                      }}
+                    >
+                      {scoring.CIT.score}
+                    </span>
+                    <div>
+                      <div className="text-sm font-semibold" style={{ color: getCITColor(scoring.CIT.score) }}>
+                        {scoring.CIT.classification}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Percentil {scoring.CIT.percentile}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="text-sm" style={{ color: 'var(--stone-500)' }}>
-                IC 90%: {scoring.CIT.ci90[0]}–{scoring.CIT.ci90[1]}
+                <div className="flex-1">
+                  <div className="h-2 rounded-full overflow-hidden bg-gray-200">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${(scoring.CIT.score / 160) * 100}%`, background: getCITColor(scoring.CIT.score) }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                    <span>40</span><span>70</span><span>85</span><span>100</span><span>115</span><span>130</span><span>160</span>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-500">
+                  IC 90%: {scoring.CIT.ci90[0]}–{scoring.CIT.ci90[1]}
+                </div>
               </div>
             </div>
           )}
         </div>
 
         {/* Perfil de índices */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-          <h2 className="text-sm font-semibold mb-5 uppercase tracking-widest" style={{ color: 'var(--stone-400)' }}>
+        <div className="rounded-xl border border-gray-200 bg-white p-5 md:p-6">
+          <h2 className="text-sm font-semibold mb-5 uppercase tracking-widest text-gray-400">
             Perfil de índices
           </h2>
           <IndexProfile indices={INDICES} cit={scoring.CIT} />
         </div>
 
         {/* Tabla de índices */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-          <h2 className="text-sm font-semibold mb-5 uppercase tracking-widest" style={{ color: 'var(--stone-400)' }}>
+        <div className="rounded-xl border border-gray-200 bg-white p-5 md:p-6">
+          <h2 className="text-sm font-semibold mb-5 uppercase tracking-widest text-gray-400">
             Puntajes compuestos
           </h2>
           <IndicesTable rows={[
@@ -328,8 +336,8 @@ function ReportPageInner() {
         </div>
 
         {/* Tabla de subpruebas */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
-          <h2 className="text-sm font-semibold mb-5 uppercase tracking-widest" style={{ color: 'var(--stone-400)' }}>
+        <div className="rounded-xl border border-gray-200 bg-white p-5 md:p-6">
+          <h2 className="text-sm font-semibold mb-5 uppercase tracking-widest text-gray-400">
             Puntajes por subprueba
           </h2>
           <ScoresTable rawScores={rawScores} scaledScores={scaledScores} />
@@ -337,12 +345,12 @@ function ReportPageInner() {
 
         {/* Footer */}
         <div className="text-center py-4">
-          <p className="text-xs" style={{ color: 'var(--stone-400)' }}>
+          <p className="text-xs text-gray-400">
             Generado por AQN Praxis · Psiquis AQN · Santiago, Chile
             <span className="mx-2">·</span>
             {new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}
           </p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--stone-300)' }}>
+          <p className="text-xs mt-0.5 text-gray-300">
             Normas: Manual WISC-V CL, Ricardo Rosas D. & Marcelo Pizarro M. · CEDETi UC / PUC Chile
           </p>
         </div>
