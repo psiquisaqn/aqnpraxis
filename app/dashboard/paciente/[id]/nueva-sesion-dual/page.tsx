@@ -64,7 +64,13 @@ export default function NewDualSessionPage() {
     setCreating(true)
     setError(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    console.log('=== INICIANDO CREACIÓN DE SESIÓN DUAL ===')
+    
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    console.log('1. User:', user?.id)
+    console.log('1a. User error:', userError)
+    
     if (!user) {
       setError('Usuario no autenticado')
       setCreating(false)
@@ -72,6 +78,13 @@ export default function NewDualSessionPage() {
     }
 
     // Crear sesión normal
+    console.log('2. Creando sesión normal con datos:', {
+      patient_id: patientId,
+      psychologist_id: user.id,
+      test_id: selectedTest,
+      status: 'in_progress'
+    })
+    
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert({
@@ -83,14 +96,24 @@ export default function NewDualSessionPage() {
       .select()
       .single()
 
+    console.log('3. Resultado sesión normal:', { session, sessionError })
+
     if (sessionError) {
       console.error('Error creating session:', sessionError)
-      setError('Error al crear la sesión')
+      setError(`Error al crear la sesión: ${sessionError.message}`)
       setCreating(false)
       return
     }
 
     // Crear sesión dual
+    console.log('4. Creando sesión dual con datos:', {
+      session_id: session.id,
+      psychologist_id: user.id,
+      screen1_device_id: screen1Device,
+      screen2_device_id: screen2Device,
+      is_active: true
+    })
+    
     const { data: dualSession, error: dualError } = await supabase
       .from('dual_sessions')
       .insert({
@@ -103,13 +126,18 @@ export default function NewDualSessionPage() {
       .select()
       .single()
 
+    console.log('5. Resultado sesión dual:', { dualSession, dualError })
+
     if (dualError) {
       console.error('Error creating dual session:', dualError)
-      setError('Error al configurar la sesión dual')
+      setError(`Error al configurar la sesión dual: ${dualError.message}`)
       setCreating(false)
       return
     }
 
+    console.log('=== SESIÓN DUAL CREADA EXITOSAMENTE ===')
+    console.log('Redirigiendo a:', `/dual-control/${dualSession.id}`)
+    
     // Redirigir al control dual
     router.push(`/dual-control/${dualSession.id}`)
   }
