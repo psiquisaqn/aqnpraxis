@@ -46,16 +46,10 @@ export default async function DashboardPage() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).length
 
-  // Obtener nombre (primero y segundo nombre)
-  const fullName = profile?.full_name ?? ''
-  const firstName = fullName.split(' ')[0] || ''
-  const secondName = fullName.split(' ')[1] || ''
-  const displayName = firstName && secondName ? `${firstName} ${secondName}` : firstName || user?.email?.split('@')[0] || 'psicólogo'
-
   return (
     <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
       <div className="mb-6 md:mb-8">
-        <Greeting userName={displayName.toUpperCase()} />
+        <Greeting />
         <StatsBar
           totalPatients={patients.length}
           activeSessions={activeSessions}

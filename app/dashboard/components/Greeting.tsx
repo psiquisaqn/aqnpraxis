@@ -2,11 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-interface GreetingProps {
-  userName: string
-}
-
-export function Greeting({ userName }: GreetingProps) {
+export function Greeting() {
   const [greeting, setGreeting] = useState('')
 
   useEffect(() => {
@@ -17,10 +13,7 @@ export function Greeting({ userName }: GreetingProps) {
 
   return (
     <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
-      {greeting}, colega{' '}
-      <span className="text-blue-600">
-        {userName}
-      </span>
+      {greeting}, colega
     </h1>
   )
 }
