@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 interface Device {
   id: string
@@ -20,8 +19,6 @@ export default function DevicesPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
-
   const detectCurrentDevice = () => {
     const userAgent = navigator.userAgent
     if (/(tablet|ipad|playbook|silk)|(android(?!.*mobile))/i.test(userAgent)) {
@@ -36,25 +33,19 @@ export default function DevicesPage() {
     setLoading(true)
     setError(null)
     
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setLoading(false)
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('devices')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('last_seen', { ascending: false })
-
-    if (error) {
-      console.error('Error loading devices:', error)
+    try {
+      const res = await fetch('/api/devices')
+      if (!res.ok) {
+        throw new Error('Error al cargar dispositivos')
+      }
+      const data = await res.json()
+      setDevices(data)
+    } catch (err) {
+      console.error(err)
       setError('Error al cargar dispositivos')
-    } else {
-      setDevices(data || [])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -72,61 +63,58 @@ export default function DevicesPage() {
     setSaving(true)
     setError(null)
     
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setError('Usuario no autenticado')
-      setSaving(false)
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('devices')
-      .insert({
-        user_id: user.id,
-        device_name: deviceName.trim(),
-        device_type: deviceType,
-        device_brand: navigator.platform || 'desconocido',
-        last_seen: new Date().toISOString()
+    try {
+      const res = await fetch('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_name: deviceName.trim(),
+          device_type: deviceType,
+          device_brand: navigator.platform || 'desconocido'
+        })
       })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error adding device:', error)
-      setError('Error al registrar dispositivo')
-    } else if (data) {
+      
+      if (!res.ok) {
+        throw new Error('Error al registrar dispositivo')
+      }
+      
+      const data = await res.json()
       setDevices([data, ...devices])
       setDeviceName('')
-      // Resetear al tipo detectado
       const type = detectCurrentDevice()
       setDeviceType(type)
       setDeviceName(`${navigator.platform || 'dispositivo'} - ${type}`)
+    } catch (err) {
+      console.error(err)
+      setError('Error al registrar dispositivo')
+    } finally {
+      setSaving(false)
     }
-    
-    setSaving(false)
   }
 
   const removeDevice = async (deviceId: string) => {
     setError(null)
     
-    const { error } = await supabase
-      .from('devices')
-      .delete()
-      .eq('id', deviceId)
-
-    if (error) {
-      console.error('Error removing device:', error)
-      setError('Error al eliminar dispositivo')
-    } else {
+    try {
+      const res = await fetch(`/api/devices?id=${deviceId}`, { method: 'DELETE' })
+      
+      if (!res.ok) {
+        throw new Error('Error al eliminar dispositivo')
+      }
+      
       setDevices(devices.filter(d => d.id !== deviceId))
+    } catch (err) {
+      console.error(err)
+      setError('Error al eliminar dispositivo')
     }
   }
 
   const updateLastSeen = async (deviceId: string) => {
-    await supabase
-      .from('devices')
-      .update({ last_seen: new Date().toISOString() })
-      .eq('id', deviceId)
+    try {
+      await fetch(`/api/devices/lastseen?id=${deviceId}`, { method: 'PUT' })
+    } catch (err) {
+      // Silencioso, no es crítico
+    }
   }
 
   if (loading) {
