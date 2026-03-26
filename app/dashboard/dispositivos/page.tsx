@@ -9,6 +9,7 @@ interface Device {
   device_type: string
   device_brand: string
   last_seen: string
+  created_at: string
 }
 
 export default function DevicesPage() {
@@ -16,6 +17,8 @@ export default function DevicesPage() {
   const [deviceName, setDeviceName] = useState('')
   const [deviceType, setDeviceType] = useState('laptop')
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -29,21 +32,32 @@ export default function DevicesPage() {
     return 'laptop'
   }
 
-  useEffect(() => {
-    const loadDevices = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data } = await supabase
-        .from('devices')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('last_seen', { ascending: false })
-
-      if (data) setDevices(data)
+  const loadDevices = async () => {
+    setLoading(true)
+    setError(null)
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       setLoading(false)
+      return
     }
 
+    const { data, error } = await supabase
+      .from('devices')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('last_seen', { ascending: false })
+
+    if (error) {
+      console.error('Error loading devices:', error)
+      setError('Error al cargar dispositivos')
+    } else {
+      setDevices(data || [])
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
     loadDevices()
     
     // Sugerir nombre basado en dispositivo actual
@@ -53,29 +67,66 @@ export default function DevicesPage() {
   }, [])
 
   const addDevice = async () => {
+    if (!deviceName.trim()) return
+    
+    setSaving(true)
+    setError(null)
+    
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || !deviceName) return
+    if (!user) {
+      setError('Usuario no autenticado')
+      setSaving(false)
+      return
+    }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('devices')
       .insert({
         user_id: user.id,
-        device_name: deviceName,
+        device_name: deviceName.trim(),
         device_type: deviceType,
-        device_brand: navigator.platform || 'desconocido'
+        device_brand: navigator.platform || 'desconocido',
+        last_seen: new Date().toISOString()
       })
       .select()
       .single()
 
-    if (data) {
+    if (error) {
+      console.error('Error adding device:', error)
+      setError('Error al registrar dispositivo')
+    } else if (data) {
       setDevices([data, ...devices])
       setDeviceName('')
+      // Resetear al tipo detectado
+      const type = detectCurrentDevice()
+      setDeviceType(type)
+      setDeviceName(`${navigator.platform || 'dispositivo'} - ${type}`)
     }
+    
+    setSaving(false)
   }
 
   const removeDevice = async (deviceId: string) => {
-    await supabase.from('devices').delete().eq('id', deviceId)
-    setDevices(devices.filter(d => d.id !== deviceId))
+    setError(null)
+    
+    const { error } = await supabase
+      .from('devices')
+      .delete()
+      .eq('id', deviceId)
+
+    if (error) {
+      console.error('Error removing device:', error)
+      setError('Error al eliminar dispositivo')
+    } else {
+      setDevices(devices.filter(d => d.id !== deviceId))
+    }
+  }
+
+  const updateLastSeen = async (deviceId: string) => {
+    await supabase
+      .from('devices')
+      .update({ last_seen: new Date().toISOString() })
+      .eq('id', deviceId)
   }
 
   if (loading) {
@@ -91,7 +142,14 @@ export default function DevicesPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-semibold text-gray-800 mb-6">Mis dispositivos</h1>
+      <h1 className="text-2xl font-semibold text-gray-800 mb-2">Mis dispositivos</h1>
+      <p className="text-gray-500 mb-6">Registra los dispositivos que usas para evaluaciones duales</p>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
@@ -100,7 +158,7 @@ export default function DevicesPage() {
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
-            placeholder="Nombre del dispositivo (ej: iPad de consultorio)"
+            placeholder="Nombre del dispositivo (ej: iPad consultorio)"
             value={deviceName}
             onChange={(e) => setDeviceName(e.target.value)}
             className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -117,9 +175,10 @@ export default function DevicesPage() {
           </select>
           <button
             onClick={addDevice}
-            className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
+            disabled={!deviceName.trim() || saving}
+            className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Registrar
+            {saving ? 'Registrando...' : 'Registrar'}
           </button>
         </div>
         <p className="text-xs text-gray-400 mt-2">
@@ -131,7 +190,8 @@ export default function DevicesPage() {
         {devices.map((device) => (
           <div
             key={device.id}
-            className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between"
+            className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between hover:shadow-sm transition-shadow"
+            onMouseEnter={() => updateLastSeen(device.id)}
           >
             <div>
               <div className="flex items-center gap-2">
@@ -143,10 +203,13 @@ export default function DevicesPage() {
               <p className="text-xs text-gray-400 mt-1">
                 {device.device_brand} · Último uso: {new Date(device.last_seen).toLocaleString()}
               </p>
+              <p className="text-xs text-gray-300 mt-0.5">
+                Registrado: {new Date(device.created_at).toLocaleDateString()}
+              </p>
             </div>
             <button
               onClick={() => removeDevice(device.id)}
-              className="text-red-500 hover:text-red-700 text-sm"
+              className="text-red-500 hover:text-red-700 text-sm px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
             >
               Eliminar
             </button>
@@ -158,7 +221,7 @@ export default function DevicesPage() {
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
           <div className="text-4xl mb-3">📱</div>
           <p className="text-gray-400">No tienes dispositivos registrados</p>
-          <p className="text-xs text-gray-300 mt-1">Registra tu primer dispositivo para comenzar</p>
+          <p className="text-xs text-gray-300 mt-1">Registra tu primer dispositivo para usar evaluación dual</p>
         </div>
       )}
     </div>
