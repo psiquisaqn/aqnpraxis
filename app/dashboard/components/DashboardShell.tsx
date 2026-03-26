@@ -64,14 +64,13 @@ export function DashboardShell({ profile, children }: Props) {
     .toUpperCase() ?? '?'
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--stone-100)' }}>
-      {/* Sidebar */}
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar - ahora con fondo blanco y borde gris */}
       <aside
-        className="flex flex-col sticky top-0 h-screen shrink-0 transition-all duration-200 border-r"
+        className="flex flex-col sticky top-0 h-screen shrink-0 transition-all duration-200 border-r bg-white"
         style={{
-          width: collapsed ? '64px' : '220px',
-          background: 'var(--stone-900)',
-          borderColor: 'rgba(255,255,255,0.06)',
+          width: collapsed ? '64px' : '240px',
+          borderColor: '#E5E7EB',
         }}
       >
         {/* Logo */}
@@ -79,13 +78,12 @@ export function DashboardShell({ profile, children }: Props) {
           className="flex items-center gap-3 px-4 border-b"
           style={{
             height: '60px',
-            borderColor: 'rgba(255,255,255,0.06)',
+            borderColor: '#E5E7EB',
             overflow: 'hidden',
           }}
         >
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: 'var(--teal-600)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-600"
           >
             <svg width="16" height="16" viewBox="0 0 22 22" fill="none">
               <circle cx="11" cy="11" r="2" fill="white"/>
@@ -93,10 +91,7 @@ export function DashboardShell({ profile, children }: Props) {
             </svg>
           </div>
           {!collapsed && (
-            <span
-              className="font-semibold text-sm text-white truncate"
-              style={{ fontFamily: 'var(--font-sans)' }}
-            >
+            <span className="font-semibold text-sm text-gray-800 truncate">
               AQN Praxis
             </span>
           )}
@@ -112,8 +107,8 @@ export function DashboardShell({ profile, children }: Props) {
                 href={item.href}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
                 style={{
-                  color: active ? 'white' : 'rgba(255,255,255,0.5)',
-                  background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  color: active ? '#3B82F6' : '#6B7280',
+                  background: active ? '#EFF6FF' : 'transparent',
                   overflow: 'hidden',
                   whiteSpace: 'nowrap',
                 }}
@@ -126,23 +121,19 @@ export function DashboardShell({ profile, children }: Props) {
         </nav>
 
         {/* Perfil + logout */}
-        <div
-          className="border-t p-3"
-          style={{ borderColor: 'rgba(255,255,255,0.06)' }}
-        >
+        <div className="border-t p-3" style={{ borderColor: '#E5E7EB' }}>
           <div className="flex items-center gap-3 px-2 py-2 overflow-hidden">
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
-              style={{ background: 'var(--teal-700)' }}
+              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white bg-blue-600"
             >
               {initials}
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-white truncate">
+                <p className="text-xs font-medium text-gray-800 truncate">
                   {profile?.full_name}
                 </p>
-                <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                <p className="text-xs text-gray-400 truncate">
                   {profile?.plan === 'free' ? 'Plan gratuito' : `Plan ${profile?.plan}`}
                 </p>
               </div>
@@ -152,8 +143,8 @@ export function DashboardShell({ profile, children }: Props) {
           <form action={logout} className="mt-1">
             <button
               type="submit"
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm transition-all duration-150"
-              style={{ color: 'rgba(255,255,255,0.4)', overflow: 'hidden', whiteSpace: 'nowrap' }}
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-all duration-150"
+              style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
                 <path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M10.5 11l3-3-3-3M13.5 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -166,11 +157,10 @@ export function DashboardShell({ profile, children }: Props) {
         {/* Toggle collapse */}
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="absolute -right-3 top-[72px] w-6 h-6 rounded-full border flex items-center justify-center"
+          className="absolute -right-3 top-[72px] w-6 h-6 rounded-full border flex items-center justify-center bg-white shadow-sm"
           style={{
-            background: 'var(--stone-900)',
-            borderColor: 'rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.5)',
+            borderColor: '#E5E7EB',
+            color: '#6B7280',
           }}
         >
           <svg
@@ -186,7 +176,7 @@ export function DashboardShell({ profile, children }: Props) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 overflow-auto">
+      <main className="flex-1 min-w-0 overflow-auto bg-gray-50">
         {children}
       </main>
     </div>
