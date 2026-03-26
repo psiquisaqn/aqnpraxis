@@ -47,6 +47,7 @@ export default async function DashboardPage() {
 
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const userName = profile?.full_name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'psicólogo'
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
         <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
           {greeting}, colega{' '}
           <span className="text-blue-600">
-            {profile?.full_name?.split(' ')[0] ?? ''}
+            {userName}
           </span>
         </h1>
         <StatsBar
