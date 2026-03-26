@@ -32,14 +32,11 @@ export default async function DashboardPage() {
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
 
   return (
-    <div className="px-8 py-8 max-w-6xl">
-      <div className="mb-8">
-        <h1
-          className="text-2xl font-medium mb-4"
-          style={{ fontFamily: 'var(--font-serif)', color: 'var(--stone-900)' }}
-        >
+    <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
           {greeting},{' '}
-          <span style={{ color: 'var(--teal-700)' }}>
+          <span className="text-blue-600">
             {profile?.full_name?.split(' ')[0] ?? 'psicólogo/a'}
           </span>
         </h1>
@@ -52,13 +49,10 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mb-6 flex items-center gap-4">
-        <h2
-          className="text-sm font-semibold uppercase tracking-widest shrink-0"
-          style={{ color: 'var(--stone-400)' }}
-        >
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
           Pacientes activos
         </h2>
-        <div className="flex-1 h-px" style={{ background: 'var(--stone-200)' }} />
+        <div className="flex-1 h-px bg-gray-200" />
       </div>
 
       <PatientList patients={patients} />
