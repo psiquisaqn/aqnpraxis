@@ -105,7 +105,7 @@ export function DashboardShell({ profile, children }: Props) {
   src="/isotipoaqnpraxis.png" 
   alt="AQN Praxis" 
   className="w-auto h-10 object-contain"
-  style={{ filter: 'brightness(0.5) sepia(1) hue-rotate(170deg) saturate(5) brightness(1.2)' }}
+  style={{ filter: 'brightness(0) saturate(100%) invert(35%) sepia(98%) saturate(748%) hue-rotate(200deg) brightness(95%) contrast(95%)' }}
 />
           </div>
           {isMobile && (
