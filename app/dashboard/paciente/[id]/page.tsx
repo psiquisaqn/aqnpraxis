@@ -1,4 +1,5 @@
 import { PatientDetailClient } from './PatientDetailClient'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,8 +11,8 @@ export default async function PatientPage({ params }: Props) {
   const { id } = await params
   return (
     <div>
-      <div className="flex justify-end px-4 pt-4">
-        <a
+      <div className="flex justify-end gap-3 px-4 pt-4">
+        <Link
           href={`/dashboard/paciente/${id}/nueva-sesion-dual`}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
         >
@@ -21,7 +22,7 @@ export default async function PatientPage({ params }: Props) {
             <circle cx="8" cy="9" r="1" fill="white"/>
           </svg>
           Evaluación dual
-        </a>
+        </Link>
       </div>
       <PatientDetailClient patientId={id} />
     </div>

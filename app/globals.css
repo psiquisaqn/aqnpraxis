@@ -1,85 +1,26 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --primary: #3B82F6;
-  --primary-hover: #2563EB;
-  --primary-light: #EFF6FF;
-  --secondary: #6B7280;
-  --background: #FFFFFF;
-  --surface: #F9FAFB;
-  --border: #E5E7EB;
-  --text-primary: #111827;
-  --text-secondary: #6B7280;
-  --success: #10B981;
-  --warning: #F59E0B;
-  --error: #EF4444;
+/* Asegurar visibilidad de botones */
+button, 
+a[role="button"],
+[class*="btn"],
+[class*="button"] {
+  cursor: pointer;
 }
 
-body {
-  background: var(--background);
-  color: var(--text-primary);
-  font-family: system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-}
-
-/* Botón primario */
-.btn-primary {
-  background: var(--primary);
-  color: white;
+/* Mejorar contraste en hover */
+button:hover,
+a:hover {
   transition: all 0.2s ease;
 }
-.btn-primary:hover {
-  background: var(--primary-hover);
+
+/* Asegurar que los botones con fondo oscuro tengan texto visible */
+.bg-blue-600,
+.bg-blue-700,
+.bg-green-600,
+.bg-red-600 {
+  color: white !important;
 }
 
-/* Botón secundario */
-.btn-secondary {
-  background: white;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  transition: all 0.2s ease;
-}
-.btn-secondary:hover {
-  background: var(--surface);
-}
-
-/* Tarjetas */
-.card {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-}
-
-/* Animaciones */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-/* Transiciones */
-.transition-smooth {
-  transition: all 0.2s ease-in-out;
-}
-
-/* Scrollbar personalizada (opcional) */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--surface);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--secondary);
+/* Botones secundarios */
+.bg-gray-100 {
+  color: #374151 !important;
 }

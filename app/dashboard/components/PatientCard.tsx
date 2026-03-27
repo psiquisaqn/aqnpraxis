@@ -33,7 +33,6 @@ export function PatientCard({ patient, onNewSession }: Props) {
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Avatar inicial */}
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-semibold text-sm bg-gray-100 text-gray-700">
               {patient.full_name.charAt(0).toUpperCase()}
             </div>
@@ -59,7 +58,6 @@ export function PatientCard({ patient, onNewSession }: Props) {
             </div>
           </div>
 
-          {/* Contador de sesiones */}
           <div className="shrink-0 text-right">
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
               {patient.session_count ?? 0} ses.
@@ -100,13 +98,19 @@ export function PatientCard({ patient, onNewSession }: Props) {
       </div>
 
       {/* Acciones */}
-      <div className="px-4 py-3 flex items-center gap-2 border-t border-gray-100 bg-gray-50">
+      <div className="px-4 py-3 flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50">
         <button
           onClick={() => onNewSession(patient.id)}
           className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700"
         >
           + Nueva evaluación
         </button>
+        <Link
+          href={`/dashboard/paciente/${patient.id}/nueva-sesion-dual`}
+          className="flex-1 text-xs font-medium py-1.5 rounded-lg border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 transition-colors text-center"
+        >
+          🎮 Evaluación dual
+        </Link>
         <Link
           href={`/dashboard/paciente/${patient.id}`}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
