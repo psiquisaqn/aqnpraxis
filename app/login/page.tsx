@@ -42,12 +42,6 @@ export default function LoginPage() {
               className="h-16 w-auto"
             />
           </div>
-          <h2 className="mt-2 text-3xl font-bold text-gray-900">
-            AQN Praxis
-          </h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Plataforma de Evaluación Psicológica
-          </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
