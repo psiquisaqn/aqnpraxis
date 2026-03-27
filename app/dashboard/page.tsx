@@ -46,10 +46,34 @@ export default async function DashboardPage() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).length
 
+  const hour = now.getHours()
+  const greeting = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches'
+  const userName = profile?.full_name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'psicólogo'
+
   return (
     <div className="px-4 py-6 md:px-8 md:py-8 max-w-7xl">
       <div className="mb-6 md:mb-8">
-        <Greeting />
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-xl md:text-2xl font-medium mb-2 text-gray-900">
+              {greeting}, colega{' '}
+              <span className="text-blue-600">
+                {userName}
+              </span>
+            </h1>
+          </div>
+          <a
+            href="/sala"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="2" stroke="white" strokeWidth="1.5"/>
+              <path d="M3 15c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M9 9a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="white" strokeWidth="1.5"/>
+            </svg>
+            Sala de pacientes
+          </a>
+        </div>
         <StatsBar
           totalPatients={patients.length}
           activeSessions={activeSessions}
