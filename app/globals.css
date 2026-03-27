@@ -1,3 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #3B82F6;
+  --primary-hover: #2563EB;
+  --primary-light: #EFF6FF;
+  --secondary: #6B7280;
+  --background: #FFFFFF;
+  --surface: #F9FAFB;
+  --border: #E5E7EB;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+}
+
+@layer components {
+  /* Botón primario */
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    transition: all 0.2s ease;
+  }
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+
+  /* Botón secundario */
+  .btn-secondary {
+    background: white;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+  }
+  .btn-secondary:hover {
+    background: var(--surface);
+  }
+
+  /* Tarjetas */
+  .card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+}
+
+@layer utilities {
+  /* Animaciones */
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  /* Transiciones */
+  .transition-smooth {
+    transition: all 0.2s ease-in-out;
+  }
+
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--surface);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary);
+  }
+
+  /* Touch optimization for mobile */
+  button, 
+  a[class*="btn"],
+  a[class*="button"],
+  [role="button"] {
+    touch-action: manipulation;
+    min-height: 44px;
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  button, 
+  a[class*="btn"],
+  button[class*="btn"] {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+  
+  /* Mejorar legibilidad en móvil */
+  p, li, .text-base {
+    line-height: 1.5;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+  }
+  
+  h2 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+  }
+}
+
 /* Asegurar visibilidad de botones */
 button, 
 a[role="button"],
@@ -23,4 +159,19 @@ a:hover {
 /* Botones secundarios */
 .bg-gray-100 {
   color: #374151 !important;
+}
+
+/* Fix para Tailwind en móvil - asegurar que los estilos se aplican */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
 }
