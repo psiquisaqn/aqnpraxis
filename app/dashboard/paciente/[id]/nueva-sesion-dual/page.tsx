@@ -22,6 +22,7 @@ export default function NewDualSessionPage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [roomCode, setRoomCode] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -31,6 +32,15 @@ export default function NewDualSessionPage() {
     { id: 'peca', name: 'PECA', description: 'Prueba de Conducta Adaptativa', items: 45 },
     { id: 'wisc5', name: 'WISC-V', description: 'Escala de Inteligencia', items: 15 }
   ]
+
+  const generateRoomCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return code
+  }
 
   useEffect(() => {
     const loadDevices = async () => {
@@ -64,12 +74,7 @@ export default function NewDualSessionPage() {
     setCreating(true)
     setError(null)
 
-    console.log('=== INICIANDO CREACIÓN DE SESIÓN DUAL ===')
-    
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    console.log('1. User:', user?.id)
-    console.log('1a. User error:', userError)
     
     if (!user) {
       setError('Usuario no autenticado')
@@ -78,13 +83,6 @@ export default function NewDualSessionPage() {
     }
 
     // Crear sesión normal
-    console.log('2. Creando sesión normal con datos:', {
-      patient_id: patientId,
-      psychologist_id: user.id,
-      test_id: selectedTest,
-      status: 'in_progress'
-    })
-    
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert({
@@ -96,8 +94,6 @@ export default function NewDualSessionPage() {
       .select()
       .single()
 
-    console.log('3. Resultado sesión normal:', { session, sessionError })
-
     if (sessionError) {
       console.error('Error creating session:', sessionError)
       setError(`Error al crear la sesión: ${sessionError.message}`)
@@ -105,15 +101,10 @@ export default function NewDualSessionPage() {
       return
     }
 
+    // Generar código de sala
+    const roomCode = generateRoomCode()
+
     // Crear sesión dual
-    console.log('4. Creando sesión dual con datos:', {
-      session_id: session.id,
-      psychologist_id: user.id,
-      screen1_device_id: screen1Device,
-      screen2_device_id: screen2Device,
-      is_active: true
-    })
-    
     const { data: dualSession, error: dualError } = await supabase
       .from('dual_sessions')
       .insert({
@@ -121,12 +112,11 @@ export default function NewDualSessionPage() {
         psychologist_id: user.id,
         screen1_device_id: screen1Device,
         screen2_device_id: screen2Device,
+        room_code: roomCode,
         is_active: true
       })
       .select()
       .single()
-
-    console.log('5. Resultado sesión dual:', { dualSession, dualError })
 
     if (dualError) {
       console.error('Error creating dual session:', dualError)
@@ -135,11 +125,12 @@ export default function NewDualSessionPage() {
       return
     }
 
-    console.log('=== SESIÓN DUAL CREADA EXITOSAMENTE ===')
-    console.log('Redirigiendo a:', `/dual-control/${dualSession.id}`)
+    setRoomCode(roomCode)
     
-    // Redirigir al control dual
-    router.push(`/dual-control/${dualSession.id}`)
+    // Esperar 2 segundos para que el psicólogo vea el código antes de redirigir
+    setTimeout(() => {
+      router.push(`/dual-control/${dualSession.id}`)
+    }, 2000)
   }
 
   if (loading) {
@@ -175,6 +166,22 @@ export default function NewDualSessionPage() {
           </div>
         )}
 
+        {roomCode && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+            <p className="text-sm text-green-700 mb-1">✅ Sesión dual creada con éxito</p>
+            <p className="text-xs text-green-600 mb-2">Comparte este código con el paciente:</p>
+            <p className="text-3xl font-mono font-bold tracking-wider text-green-800 bg-white inline-block px-6 py-2 rounded-lg border border-green-200">
+              {roomCode}
+            </p>
+            <p className="text-xs text-green-500 mt-2">
+              El paciente debe ingresar en: <span className="font-mono">aqnpraxis.vercel.app/sala</span>
+            </p>
+            <p className="text-xs text-green-500 mt-1">
+              Redirigiendo a la pantalla de control...
+            </p>
+          </div>
+        )}
+
         {/* Selección de test */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
@@ -185,11 +192,12 @@ export default function NewDualSessionPage() {
               <button
                 key={test.id}
                 onClick={() => setSelectedTest(test.id)}
+                disabled={!!roomCode}
                 className={`p-4 rounded-xl border text-left transition-all ${
                   selectedTest === test.id
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200 hover:bg-gray-50'
-                }`}
+                } ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="font-medium text-gray-800">{test.name}</div>
                 <div className="text-xs text-gray-400 mt-1">{test.description}</div>
@@ -212,7 +220,7 @@ export default function NewDualSessionPage() {
                   screen1Device === device.id
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200 hover:bg-gray-50'
-                }`}
+                } ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <input
                   type="radio"
@@ -220,6 +228,7 @@ export default function NewDualSessionPage() {
                   value={device.id}
                   checked={screen1Device === device.id}
                   onChange={(e) => setScreen1Device(e.target.value)}
+                  disabled={!!roomCode}
                   className="text-blue-600"
                 />
                 <div>
@@ -255,7 +264,7 @@ export default function NewDualSessionPage() {
                   screen2Device === device.id
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200 hover:bg-gray-50'
-                }`}
+                } ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <input
                   type="radio"
@@ -263,6 +272,7 @@ export default function NewDualSessionPage() {
                   value={device.id}
                   checked={screen2Device === device.id}
                   onChange={(e) => setScreen2Device(e.target.value)}
+                  disabled={!!roomCode}
                   className="text-blue-600"
                 />
                 <div>
@@ -276,14 +286,14 @@ export default function NewDualSessionPage() {
 
         <button
           onClick={createDualSession}
-          disabled={!selectedTest || !screen1Device || !screen2Device || creating || devices.length === 0}
+          disabled={!selectedTest || !screen1Device || !screen2Device || creating || devices.length === 0 || !!roomCode}
           className={`w-full py-3 rounded-xl font-medium transition-colors ${
-            !selectedTest || !screen1Device || !screen2Device || creating || devices.length === 0
+            !selectedTest || !screen1Device || !screen2Device || creating || devices.length === 0 || roomCode
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {creating ? 'Creando sesión...' : 'Iniciar evaluación dual'}
+          {creating ? 'Creando sesión...' : roomCode ? 'Sesión creada' : 'Iniciar evaluación dual'}
         </button>
       </div>
     </div>

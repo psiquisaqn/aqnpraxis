@@ -16,6 +16,7 @@ export default function DualControlPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentTest, setCurrentTest] = useState<string>('')
   const [sessionId, setSessionId] = useState<string>('')
+  const [roomCode, setRoomCode] = useState<string>('')
 
   const supabase = createClient()
 
@@ -41,6 +42,7 @@ export default function DualControlPage() {
         setSessionData(data)
         setCurrentTest(data.session.test_id)
         setSessionId(data.session.id)
+        setRoomCode(data.room_code || '')
       }
       setLoading(false)
     }
@@ -55,7 +57,6 @@ export default function DualControlPage() {
     }
     if (payload.type === 'display_ready') {
       console.log('Display listo, enviando evento al componente...')
-      // Disparar evento para que CoopersmithControl envíe el ítem
       window.dispatchEvent(new CustomEvent('display_ready'))
     }
   })
@@ -90,6 +91,11 @@ export default function DualControlPage() {
       message: 'Mensaje de prueba',
       timestamp: new Date().toISOString()
     })
+  }
+
+  const copyRoomCode = () => {
+    navigator.clipboard.writeText(roomCode)
+    alert('Código copiado al portapapeles')
   }
 
   if (loading) {
@@ -149,6 +155,28 @@ export default function DualControlPage() {
             </div>
           </div>
         </div>
+
+        {/* Código de sala */}
+        {roomCode && (
+          <div className="bg-blue-50 rounded-lg p-4 mb-4 text-center border border-blue-200">
+            <p className="text-xs text-blue-600 mb-1">Código de la sala</p>
+            <div className="flex items-center justify-center gap-3">
+              <p className="text-3xl font-mono font-bold tracking-wider text-blue-800">
+                {roomCode}
+              </p>
+              <button
+                onClick={copyRoomCode}
+                className="px-3 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg text-xs text-blue-700 transition-colors"
+              >
+                Copiar
+              </button>
+            </div>
+            <p className="text-xs text-blue-500 mt-2">
+              Comparte este código con el paciente. Debe ingresar en:{' '}
+              <span className="font-mono">aqnpraxis.vercel.app/sala</span>
+            </p>
+          </div>
+        )}
 
         {currentTest === 'coopersmith' ? (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
