@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { useRealtime } from '@/hooks/useRealtime'
 
 export default function DualDisplayPage() {
@@ -106,37 +107,59 @@ export default function DualDisplayPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
-        <div className="mb-4 p-2 bg-gray-100 rounded-lg text-xs font-mono">
-          <div>🔌 ID: {dualSessionId.slice(0, 8)}...</div>
-          <div>📨 Mensajes: {messageCount}</div>
-          <div>📦 Último: {lastMessage.slice(0, 50) || 'ninguno'}</div>
-          <div>⏳ Estado: {waiting ? 'Esperando...' : currentDisplay ? 'Activo' : 'Timeout'}</div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-2xl w-full mx-auto">
+        {/* Botón de salir flotante */}
+        <div className="fixed bottom-4 right-4 z-50">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Salir
+          </Link>
         </div>
 
-        {waiting && !currentDisplay ? (
-          <div className="text-center">
-            <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl font-medium text-gray-700 mb-2">Esperando al psicólogo</h2>
-            <p className="text-gray-400 text-sm">
-              La evaluación comenzará en breve. Por favor, espera las instrucciones.
-            </p>
-            <div className="mt-6 flex justify-center">
-              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+          {/* Panel de debug (solo para desarrollo) */}
+          <div className="mb-4 p-2 bg-gray-100 rounded-lg text-xs font-mono">
+            <div>🔌 ID: {dualSessionId.slice(0, 8)}...</div>
+            <div>📨 Mensajes: {messageCount}</div>
+            <div>📦 Último: {lastMessage.slice(0, 50) || 'ninguno'}</div>
+            <div>⏳ Estado: {waiting ? 'Esperando...' : currentDisplay ? 'Activo' : 'Timeout'}</div>
+          </div>
+
+          {waiting && !currentDisplay ? (
+            <div className="text-center py-8">
+              <div className="text-5xl mb-4">🔍</div>
+              <h2 className="text-xl font-medium text-gray-700 mb-2">Esperando al psicólogo</h2>
+              <p className="text-gray-400 text-sm">
+                La evaluación comenzará en breve. Por favor, espera las instrucciones.
+              </p>
+              <div className="mt-6 flex justify-center">
+                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
             </div>
-          </div>
-        ) : currentDisplay ? (
-          renderDisplay()
-        ) : (
-          <div className="text-center">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
-            <p className="text-gray-400 text-sm">
-              La evaluación no ha comenzado. Contacta al psicólogo.
-            </p>
-          </div>
-        )}
+          ) : currentDisplay ? (
+            renderDisplay()
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">⚠️</div>
+              <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
+              <p className="text-gray-400 text-sm">
+                La evaluación no ha comenzado. Contacta al psicólogo.
+              </p>
+              <Link
+                href="/dashboard"
+                className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+              >
+                Volver al inicio
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

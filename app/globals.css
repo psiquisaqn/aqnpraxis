@@ -24,9 +24,10 @@
   }
   
   body {
-    background: var(--background);
+    background: linear-gradient(135deg, #f5f7fa 0%, #eef2f6 100%);
     color: var(--text-primary);
     font-family: system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
   }
 }
 
@@ -58,6 +59,11 @@
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  
+  /* Fondo blanco para componentes específicos */
+  .bg-white-card {
+    background: white;
   }
 }
 
@@ -174,4 +180,26 @@ video,
 canvas {
   max-width: 100%;
   height: auto;
+}
+
+/* Fondo para elementos que deben mantener blanco puro */
+.bg-white,
+.bg-white-card,
+[class*="bg-white"] {
+  background-color: #ffffff !important;
+}
+
+/* Gradientes suaves para secciones */
+.bg-gradient-soft {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+/* Sombra suave para tarjetas */
+.shadow-soft {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* Borde sutil */
+.border-subtle {
+  border-color: rgba(0, 0, 0, 0.05);
 }
