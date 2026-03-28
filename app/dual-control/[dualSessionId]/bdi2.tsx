@@ -138,10 +138,11 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
 
     const result = scoreBdi2(responses)
 
+    // Guardar respuestas con formato i1, i2, etc.
     const itemCols: Record<string, number> = {}
     for (let i = 1; i <= 21; i++) {
       if (responses[i] !== undefined) {
-        itemCols[`item_${i}`] = responses[i]
+        itemCols[`i${i}`] = responses[i]
       }
     }
 
