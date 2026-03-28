@@ -27,8 +27,6 @@ export function PatientCard({ patient, onNewSession }: Props) {
   const s = patient.latest_session
   const statusColor = s ? STATUS_COLORS[s.status] : null
 
-  const buttonBaseClass = "flex-1 text-xs font-medium py-2 px-2 rounded-lg transition-all duration-150 text-center"
-
   return (
     <div className="group bg-white rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 overflow-hidden">
       {/* Cabecera */}
@@ -99,29 +97,33 @@ export function PatientCard({ patient, onNewSession }: Props) {
         )}
       </div>
 
-      {/* Acciones - todos los botones con la misma clase base */}
+      {/* Acciones - todos como Link */}
       <div className="px-4 py-3 flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50">
-        <button
-          onClick={() => onNewSession(patient.id)}
-          className={`${buttonBaseClass} text-white bg-blue-600 hover:bg-blue-700`}
+        <Link
+          href={`/dashboard/paciente/${patient.id}/nueva-sesion`}
+          onClick={(e) => {
+            e.preventDefault()
+            onNewSession(patient.id)
+          }}
+          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center"
         >
           + Evaluación simple
-        </button>
+        </Link>
         <Link
           href={`/dashboard/paciente/${patient.id}/nueva-sesion-dual`}
-          className={`${buttonBaseClass} border border-blue-200 text-blue-600 bg-white hover:bg-blue-50`}
+          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 transition-colors text-center"
         >
           🎮 Evaluación dual
         </Link>
         <Link
           href={`/dashboard/agenda?patient=${patient.id}&new=true`}
-          className={`${buttonBaseClass} border border-green-200 text-green-600 bg-white hover:bg-green-50`}
+          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg border border-green-200 text-green-600 bg-white hover:bg-green-50 transition-colors text-center"
         >
           📅 Agendar
         </Link>
         <Link
           href={`/dashboard/paciente/${patient.id}`}
-          className={`${buttonBaseClass} border border-gray-200 text-gray-600 bg-white hover:bg-gray-50`}
+          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-center"
         >
           Ver ficha
         </Link>
