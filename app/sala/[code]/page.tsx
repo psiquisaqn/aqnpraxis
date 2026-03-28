@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/useRealtime'
 
@@ -13,68 +14,72 @@ export default function SalaDisplayPage() {
   const [waiting, setWaiting] = useState(true)
   const [dualSessionId, setDualSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [debug, setDebug] = useState<string>('Buscando sesión...')
 
   const supabase = createClient()
 
   // Buscar sesión dual por código
   useEffect(() => {
     const findSession = async () => {
+      console.log('🔍 Buscando sesión con código:', code)
+      setDebug(`Buscando código: ${code}`)
+      
       const { data, error } = await supabase
         .from('dual_sessions')
-        .select('id, session_id, screen2_device_id')
+        .select('id, session_id, screen2_device_id, is_active, room_code')
         .eq('room_code', code)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
-      if (error || !data) {
+      console.log('📦 Resultado búsqueda:', { data, error })
+
+      if (error) {
+        console.error('❌ Error en búsqueda:', error)
+        setDebug(`Error: ${error.message}`)
+        setError('Error al buscar la sesión')
+        setWaiting(false)
+      } else if (!data) {
+        console.log('❌ No se encontró sesión con código:', code)
+        setDebug(`No se encontró sesión para el código: ${code}`)
         setError('Código inválido o sesión no encontrada')
         setWaiting(false)
       } else {
+        console.log('✅ Sesión encontrada, ID:', data.id)
+        setDebug(`Sesión encontrada: ${data.id}`)
         setDualSessionId(data.id)
       }
     }
 
-    findSession()
+    if (code && code !== 'undefined') {
+      findSession()
+    } else {
+      setError('Código no válido')
+      setWaiting(false)
+    }
   }, [code])
 
   // Escuchar comandos del psicólogo
   const { sendMessage } = useRealtime(dualSessionId || '', (payload) => {
+    console.log('📨 Mensaje recibido en display:', payload)
+    
     if (payload.type === 'update_display') {
       setCurrentDisplay(payload.content)
       setWaiting(false)
     }
   })
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-          <div className="text-4xl mb-3">⚠️</div>
-          <h2 className="text-xl font-medium text-gray-700 mb-2">Código inválido</h2>
-          <p className="text-gray-400 text-sm mb-4">
-            No se encontró una evaluación activa con este código.
-          </p>
-          <a
-            href="/sala"
-            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
-          >
-            Volver al inicio
-          </a>
-        </div>
-      </div>
-    )
-  }
-
-  if (!dualSessionId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500">Buscando evaluación...</p>
-        </div>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (dualSessionId) {
+      const timer = setTimeout(() => {
+        console.log('📤 Enviando display_ready')
+        sendMessage({
+          type: 'display_ready',
+          message: 'Display listo'
+        })
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [dualSessionId, sendMessage])
 
   const renderDisplay = () => {
     if (!currentDisplay) return null
@@ -138,35 +143,87 @@ export default function SalaDisplayPage() {
     }
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <h2 className="text-xl font-medium text-gray-700 mb-2">Error</h2>
+          <p className="text-gray-400 text-sm mb-4">{error}</p>
+          <p className="text-xs text-gray-300 mb-4">Código ingresado: {code}</p>
+          <Link
+            href="/sala"
+            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+          >
+            Volver al inicio
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!dualSessionId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500">Buscando evaluación...</p>
+          <p className="text-xs text-gray-400 mt-2">Código: {code}</p>
+          <p className="text-xs text-gray-300 mt-1">{debug}</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
-        <div className="text-center mb-4">
-          <div className="text-sm text-gray-400">Código de sala: {code}</div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-2xl w-full mx-auto">
+        <div className="fixed bottom-4 right-4 z-50">
+          <Link
+            href="/"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Salir
+          </Link>
         </div>
 
-        {waiting && !currentDisplay ? (
-          <div className="text-center">
-            <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl font-medium text-gray-700 mb-2">Esperando al psicólogo</h2>
-            <p className="text-gray-400 text-sm">
-              La evaluación comenzará en breve. Por favor, espera las instrucciones.
-            </p>
-            <div className="mt-6 flex justify-center">
-              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+          <div className="text-center mb-4">
+            <div className="text-sm text-gray-400">Código de sala: <span className="font-mono font-bold">{code}</span></div>
+          </div>
+
+          {waiting && !currentDisplay ? (
+            <div className="text-center py-8">
+              <div className="text-5xl mb-4">🔍</div>
+              <h2 className="text-xl font-medium text-gray-700 mb-2">Esperando al psicólogo</h2>
+              <p className="text-gray-400 text-sm">
+                La evaluación comenzará en breve. Por favor, espera las instrucciones.
+              </p>
+              <div className="mt-6 flex justify-center">
+                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
             </div>
-          </div>
-        ) : currentDisplay ? (
-          renderDisplay()
-        ) : (
-          <div className="text-center">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
-            <p className="text-gray-400 text-sm">
-              La evaluación no ha comenzado. Contacta al psicólogo.
-            </p>
-          </div>
-        )}
+          ) : currentDisplay ? (
+            renderDisplay()
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">⚠️</div>
+              <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
+              <p className="text-gray-400 text-sm">
+                La evaluación no ha comenzado. Contacta al psicólogo.
+              </p>
+              <Link
+                href="/sala"
+                className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+              >
+                Volver al inicio
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
