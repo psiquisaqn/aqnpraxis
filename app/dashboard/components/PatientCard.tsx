@@ -97,7 +97,7 @@ export function PatientCard({ patient, onNewSession }: Props) {
         )}
       </div>
 
-      {/* Acciones */}
+      {/* Acciones - todos los botones con la misma altura */}
       <div className="px-4 py-3 flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50">
         <button
           onClick={() => onNewSession(patient.id)}
@@ -119,7 +119,7 @@ export function PatientCard({ patient, onNewSession }: Props) {
         </Link>
         <Link
           href={`/dashboard/paciente/${patient.id}`}
-          className="text-xs font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
+          className="text-xs font-medium py-2 px-3 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-center"
         >
           Ver ficha
         </Link>
