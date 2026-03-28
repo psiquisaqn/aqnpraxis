@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/useRealtime'
 import { CoopersmithControl } from './coopersmith'
+import { Bdi2Control } from './bdi2'
+import { PecaControl } from './peca'
 
 export default function DualControlPage() {
   const params = useParams()
@@ -69,7 +71,7 @@ export default function DualControlPage() {
     })
   }
 
-  const saveResponse = async (item: number, value: string) => {
+  const saveResponse = async (item: number, value: any) => {
     const { error } = await supabase
       .from('dual_session_tests')
       .upsert({
@@ -82,15 +84,6 @@ export default function DualControlPage() {
     if (error) {
       console.error('Error saving response:', error)
     }
-  }
-
-  const sendTestMessage = () => {
-    console.log('Enviando mensaje de prueba al display')
-    updatePatientScreen({
-      type: 'test',
-      message: 'Mensaje de prueba',
-      timestamp: new Date().toISOString()
-    })
   }
 
   const copyRoomCode = () => {
@@ -125,6 +118,62 @@ export default function DualControlPage() {
     )
   }
 
+  const getTestTitle = () => {
+    switch (currentTest) {
+      case 'coopersmith': return 'Coopersmith SEI'
+      case 'bdi2': return 'BDI-II'
+      case 'peca': return 'PECA'
+      default: return currentTest
+    }
+  }
+
+  const renderControl = () => {
+    switch (currentTest) {
+      case 'coopersmith':
+        return (
+          <CoopersmithControl
+            dualSessionId={dualSessionId}
+            sessionId={sessionId}
+            onUpdatePatient={updatePatientScreen}
+            onSaveResponse={saveResponse}
+          />
+        )
+      case 'bdi2':
+        return (
+          <Bdi2Control
+            dualSessionId={dualSessionId}
+            sessionId={sessionId}
+            onUpdatePatient={updatePatientScreen}
+            onSaveResponse={saveResponse}
+          />
+        )
+      case 'peca':
+        return (
+          <PecaControl
+            dualSessionId={dualSessionId}
+            sessionId={sessionId}
+            onUpdatePatient={updatePatientScreen}
+            onSaveResponse={saveResponse}
+          />
+        )
+      default:
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+            <div className="text-4xl mb-3">🎮</div>
+            <p className="text-gray-500 mb-4">
+              Test no implementado: {getTestTitle()}
+            </p>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+            >
+              Volver al dashboard
+            </button>
+          </div>
+        )
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-2xl mx-auto">
@@ -136,16 +185,10 @@ export default function DualControlPage() {
                 Paciente: {sessionData.session?.patient?.full_name}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Test: {currentTest === 'coopersmith' ? 'Coopersmith SEI' : currentTest}
+                Test: {getTestTitle()}
               </p>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={sendTestMessage}
-                className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-medium transition-colors"
-              >
-                Probar display
-              </button>
               <button
                 onClick={() => router.push('/dashboard')}
                 className="text-sm text-gray-500 hover:text-gray-700"
@@ -178,35 +221,7 @@ export default function DualControlPage() {
           </div>
         )}
 
-        {currentTest === 'coopersmith' ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <CoopersmithControl
-              dualSessionId={dualSessionId}
-              sessionId={sessionId}
-              onUpdatePatient={updatePatientScreen}
-              onSaveResponse={saveResponse}
-            />
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-            <div className="text-4xl mb-3">🎮</div>
-            <p className="text-gray-500 mb-4">
-              Evaluación dual - Test {currentTest}
-            </p>
-            <div className="bg-yellow-50 rounded-lg p-4 text-left">
-              <p className="text-sm text-yellow-700">
-                ⚠️ Este test aún no está implementado en modo dual.
-                Próximamente se agregará soporte para {currentTest}.
-              </p>
-            </div>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-            >
-              Volver al dashboard
-            </button>
-          </div>
-        )}
+        {renderControl()}
       </div>
     </div>
   )
