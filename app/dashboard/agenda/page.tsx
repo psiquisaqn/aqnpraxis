@@ -23,6 +23,7 @@ export default function AgendaPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showNewForm, setShowNewForm] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
+  const [currentDate, setCurrentDate] = useState(new Date())
   const supabase = createClient()
 
   const [newAppointment, setNewAppointment] = useState({
@@ -96,7 +97,6 @@ export default function AgendaPage() {
     if (!error) {
       setShowNewForm(false)
       setNewAppointment({ patient_id: '', date: '', time: '', type: 'Evaluación', notes: '' })
-      // Recargar citas
       window.location.reload()
     } else {
       console.error('Error al guardar:', error)
@@ -115,28 +115,83 @@ export default function AgendaPage() {
     }
   }
 
-  // Filtrar citas según vista
-  const getFilteredAppointments = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const startOfWeek = new Date(today)
-    const day = today.getDay()
-    startOfWeek.setDate(today.getDate() - day)
-    
-    const endOfWeek = new Date(startOfWeek)
-    endOfWeek.setDate(startOfWeek.getDate() + 6)
+  // Obtener el primer día de la semana (lunes)
+  const getWeekStart = (date: Date) => {
+    const d = new Date(date)
+    const day = d.getDay()
+    const diff = (day === 0 ? 6 : day - 1)
+    d.setDate(d.getDate() - diff)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
 
-    if (viewMode === 'list') {
-      return appointments.filter(a => new Date(a.date) >= today)
+  // Obtener los días de la semana actual
+  const getWeekDays = (startDate: Date) => {
+    const days = []
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startDate)
+      day.setDate(startDate.getDate() + i)
+      days.push(day)
     }
-    if (viewMode === 'week') {
-      return appointments.filter(a => {
-        const date = new Date(a.date)
-        return date >= startOfWeek && date <= endOfWeek
-      })
+    return days
+  }
+
+  // Obtener citas para un día específico
+  const getAppointmentsForDay = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0]
+    return appointments.filter(a => a.date === dateStr)
+  }
+
+  // Obtener días del mes actual con lunes como primer día
+  const getMonthDays = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDayOfMonth = new Date(year, month, 1)
+    const startOfWeek = getWeekStart(firstDayOfMonth)
+    
+    const days = []
+    for (let i = 0; i < 42; i++) {
+      const day = new Date(startOfWeek)
+      day.setDate(startOfWeek.getDate() + i)
+      days.push(day)
     }
-    return appointments
+    return days
+  }
+
+  const goToPreviousWeek = () => {
+    const newDate = new Date(currentDate)
+    newDate.setDate(currentDate.getDate() - 7)
+    setCurrentDate(newDate)
+  }
+
+  const goToNextWeek = () => {
+    const newDate = new Date(currentDate)
+    newDate.setDate(currentDate.getDate() + 7)
+    setCurrentDate(newDate)
+  }
+
+  const goToPreviousMonth = () => {
+    const newDate = new Date(currentDate)
+    newDate.setMonth(currentDate.getMonth() - 1)
+    setCurrentDate(newDate)
+  }
+
+  const goToNextMonth = () => {
+    const newDate = new Date(currentDate)
+    newDate.setMonth(currentDate.getMonth() + 1)
+    setCurrentDate(newDate)
+  }
+
+  const goToToday = () => {
+    setCurrentDate(new Date())
+  }
+
+  const formatDateHeader = (date: Date) => {
+    return date.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' })
+  }
+
+  const formatMonthHeader = () => {
+    return currentDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
   }
 
   if (loading) {
@@ -148,7 +203,7 @@ export default function AgendaPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Agenda</h1>
         <div className="flex gap-2">
@@ -163,6 +218,12 @@ export default function AgendaPage() {
             className={`p-2 rounded-lg transition-colors ${viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             📅 Semana
+          </button>
+          <button
+            onClick={() => setViewMode('month')}
+            className={`p-2 rounded-lg transition-colors ${viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            📆 Mes
           </button>
           <button
             onClick={() => setShowNewForm(!showNewForm)}
@@ -242,59 +303,142 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* Lista de citas */}
-      {getFilteredAppointments().length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <p className="text-gray-400">No hay citas programadas</p>
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-          >
-            Agendar primera sesión
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {getFilteredAppointments().map((apt) => (
-            <div key={apt.id} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center justify-between gap-3 hover:shadow-sm transition-shadow">
-              <div className="flex-1">
-                <div className="font-medium text-gray-800">{apt.patient_name}</div>
-                <div className="text-sm text-gray-500">{apt.type}</div>
-                <div className="text-xs text-gray-400">{new Date(apt.date).toLocaleDateString()} a las {apt.time}</div>
-                {apt.notes && <div className="text-xs text-gray-500 mt-1">{apt.notes}</div>}
-              </div>
-              <div className="flex gap-2">
-                {apt.status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => updateStatus(apt.id, 'completed')}
-                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
-                    >
-                      Completar
-                    </button>
-                    <button
-                      onClick={() => updateStatus(apt.id, 'cancelled')}
-                      className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
-                    >
-                      Cancelar
-                    </button>
-                  </>
-                )}
-                {apt.status === 'completed' && (
-                  <span className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded">Completada</span>
-                )}
-                {apt.status === 'cancelled' && (
-                  <span className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded">Cancelada</span>
-                )}
-                <Link
-                  href={`/dashboard/paciente/${apt.patient_id}`}
-                  className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                >
-                  Ver ficha
-                </Link>
-              </div>
+      {/* Vista Lista */}
+      {viewMode === 'list' && (
+        <>
+          {appointments.filter(a => new Date(a.date) >= new Date()).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+              <p className="text-gray-400">No hay citas programadas</p>
+              <button
+                onClick={() => setShowNewForm(true)}
+                className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+              >
+                Agendar primera sesión
+              </button>
             </div>
-          ))}
+          ) : (
+            <div className="space-y-3">
+              {appointments.filter(a => new Date(a.date) >= new Date()).map((apt) => (
+                <div key={apt.id} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center justify-between gap-3 hover:shadow-sm transition-shadow">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-800">{apt.patient_name}</div>
+                    <div className="text-sm text-gray-500">{apt.type}</div>
+                    <div className="text-xs text-gray-400">{new Date(apt.date).toLocaleDateString()} a las {apt.time}</div>
+                    {apt.notes && <div className="text-xs text-gray-500 mt-1">{apt.notes}</div>}
+                  </div>
+                  <div className="flex gap-2">
+                    {apt.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => updateStatus(apt.id, 'completed')}
+                          className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                        >
+                          Completar
+                        </button>
+                        <button
+                          onClick={() => updateStatus(apt.id, 'cancelled')}
+                          className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    )}
+                    {apt.status === 'completed' && (
+                      <span className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded">Completada</span>
+                    )}
+                    {apt.status === 'cancelled' && (
+                      <span className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded">Cancelada</span>
+                    )}
+                    <Link
+                      href={`/dashboard/paciente/${apt.patient_id}`}
+                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                    >
+                      Ver ficha
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Vista Semana */}
+      {viewMode === 'week' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <button onClick={goToPreviousWeek} className="px-3 py-1 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">← Semana anterior</button>
+            <span className="text-lg font-medium text-gray-700">
+              {formatDateHeader(getWeekStart(currentDate))} - {formatDateHeader(getWeekDays(getWeekStart(currentDate))[6])}
+            </span>
+            <button onClick={goToNextWeek} className="px-3 py-1 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">Semana siguiente →</button>
+            <button onClick={goToToday} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200">Hoy</button>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {getWeekDays(getWeekStart(currentDate)).map((day, idx) => {
+              const dayAppointments = getAppointmentsForDay(day)
+              const isToday = day.toDateString() === new Date().toDateString()
+              return (
+                <div key={idx} className={`bg-white rounded-xl border p-3 min-h-[200px] ${isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                  <div className={`text-sm font-medium mb-2 ${isToday ? 'text-blue-600' : 'text-gray-600'}`}>
+                    {day.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric' })}
+                  </div>
+                  <div className="space-y-2">
+                    {dayAppointments.map(apt => (
+                      <div key={apt.id} className="text-xs p-2 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-gray-800">{apt.time} - {apt.patient_name}</div>
+                        <div className="text-gray-500">{apt.type}</div>
+                        {apt.status === 'pending' && <span className="text-yellow-600 text-[10px]">Pendiente</span>}
+                        {apt.status === 'completed' && <span className="text-green-600 text-[10px]">Completada</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Vista Mes */}
+      {viewMode === 'month' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <button onClick={goToPreviousMonth} className="px-3 py-1 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">← Mes anterior</button>
+            <span className="text-lg font-medium text-gray-700 capitalize">{formatMonthHeader()}</span>
+            <button onClick={goToNextMonth} className="px-3 py-1 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">Mes siguiente →</button>
+            <button onClick={goToToday} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200">Hoy</button>
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(day => (
+              <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">{day}</div>
+            ))}
+            {getMonthDays(currentDate).map((day, idx) => {
+              const dayAppointments = getAppointmentsForDay(day)
+              const isCurrentMonth = day.getMonth() === currentDate.getMonth()
+              const isToday = day.toDateString() === new Date().toDateString()
+              return (
+                <div
+                  key={idx}
+                  className={`bg-white rounded-lg border p-2 min-h-[100px] ${!isCurrentMonth ? 'bg-gray-50 text-gray-400' : ''} ${isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
+                >
+                  <div className={`text-xs font-medium mb-1 ${isToday ? 'text-blue-600' : isCurrentMonth ? 'text-gray-700' : 'text-gray-400'}`}>
+                    {day.getDate()}
+                  </div>
+                  <div className="space-y-1">
+                    {dayAppointments.slice(0, 3).map(apt => (
+                      <div key={apt.id} className="text-[10px] p-1 bg-gray-50 rounded truncate" title={`${apt.time} - ${apt.patient_name}`}>
+                        {apt.time} {apt.patient_name.split(' ')[0]}
+                      </div>
+                    ))}
+                    {dayAppointments.length > 3 && (
+                      <div className="text-[10px] text-gray-400">+{dayAppointments.length - 3} más</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
