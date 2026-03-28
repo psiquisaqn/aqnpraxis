@@ -97,36 +97,38 @@ export function PatientCard({ patient, onNewSession }: Props) {
         )}
       </div>
 
-      {/* Acciones - todos como Link */}
-      <div className="px-4 py-3 flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50">
-        <Link
-          href={`/dashboard/paciente/${patient.id}/nueva-sesion`}
-          onClick={(e) => {
-            e.preventDefault()
-            onNewSession(patient.id)
-          }}
-          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center"
-        >
-          + Evaluación simple
-        </Link>
-        <Link
-          href={`/dashboard/paciente/${patient.id}/nueva-sesion-dual`}
-          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 transition-colors text-center"
-        >
-          🎮 Evaluación dual
-        </Link>
-        <Link
-          href={`/dashboard/agenda?patient=${patient.id}&new=true`}
-          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg border border-green-200 text-green-600 bg-white hover:bg-green-50 transition-colors text-center"
-        >
-          📅 Agendar
-        </Link>
-        <Link
-          href={`/dashboard/paciente/${patient.id}`}
-          className="flex-1 text-xs font-medium py-2 px-2 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-center"
-        >
-          Ver ficha
-        </Link>
+      {/* Acciones - diseño responsivo con grid para móvil */}
+      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Link
+            href={`/dashboard/paciente/${patient.id}/nueva-sesion`}
+            onClick={(e) => {
+              e.preventDefault()
+              onNewSession(patient.id)
+            }}
+            className="text-xs font-medium py-2 px-1 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center whitespace-nowrap"
+          >
+            + Evaluación simple
+          </Link>
+          <Link
+            href={`/dashboard/paciente/${patient.id}/nueva-sesion-dual`}
+            className="text-xs font-medium py-2 px-1 rounded-lg border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 transition-colors text-center whitespace-nowrap"
+          >
+            🎮 Evaluación dual
+          </Link>
+          <Link
+            href={`/dashboard/agenda?patient=${patient.id}&new=true`}
+            className="text-xs font-medium py-2 px-1 rounded-lg border border-green-200 text-green-600 bg-white hover:bg-green-50 transition-colors text-center whitespace-nowrap"
+          >
+            📅 Agendar
+          </Link>
+          <Link
+            href={`/dashboard/paciente/${patient.id}`}
+            className="text-xs font-medium py-2 px-1 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-center whitespace-nowrap"
+          >
+            Ver ficha
+          </Link>
+        </div>
       </div>
     </div>
   )
