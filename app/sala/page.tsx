@@ -14,34 +14,41 @@ export default function SalaDisplayPage() {
   const [waiting, setWaiting] = useState(true)
   const [dualSessionId, setDualSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [messageCount, setMessageCount] = useState(0)
 
   const supabase = createClient()
 
   // Buscar sesión dual por código
   useEffect(() => {
     const findSession = async () => {
+      console.log('Buscando sesión con código:', code)
+      
       const { data, error } = await supabase
         .from('dual_sessions')
-        .select('id, session_id, screen2_device_id, is_active')
+        .select('id, session_id, screen2_device_id, is_active, room_code')
         .eq('room_code', code)
         .eq('is_active', true)
-        .single()
+        .maybeSingle() // Cambiar .single() por .maybeSingle() para evitar error 406
+
+      console.log('Resultado búsqueda:', { data, error })
 
       if (error || !data) {
+        console.error('Error o sesión no encontrada:', error)
         setError('Código inválido o sesión no encontrada')
         setWaiting(false)
       } else {
+        console.log('Sesión encontrada, ID:', data.id)
         setDualSessionId(data.id)
       }
     }
 
-    findSession()
+    if (code) {
+      findSession()
+    }
   }, [code])
 
   // Escuchar comandos del psicólogo
   const { sendMessage } = useRealtime(dualSessionId || '', (payload) => {
-    setMessageCount(prev => prev + 1)
+    console.log('Mensaje recibido en display:', payload)
     
     if (payload.type === 'update_display') {
       setCurrentDisplay(payload.content)
@@ -52,6 +59,7 @@ export default function SalaDisplayPage() {
   useEffect(() => {
     if (dualSessionId) {
       const timer = setTimeout(() => {
+        console.log('Enviando display_ready')
         sendMessage({
           type: 'display_ready',
           message: 'Display listo'
@@ -157,7 +165,6 @@ export default function SalaDisplayPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <div className="max-w-2xl w-full mx-auto">
-        {/* Botón de salir flotante */}
         <div className="fixed bottom-4 right-4 z-50">
           <Link
             href="/"

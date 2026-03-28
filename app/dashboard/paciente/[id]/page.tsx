@@ -13,6 +13,16 @@ export default async function PatientPage({ params }: Props) {
     <div>
       <div className="flex justify-end gap-3 px-4 pt-4">
         <Link
+          href={`/dashboard/agenda?patient=${id}&new=true`}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="3" width="12" height="11" rx="1" stroke="white" strokeWidth="1.2"/>
+            <path d="M5 1v3M11 1v3M3 6h10" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          Agendar sesión
+        </Link>
+        <Link
           href={`/dashboard/paciente/${id}/nueva-sesion-dual`}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
         >

@@ -112,6 +112,12 @@ export function PatientCard({ patient, onNewSession }: Props) {
           🎮 Evaluación dual
         </Link>
         <Link
+          href={`/dashboard/agenda?patient=${patient.id}&new=true`}
+          className="flex-1 text-xs font-medium py-2 rounded-lg border border-green-200 text-green-600 bg-white hover:bg-green-50 transition-colors text-center"
+        >
+          📅 Agendar
+        </Link>
+        <Link
           href={`/dashboard/paciente/${patient.id}`}
           className="text-xs font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
         >

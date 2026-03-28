@@ -1,3 +1,5 @@
+'use client'
+
 interface Props {
   totalPatients: number
   activeSessions: number
@@ -12,28 +14,30 @@ export function StatsBar({ totalPatients, activeSessions, completedThisMonth, pl
     { label: 'Completadas este mes', value: completedThisMonth },
   ]
 
+  const getPlanColor = (plan: string) => {
+    switch (plan) {
+      case 'premium': return 'bg-blue-100 text-blue-700 border-blue-200'
+      case 'professional': return 'bg-purple-100 text-purple-700 border-purple-200'
+      default: return 'bg-gray-100 text-gray-600 border-gray-200'
+    }
+  }
+
   return (
-    <div className="flex items-center gap-6 flex-wrap">
+    <div className="flex flex-wrap items-center gap-4 md:gap-6 mt-2">
       {stats.map((s) => (
-        <div key={s.label} className="flex items-baseline gap-2">
-          <span
-            className="text-2xl font-semibold"
-            style={{ color: 'var(--stone-800)', fontFamily: 'var(--font-serif)' }}
-          >
+        <div key={s.label} className="flex items-baseline gap-2 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
+          <span className="text-xl md:text-2xl font-semibold text-gray-800">
             {s.value}
           </span>
-          <span className="text-xs" style={{ color: 'var(--stone-500)' }}>
+          <span className="text-xs text-gray-500">
             {s.label}
           </span>
         </div>
       ))}
 
       <div className="ml-auto">
-        <span
-          className="text-xs px-3 py-1.5 rounded-full font-medium capitalize"
-          style={{ background: 'var(--teal-50)', color: 'var(--teal-700)', border: '1px solid var(--teal-100)' }}
-        >
-          Plan {planLabel}
+        <span className={`text-xs px-3 py-1.5 rounded-full font-medium capitalize ${getPlanColor(planLabel)}`}>
+          Plan {planLabel === 'free' ? 'Gratuito' : planLabel === 'premium' ? 'Premium' : 'Professional'}
         </span>
       </div>
     </div>
