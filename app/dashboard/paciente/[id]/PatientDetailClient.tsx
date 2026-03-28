@@ -317,7 +317,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                   {session.status === 'completed' && (
                     <Link
                       href={`/resultados/${session.test_id}?session=${session.id}`}
-                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
                     >
                       Ver informe
                     </Link>
@@ -325,14 +325,14 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                   {session.status === 'in_progress' && (
                     <Link
                       href={`/session/${session.id}`}
-                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
                     >
                       Continuar
                     </Link>
                   )}
                   <button
                     onClick={() => handleDeleteSession(session.id)}
-                    className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                    className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
                   >
                     Eliminar
                   </button>
