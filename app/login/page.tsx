@@ -39,7 +39,7 @@ export default function LoginPage() {
             <img 
               src="/isotipoaqnpraxis.png" 
               alt="AQN Praxis" 
-              className="h-16 w-auto"
+              className="h-20 w-auto"
             />
           </div>
         </div>
