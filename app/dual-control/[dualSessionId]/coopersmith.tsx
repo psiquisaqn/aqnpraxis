@@ -138,16 +138,17 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
     })
   }
 
-  const handleFinish = async () => {
-    if (!allDone) return
-    setFinishing(true)
-    await finishEvaluation({
-      dualSessionId,
-      sessionId,
-      responses,
-      router
-    })
-  }
+const handleFinish = async () => {
+  if (!allDone) return
+  setFinishing(true)
+  console.log('Finalizando evaluación con', Object.keys(responses).length, 'respuestas')
+  await finishEvaluation({
+    dualSessionId,
+    sessionId,
+    responses,
+    router
+  })
+}
 
   const currentResponse = responses[currentItem]
 

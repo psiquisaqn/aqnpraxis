@@ -101,19 +101,19 @@ export function PatientCard({ patient, onNewSession }: Props) {
       <div className="px-4 py-3 flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50">
         <button
           onClick={() => onNewSession(patient.id)}
-          className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700"
+          className="flex-1 text-xs font-medium py-2 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700"
         >
-          + Nueva evaluación
+          + Evaluación simple
         </button>
         <Link
           href={`/dashboard/paciente/${patient.id}/nueva-sesion-dual`}
-          className="flex-1 text-xs font-medium py-1.5 rounded-lg border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 transition-colors text-center"
+          className="flex-1 text-xs font-medium py-2 rounded-lg border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 transition-colors text-center"
         >
           🎮 Evaluación dual
         </Link>
         <Link
           href={`/dashboard/paciente/${patient.id}`}
-          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
+          className="text-xs font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
         >
           Ver ficha
         </Link>
