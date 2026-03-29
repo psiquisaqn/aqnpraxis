@@ -1,15 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
-import { useSessionRealtime, type DisplayCommand } from '@/hooks/useSessionRealtime'
+import { useSessionRealtime } from '@/hooks/useSessionRealtime'
 
 export default function DisplayPage() {
   const { sessionId } = useParams()
 
-  // El hook devuelve un objeto con estado y funciones
-  const { state, sendDisplayCommand, sendSessionControl } = useSessionRealtime(sessionId as string)
+  // El hook devuelve sólo state y sendDisplayCommand
+  const { state, sendDisplayCommand } = useSessionRealtime(sessionId as string)
 
   return (
     <div className="p-6">
