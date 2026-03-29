@@ -1,32 +1,29 @@
+// app/api/scores/peca/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase/client'
+import { scorePeca, type PecaResponses } from '@/lib/peca/engine'
 
-const supabase = supabase(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const sessionId = req.nextUrl.searchParams.get('session')
-    
-    if (!sessionId) {
-      return NextResponse.json({ error: 'session requerido' }, { status: 400 })
-    }
+    const body = await req.json()
+    const responses: PecaResponses = body.respuestas  // ✅ un solo objeto
+
+    const resultado = scorePeca(responses)
 
     const { data, error } = await supabase
-      .from('peca_scores')
-      .select('*, session:sessions(id, started_at, patient:patients(id, full_name))')
-      .eq('session_id', sessionId)
-      .single()
+      .from('resultados')
+      .insert({
+        session_id: body.session_id,
+        test: 'PECA',
+        resultado,
+      })
 
-    if (error || !data) {
-      return NextResponse.json({ error: 'Resultados no encontrados' }, { status: 404 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error('Error en /api/scores/peca:', error)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    return NextResponse.json({ data }, { status: 200 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
