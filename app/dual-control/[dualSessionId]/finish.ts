@@ -9,9 +9,7 @@ interface FinishEvaluationProps {
 }
 
 export async function finishEvaluation({ dualSessionId, sessionId, responses, router }: FinishEvaluationProps) {
-  const supabase = supabase()
-
-  console.log('=== INICIANDO FINALIZACIÓN ===')
+  supabase  console.log('=== INICIANDO FINALIZACIÓN ===')
   console.log('dualSessionId:', dualSessionId)
   console.log('sessionId:', sessionId)
   console.log('responses count:', Object.keys(responses).length)

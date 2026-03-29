@@ -9,8 +9,7 @@ type MessagePayload = {
 }
 
 export function useRealtime(channelId: string, onMessage: (payload: MessagePayload) => void) {
-  const supabase = supabase()
-  const channelRef = useRef<any>(null)
+  supabase  const channelRef = useRef<any>(null)
 
   useEffect(() => {
     if (!channelId) return

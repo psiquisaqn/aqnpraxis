@@ -22,9 +22,7 @@ export default function DualSetupPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const supabase = supabase()
-
-  useEffect(() => {
+  supabase  useEffect(() => {
     const loadDevices = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return

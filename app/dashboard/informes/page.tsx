@@ -18,9 +18,7 @@ export default function InformesPage() {
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc')
-  const supabase = supabase()
-
-  useEffect(() => {
+  supabase  useEffect(() => {
     const loadReports = async () => {
       // Obtener sesiones completadas con datos de pacientes y tests
       const { data: sessions, error } = await supabase

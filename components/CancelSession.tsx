@@ -10,8 +10,7 @@ export function useCancelSession(sessionId: string, patientId?: string) {
 
   const cancel = () => {
     startTransition(async () => {
-      const supabase = supabase()
-      await supabase
+      supabase      await supabase
         .from('sessions')
         .update({ status: 'cancelled', completed_at: new Date().toISOString() })
         .eq('id', sessionId)

@@ -24,9 +24,7 @@ export default function AgendaPage() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
   const [currentDate, setCurrentDate] = useState(new Date())
-  const supabase = supabase()
-
-  const [newAppointment, setNewAppointment] = useState({
+  supabase  const [newAppointment, setNewAppointment] = useState({
     patient_id: '',
     date: '',
     time: '',

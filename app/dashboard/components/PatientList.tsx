@@ -20,8 +20,7 @@ export function PatientList({ patients: initialPatients }: Props) {
 
   useEffect(() => {
     const load = async () => {
-      const supabase = supabase()
-      const { data: { user } } = await supabase.auth.getUser()
+      supabase      const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
       const res = await fetch(`/api/patients?psychologist_id=${user.id}`)
@@ -59,8 +58,7 @@ export function PatientList({ patients: initialPatients }: Props) {
 
   const handlePatientCreated = async () => {
     setNewPatientOpen(false)
-    const supabase = supabase()
-    const { data: { user } } = await supabase.auth.getUser()
+    supabase    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const res = await fetch(`/api/patients?psychologist_id=${user.id}`)
     if (!res.ok) return

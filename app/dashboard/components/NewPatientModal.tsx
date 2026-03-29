@@ -28,8 +28,7 @@ export function NewPatientModal({ open, onClose }: Props) {
     setIsPending(true)
 
     const formData = new FormData(e.currentTarget)
-    const supabase = supabase()
-    const { data: { user } } = await supabase.auth.getUser()
+    supabase    const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       setError('No autenticado')

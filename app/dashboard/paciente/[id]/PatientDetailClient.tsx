@@ -25,9 +25,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const router = useRouter()
-  const supabase = supabase()
-
-  const [formData, setFormData] = useState({
+  supabase  const [formData, setFormData] = useState({
     full_name: '',
     rut: '',
     birth_date: '',
