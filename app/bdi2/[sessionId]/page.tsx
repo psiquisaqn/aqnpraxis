@@ -71,12 +71,17 @@ export default function Bdi2SessionPage() {
     if (!allDone) return
     setSaving(true)
     try {
-      const res = await fetch('/api/bdi2/score', {
+      const res = await fetch('/api/bdi2/save', {   // ✅ ahora apunta al endpoint correcto
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, responses }),
       })
-      if (res.ok) router.push('/resultados/bdi2?session=' + sessionId)
+      if (res.ok) {
+        router.push('/resultados/bdi2?session=' + sessionId)
+      } else {
+        const data = await res.json()
+        console.error("Error al guardar:", data.error)
+      }
     } finally {
       setSaving(false)
     }
