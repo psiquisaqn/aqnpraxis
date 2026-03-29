@@ -1,18 +1,19 @@
-import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/server'
+import { NextResponse, NextRequest } from 'next/server'
+import { supabase } from '@/lib/supabase/client'
 
-export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
 
-  if (code) {
-    const supabase = await supabase()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
-    }
+  if (!code) {
+    return NextResponse.json({ error: 'Código de autenticación requerido' }, { status: 400 })
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ user: data.user })
 }
