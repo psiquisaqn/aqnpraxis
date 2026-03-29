@@ -8,7 +8,8 @@
  * CEDETi UC / PUC Chile — Tablas A.1 a A.7
  */
 
-import { supabase } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ─── Tipos ──────────────────────────────────────────────────
 
@@ -123,11 +124,9 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
 // ─── Motor principal ─────────────────────────────────────────
 
 export class Wisc5Engine {
-  private supabase: ReturnType<typeof supabase>
+  private supabase: SupabaseClient = supabase
 
-  constructor(supabaseUrl: string, supabaseKey: string) {
-    this.supabase = supabase(supabaseUrl, supabaseKey)
-  }
+
 
   /**
    * Paso 2 de la corrección: PD → PE para una subprueba y grupo etario.
@@ -358,6 +357,7 @@ export class Wisc5Engine {
 
 // ─── Exportar instancia lista para usar ──────────────────────
 
-export function createWisc5Engine(supabaseUrl: string, supabaseKey: string): Wisc5Engine {
-  return new Wisc5Engine(supabaseUrl, supabaseKey)
+export function createWisc5Engine(): Wisc5Engine {
+  return new Wisc5Engine()
 }
+
