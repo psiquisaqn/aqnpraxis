@@ -14,12 +14,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter }                      from 'next/navigation'
-import { createClient }                              from '@supabase/supabase-js'
+import { supabase }                              from '@supabase/supabase-js'
 import { CancelSessionButton } from '@/components/CancelSession'
 import { useSessionRealtime }                        from '@/hooks/useSessionRealtime'
 import type { WiscScoringResult, SubtestCode }       from '@/lib/wisc5/engine'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

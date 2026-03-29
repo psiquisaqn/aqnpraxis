@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient }              from '@supabase/supabase-js'
+import { supabase }              from '@supabase/supabase-js'
 import { createWisc5Engine, type RawScores, type SubtestCode } from '@/lib/wisc5/engine'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Cliente con service role para escritura
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = supabase(supabaseUrl, supabaseServiceKey)
 
     // Obtener la sesión con datos del paciente
     const { data: session, error: sessionError } = await supabase

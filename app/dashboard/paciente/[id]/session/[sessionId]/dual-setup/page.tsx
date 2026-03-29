@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 interface Device {
   id: string
@@ -22,7 +22,7 @@ export default function DualSetupPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const supabase = createClient()
+  const supabase = supabase()
 
   useEffect(() => {
     const loadDevices = async () => {

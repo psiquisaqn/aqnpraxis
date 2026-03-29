@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 interface PatientDetailClientProps {
@@ -25,7 +25,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = supabase()
 
   const [formData, setFormData] = useState({
     full_name: '',

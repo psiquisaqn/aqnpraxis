@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@supabase/supabase-js'
 import { scorePeca, type PecaResponses } from '@/lib/peca/engine'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 interface Appointment {
   id: string
@@ -24,7 +24,7 @@ export default function AgendaPage() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
   const [currentDate, setCurrentDate] = useState(new Date())
-  const supabase = createClient()
+  const supabase = supabase()
 
   const [newAppointment, setNewAppointment] = useState({
     patient_id: '',

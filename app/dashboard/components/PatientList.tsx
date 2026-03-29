@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 import type { Patient } from '@/types'
 import { PatientCard } from './PatientCard'
 import { NewPatientModal } from './NewPatientModal'
@@ -20,7 +20,7 @@ export function PatientList({ patients: initialPatients }: Props) {
 
   useEffect(() => {
     const load = async () => {
-      const supabase = createClient()
+      const supabase = supabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -59,7 +59,7 @@ export function PatientList({ patients: initialPatients }: Props) {
 
   const handlePatientCreated = async () => {
     setNewPatientOpen(false)
-    const supabase = createClient()
+    const supabase = supabase()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const res = await fetch(`/api/patients?psychologist_id=${user.id}`)

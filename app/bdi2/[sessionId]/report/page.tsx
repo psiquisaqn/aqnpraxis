@@ -3,11 +3,11 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreBdi2, BDI2_SEVERITY_COLORS, type BdiResult } from '@/lib/bdi2/engine'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

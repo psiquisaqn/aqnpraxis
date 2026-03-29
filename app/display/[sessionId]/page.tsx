@@ -10,10 +10,10 @@
 
 import { useEffect, useState } from 'react'
 import { useParams }           from 'next/navigation'
-import { createClient }        from '@supabase/supabase-js'
+import { supabase }        from '@supabase/supabase-js'
 import { useSessionRealtime, type DisplayCommand } from '@/hooks/useSessionRealtime'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

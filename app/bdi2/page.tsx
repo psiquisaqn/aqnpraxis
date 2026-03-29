@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@supabase/supabase-js'
 import { TestLayout } from '@/components/TestLayout'
 import { PaginationNav } from '@/components/PaginationNav'
 import { QuickIndex } from '@/components/QuickIndex'
 import { useTestNavigation } from '@/hooks/useTestNavigation'
 import { BDI2_ITEMS, scoreBdi2, type BdiResponse, type BdiResponses } from '@/lib/bdi2/engine'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

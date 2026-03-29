@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 interface Props {
   open: boolean
@@ -28,7 +28,7 @@ export function NewPatientModal({ open, onClose }: Props) {
     setIsPending(true)
 
     const formData = new FormData(e.currentTarget)
-    const supabase = createClient()
+    const supabase = supabase()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {

@@ -1,6 +1,6 @@
 // app/api/bdi2/save/route.ts
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@supabase/supabase-js';
 
 // Cargar variables de entorno de forma segura
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -11,7 +11,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 // Crear cliente Supabase
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabase(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
   try {

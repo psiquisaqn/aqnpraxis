@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 import { scoreCoopersmith } from '@/lib/coopersmith/engine'
 
 interface FinishEvaluationProps {
@@ -9,7 +9,7 @@ interface FinishEvaluationProps {
 }
 
 export async function finishEvaluation({ dualSessionId, sessionId, responses, router }: FinishEvaluationProps) {
-  const supabase = createClient()
+  const supabase = supabase()
 
   console.log('=== INICIANDO FINALIZACIÓN ===')
   console.log('dualSessionId:', dualSessionId)

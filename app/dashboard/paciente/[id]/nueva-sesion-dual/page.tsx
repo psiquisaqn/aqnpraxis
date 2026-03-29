@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 interface Device {
   id: string
@@ -24,7 +24,7 @@ export default function NewDualSessionPage() {
   const [error, setError] = useState<string | null>(null)
   const [roomCode, setRoomCode] = useState<string | null>(null)
 
-  const supabase = createClient()
+  const supabase = supabase()
 
   const tests = [
     { id: 'coopersmith', name: 'Coopersmith SEI', description: 'Inventario de Autoestima', items: 58 },

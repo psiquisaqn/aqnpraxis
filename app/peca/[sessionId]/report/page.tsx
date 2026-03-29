@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@supabase/supabase-js'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scorePeca, DIMENSIONS, AAMR_SETS, type PecaResult, type SupportIntensity } from '@/lib/peca/engine'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

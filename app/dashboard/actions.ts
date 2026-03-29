@@ -1,8 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase/server'
+import { supabase as createServiceClient } from '@supabase/supabase-js'
 import type { Patient } from '@/types'
 import { calcAge } from '@/lib/utils'
 
@@ -18,7 +18,7 @@ export async function getPatients(opts?: {
   search?: string
   archived?: boolean
 }): Promise<Patient[]> {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
@@ -61,7 +61,7 @@ export async function getPatients(opts?: {
 
 // ── Crear paciente ──────────────────────────────────────────────────
 export async function createPatient(formData: FormData) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
@@ -88,7 +88,7 @@ export async function createPatient(formData: FormData) {
 
 // ── Actualizar paciente ─────────────────────────────────────────────
 export async function updatePatient(id: string, formData: FormData) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
@@ -118,7 +118,7 @@ export async function updatePatient(id: string, formData: FormData) {
 
 // ── Archivar / desarchivar ──────────────────────────────────────────
 export async function archivePatient(id: string, archive: boolean) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
@@ -137,7 +137,7 @@ export async function archivePatient(id: string, archive: boolean) {
 
 // ── Crear nueva sesión ──────────────────────────────────────────────
 export async function createSession(patientId: string, testId: string) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 

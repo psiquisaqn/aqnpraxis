@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 export function useCancelSession(sessionId: string, patientId?: string) {
   const router = useRouter()
@@ -10,7 +10,7 @@ export function useCancelSession(sessionId: string, patientId?: string) {
 
   const cancel = () => {
     startTransition(async () => {
-      const supabase = createClient()
+      const supabase = supabase()
       await supabase
         .from('sessions')
         .update({ status: 'cancelled', completed_at: new Date().toISOString() })

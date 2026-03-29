@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/useRealtime'
 
 export default function SalaDisplayPage() {
@@ -16,7 +16,7 @@ export default function SalaDisplayPage() {
   const [error, setError] = useState<string | null>(null)
   const [messageCount, setMessageCount] = useState(0)
 
-  const supabase = createClient()
+  const supabase = supabase()
 
   useEffect(() => {
     const findSession = async () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 type MessagePayload = {
   type: string
@@ -9,7 +9,7 @@ type MessagePayload = {
 }
 
 export function useRealtime(channelId: string, onMessage: (payload: MessagePayload) => void) {
-  const supabase = createClient()
+  const supabase = supabase()
   const channelRef = useRef<any>(null)
 
   useEffect(() => {

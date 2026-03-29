@@ -8,10 +8,10 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { createClient, RealtimeChannel }             from '@supabase/supabase-js'
+import { supabase, RealtimeChannel }             from '@supabase/supabase-js'
 import type { WiscScoringResult }                    from '@/lib/wisc5/engine'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

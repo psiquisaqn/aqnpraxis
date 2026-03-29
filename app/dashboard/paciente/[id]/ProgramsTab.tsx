@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 interface ActivitySession {
   id: string
@@ -67,7 +67,7 @@ export function ProgramsTab({ patientId, activities, onRefresh }: Props) {
   const handleEnroll = (code: string) => {
     setEnrollError(null)
     startTransition(async () => {
-      const supabase = createClient()
+      const supabase = supabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -84,7 +84,7 @@ export function ProgramsTab({ patientId, activities, onRefresh }: Props) {
 
   const handleComplete = (sessionId: string) => {
     startTransition(async () => {
-      const supabase = createClient()
+      const supabase = supabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 

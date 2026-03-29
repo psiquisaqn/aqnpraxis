@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 const TESTS = [
   { id: 'wisc5_cl',    name: 'WISC-V Chile',  full: 'Escala de Inteligencia de Wechsler para Niños — 5ª Ed.', time: '~65–80 min', age: '6 a 16 años 11 meses', color: 'var(--teal-600)' },
@@ -28,7 +28,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
     if (!selected) return
     setError(null)
     startTransition(async () => {
-      const supabase = createClient()
+      const supabase = supabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('No autenticado'); return }
 

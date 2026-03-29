@@ -14,7 +14,7 @@
 'use client'
 
 import { useRef, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 export interface ReportMeta {
   sessionId:   string
@@ -123,7 +123,7 @@ export function useReportPdf(): UseReportPdfReturn {
       }
 
       // ── 4. Subir a Supabase Storage ──────────────────────────────
-      const supabase  = createClient()
+      const supabase  = supabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 

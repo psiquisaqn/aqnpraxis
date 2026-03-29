@@ -5,13 +5,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get('sessionId')
   if (!sessionId) return NextResponse.json({ error: 'sessionId requerido' }, { status: 400 })
 
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data, error } = await supabase
     .from('sessions')
     .select('patient_id')

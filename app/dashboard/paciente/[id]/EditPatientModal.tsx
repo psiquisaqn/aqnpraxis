@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase/client'
 
 const GRADES = [
   'Pre-Kínder', 'Kínder',
@@ -40,7 +40,7 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
     setError(null)
     const formData = new FormData(e.currentTarget)
     startTransition(async () => {
-      const supabase = createClient()
+      const supabase = supabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('No autenticado'); return }
 

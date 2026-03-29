@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@supabase/supabase-js'
 import { TestLayout } from '@/components/TestLayout'
 import { PaginationNav } from '@/components/PaginationNav'
 import { COOPERSMITH_ITEMS, scoreCoopersmith, type CooperResponse, type CooperResponses } from '@/lib/coopersmith/engine'
 
-const supabase = createClient(
+const supabase = supabase(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

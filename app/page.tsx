@@ -1,13 +1,19 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 
-export default async function HomePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export default async function Page() {
+  // Aquí ya puedes usar supabase porque está importado arriba
+  const { data, error } = await supabase
+    .from('resultados')
+    .select('*')
 
-  if (user) {
-    redirect('/dashboard')
-  } else {
-    redirect('/login')
+  if (error) {
+    console.error('Error al traer resultados:', error)
   }
+
+  return (
+    <div>
+      <h1>Resultados generales</h1>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+    </div>
+  )
 }

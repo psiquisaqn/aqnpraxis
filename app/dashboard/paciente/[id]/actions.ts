@@ -1,11 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/server'
 
 // ── Obtener ficha completa del paciente ─────────────────────────────
 export async function getPatientFull(patientId: string) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
@@ -52,7 +52,7 @@ export async function getPatientFull(patientId: string) {
 
 // ── Eliminar sesión ─────────────────────────────────────────────────
 export async function deleteSession(sessionId: string, patientId: string) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
@@ -69,7 +69,7 @@ export async function deleteSession(sessionId: string, patientId: string) {
 
 // ── Actualizar datos del paciente ───────────────────────────────────
 export async function updatePatient(patientId: string, formData: FormData) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
@@ -95,7 +95,7 @@ export async function updatePatient(patientId: string, formData: FormData) {
 
 // ── Inscribir paciente en programa de intervención ──────────────────
 export async function enrollProgram(patientId: string, programCode: string) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
@@ -137,7 +137,7 @@ export async function enrollProgram(patientId: string, programCode: string) {
 
 // ── Marcar sesión de actividad como completada ──────────────────────
 export async function completeActivitySession(activitySessionId: string, patientId: string) {
-  const supabase = await createClient()
+  const supabase = await supabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 

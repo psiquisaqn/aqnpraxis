@@ -8,7 +8,7 @@
  * CEDETi UC / PUC Chile — Tablas A.1 a A.7
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@supabase/supabase-js'
 
 // ─── Tipos ──────────────────────────────────────────────────
 
@@ -123,10 +123,10 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
 // ─── Motor principal ─────────────────────────────────────────
 
 export class Wisc5Engine {
-  private supabase: ReturnType<typeof createClient>
+  private supabase: ReturnType<typeof supabase>
 
   constructor(supabaseUrl: string, supabaseKey: string) {
-    this.supabase = createClient(supabaseUrl, supabaseKey)
+    this.supabase = supabase(supabaseUrl, supabaseKey)
   }
 
   /**
