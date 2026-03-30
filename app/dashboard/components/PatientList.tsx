@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
@@ -7,6 +7,7 @@ import { PatientCard } from './PatientCard'
 import { NewPatientModal } from './NewPatientModal'
 import { NewSessionModal } from './NewSessionModal'
 import { calcAge } from '@/lib/utils'
+import Link from 'next/link'
 
 interface Props {
   patients: Patient[]
@@ -108,6 +109,15 @@ export function PatientList({ patients: initialPatients }: Props) {
           </svg>
           Nuevo paciente
         </button>
+        <Link
+          href="/sala"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 1a6 6 0 100 12A6 6 0 007 1zM7 5v4M5 7h4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          Sala de Pacientes
+        </Link>
       </div>
 
       {filtered.length === 0 ? (
@@ -147,7 +157,7 @@ function EmptyState({ search, onNew }: { search: string; onNew: () => void }) {
       ) : (
         <>
           <p className="text-sm font-medium text-gray-700">
-            Aún no tienes pacientes registrados
+            AÃºn no tienes pacientes registrados
           </p>
           <p className="text-xs mt-1 mb-5 text-gray-400">
             Agrega tu primer paciente para comenzar
