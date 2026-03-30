@@ -1,13 +1,16 @@
-﻿import { getDashboardData } from './actions'
-import { DashboardShell } from '@/app/dashboard/components/DashboardShell'
+﻿import { PatientList } from '@/app/dashboard/components/PatientList'
+import { supabase as createSupabase } from '@/lib/supabase/server'
 
 export default async function DashboardPage() {
-  const { data, error } = await getDashboardData()
-  if (error) return <div>Error: {error}</div>
+  const supabase = await createSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return <div>No autenticado</div>
 
-  return (
-    <DashboardShell profile={data ?? null}>
-      <div />
-    </DashboardShell>
-  )
+  const { data: patients } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('psychologist_id', user.id)
+    .order('created_at', { ascending: false })
+
+  return <PatientList patients={patients ?? []} />
 }
