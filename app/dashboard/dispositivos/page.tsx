@@ -33,7 +33,8 @@ export default function DevicesPage() {
 
   useEffect(() => {
     const loadDevices = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) { setLoading(false); return }
 
       const { data } = await supabase
@@ -58,8 +59,8 @@ export default function DevicesPage() {
     setSaving(true)
     setError(null)
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError) { setError('Error de autenticacion: ' + authError.message); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) { setError('No autenticado'); return }
       if (!deviceName) { setError('Ingresa un nombre para el dispositivo'); return }
 
