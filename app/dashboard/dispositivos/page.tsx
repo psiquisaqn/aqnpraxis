@@ -154,7 +154,7 @@ export default function DevicesPage() {
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                {device.device_brand} ┬À ├Ültimo uso: {new Date(device.last_seen).toLocaleString()}
+                {device.device_brand} · Último uso: {new Date(device.last_seen).toLocaleString()}
               </p>
             </div>
             <button
@@ -169,7 +169,7 @@ export default function DevicesPage() {
 
       {devices.length === 0 && (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <div className="text-4xl mb-3">­ƒô▒</div>
+          <div className="text-4xl mb-3">🖥️</div>
           <p className="text-gray-400">No tienes dispositivos registrados</p>
           <p className="text-xs text-gray-300 mt-1">Registra tu primer dispositivo para comenzar</p>
         </div>

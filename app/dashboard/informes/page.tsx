@@ -117,7 +117,7 @@ export default function InformesPage() {
           href="/dashboard"
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
         >
-          ÔåÉ Volver al dashboard
+          ↩ Volver al dashboard
         </Link>
       </div>
 
@@ -141,13 +141,13 @@ export default function InformesPage() {
               onClick={() => setSortBy('date_asc')}
               className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'date_asc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
-              Fecha Ôåæ (mís antigua)
+              Fecha ↑ (más antigua)
             </button>
             <button
               onClick={() => setSortBy('date_desc')}
               className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'date_desc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
-              Fecha Ôåô (mís reciente)
+              Fecha ↓ (más reciente)
             </button>
           </div>
         </div>

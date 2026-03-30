@@ -156,13 +156,13 @@ export default function AgendaPage() {
             onClick={() => setViewMode('list')}
             className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
-            ­ƒôï Lista
+            📋 Lista
           </button>
           <button
             onClick={() => setViewMode('week')}
             className={`p-2 rounded-lg transition-colors ${viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
-            ­ƒôà Semana
+            📅 Semana
           </button>
           <button
             onClick={() => setShowNewForm(!showNewForm)}
@@ -175,7 +175,7 @@ export default function AgendaPage() {
             href="/dashboard"
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
           >
-            ÔåÉ Volver
+            ↩ Volver
           </Link>
         </div>
       </div>
