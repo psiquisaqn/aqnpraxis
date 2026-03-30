@@ -16,6 +16,8 @@ export default function DevicesPage() {
   const [deviceName, setDeviceName] = useState('')
   const [deviceType, setDeviceType] = useState('laptop')
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   
 
