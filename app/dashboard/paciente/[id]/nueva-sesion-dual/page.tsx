@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createBrowserClient } from '@supabase/ssr'
 
 interface Device {
   id: string
@@ -15,6 +15,13 @@ export default function NewDualSessionPage() {
   const router = useRouter()
   const patientId = params.id as string
 
+  const [supabase] = useState(() =>
+    createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  )
+
   const [devices, setDevices] = useState<Device[]>([])
   const [screen1Device, setScreen1Device] = useState<string>('')
   const [screen2Device, setScreen2Device] = useState<string>('')
@@ -22,6 +29,7 @@ export default function NewDualSessionPage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [debugError, setDebugError] = useState<string | null>(null)
   const [roomCode, setRoomCode] = useState<string | null>(null)
 
   const tests = [
@@ -42,93 +50,164 @@ export default function NewDualSessionPage() {
 
   useEffect(() => {
     const loadDevices = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      try {
+        console.log('=== Cargando dispositivos ===')
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          console.error('Error getting user:', userError)
+          setDebugError(`Error de autenticación: ${userError.message}`)
+          setLoading(false)
+          return
+        }
+        
+        if (!user) {
+          console.log('No user found')
+          setDebugError('Usuario no autenticado. Por favor, inicia sesión.')
+          setLoading(false)
+          return
+        }
+
+        console.log('User ID:', user.id)
+
+        const { data, error } = await supabase
+          .from('devices')
+          .select('id, device_name, device_type')
+          .eq('user_id', user.id)
+          .order('last_seen', { ascending: false })
+
+        if (error) {
+          console.error('Error loading devices:', error)
+          setDebugError(`Error al cargar dispositivos: ${error.message}`)
+        } else {
+          console.log('Devices loaded:', data?.length || 0)
+          setDevices(data || [])
+          if (!data || data.length === 0) {
+            setDebugError('No hay dispositivos registrados. Ve a "Dispositivos" para registrar uno.')
+          }
+        }
         setLoading(false)
-        return
+      } catch (err: any) {
+        console.error('Unexpected error:', err)
+        setDebugError(`Error inesperado: ${err.message}`)
+        setLoading(false)
       }
-
-      const { data, error } = await supabase
-        .from('devices')
-        .select('id, device_name, device_type')
-        .eq('user_id', user.id)
-        .order('last_seen', { ascending: false })
-
-      if (error) {
-        console.error('Error loading devices:', error)
-        setError('Error al cargar dispositivos')
-      } else {
-        setDevices(data || [])
-      }
-      setLoading(false)
     }
 
     loadDevices()
-  }, [])
+  }, [supabase])
 
   const createDualSession = async () => {
-    if (!selectedTest || !screen1Device || !screen2Device) return
+    console.log('=== INICIANDO CREACIÓN DE SESIÓN DUAL ===')
+    console.log('selectedTest:', selectedTest)
+    console.log('screen1Device:', screen1Device)
+    console.log('screen2Device:', screen2Device)
+    
+    if (!selectedTest || !screen1Device || !screen2Device) {
+      console.log('Faltan datos')
+      setError('Por favor, completa todos los campos')
+      return
+    }
 
     setCreating(true)
     setError(null)
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (!user) {
-      setError('Usuario no autenticado')
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError) {
+        console.error('Error getting user:', userError)
+        setError(`Error de autenticación: ${userError.message}`)
+        setCreating(false)
+        return
+      }
+      
+      if (!user) {
+        setError('Usuario no autenticado')
+        setCreating(false)
+        return
+      }
+
+      console.log('Creando sesión para paciente:', patientId)
+
+      // Crear sesión normal
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .insert({
+          patient_id: patientId,
+          psychologist_id: user.id,
+          test_id: selectedTest,
+          status: 'in_progress'
+        })
+        .select()
+        .single()
+
+      if (sessionError) {
+        console.error('Error creating session:', sessionError)
+        setError(`Error al crear la sesión: ${sessionError.message}`)
+        setCreating(false)
+        return
+      }
+
+      console.log('Sesión creada:', session)
+
+      // Generar código de sala
+      const roomCode = generateRoomCode()
+      console.log('Room code generado:', roomCode)
+
+      // Crear sesión dual
+      const { data: dualSession, error: dualError } = await supabase
+        .from('dual_sessions')
+        .insert({
+          session_id: session.id,
+          psychologist_id: user.id,
+          screen1_device_id: screen1Device,
+          screen2_device_id: screen2Device,
+          room_code: roomCode,
+          is_active: true
+        })
+        .select()
+        .single()
+
+      if (dualError) {
+        console.error('Error creating dual session:', dualError)
+        setError(`Error al configurar la sesión dual: ${dualError.message}`)
+        setCreating(false)
+        return
+      }
+
+      console.log('Sesión dual creada:', dualSession)
+      setRoomCode(roomCode)
+      
+      // Esperar 2 segundos para que el psicólogo vea el código antes de redirigir
+      setTimeout(() => {
+        console.log('Redirigiendo a:', `/dual-control/${dualSession.id}`)
+        router.push(`/dual-control/${dualSession.id}`)
+      }, 2000)
+      
+    } catch (err: any) {
+      console.error('Error inesperado:', err)
+      setError(`Error inesperado: ${err.message}`)
       setCreating(false)
-      return
     }
+  }
 
-    // Crear sesión normal
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .insert({
-        patient_id: patientId,
-        psychologist_id: user.id,
-        test_id: selectedTest,
-        status: 'in_progress'
-      })
-      .select()
-      .single()
-
-    if (sessionError) {
-      console.error('Error creating session:', sessionError)
-      setError(`Error al crear la sesión: ${sessionError.message}`)
-      setCreating(false)
-      return
-    }
-
-    // Generar código de sala
-    const roomCode = generateRoomCode()
-
-    // Crear sesión dual
-    const { data: dualSession, error: dualError } = await supabase
-      .from('dual_sessions')
-      .insert({
-        session_id: session.id,
-        psychologist_id: user.id,
-        screen1_device_id: screen1Device,
-        screen2_device_id: screen2Device,
-        room_code: roomCode,
-        is_active: true
-      })
-      .select()
-      .single()
-
-    if (dualError) {
-      console.error('Error creating dual session:', dualError)
-      setError(`Error al configurar la sesión dual: ${dualError.message}`)
-      setCreating(false)
-      return
-    }
-
-    setRoomCode(roomCode)
-    
-    // Esperar 2 segundos para que el psicólogo vea el código antes de redirigir
-    setTimeout(() => {
-      router.push(`/dual-control/${dualSession.id}`)
-    }, 2000)
+  // Mostrar error de debug si existe
+  if (debugError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h2 className="text-red-700 font-semibold mb-2">Error:</h2>
+          <p className="text-red-600">{debugError}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -236,7 +315,7 @@ export default function NewDualSessionPage() {
               </label>
             ))}
           </div>
-          {devices.length === 0 && (
+          {devices.length === 0 && !debugError && (
             <div className="text-center py-4">
               <p className="text-gray-400 mb-2">No tienes dispositivos registrados</p>
               <a
