@@ -1,6 +1,7 @@
-﻿import { supabase } from '@/lib/supabase/client'
+﻿import { supabase as createSupabase } from '@/lib/supabase/server'
 
 export async function getDashboardData() {
+  const supabase = await createSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
