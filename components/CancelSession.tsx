@@ -1,4 +1,4 @@
-'use client'
+ï»¿'use client'
 import { startTransition } from 'react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -16,7 +16,7 @@ export function CancelSessionButton({ sessionId }: { sessionId: string }) {
       }
     })
   }
-  return <button onClick={cancel}>Cancelar sesión</button>
+  return <button onClick={cancel}>Cancelar sesion</button>
 }
 
 export default CancelSessionButton
