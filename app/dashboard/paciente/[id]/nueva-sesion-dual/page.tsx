@@ -24,7 +24,7 @@ export default function NewDualSessionPage() {
   const [error, setError] = useState<string | null>(null)
   const [roomCode, setRoomCode] = useState<string | null>(null)
 
-  supabase  const tests = [
+  const tests = [
     { id: 'coopersmith', name: 'Coopersmith SEI', description: 'Inventario de Autoestima', items: 58 },
     { id: 'bdi2', name: 'BDI-II', description: 'Inventario de Depresión de Beck', items: 21 },
     { id: 'peca', name: 'PECA', description: 'Prueba de Conducta Adaptativa', items: 45 },

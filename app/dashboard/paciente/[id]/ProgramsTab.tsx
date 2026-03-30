@@ -67,7 +67,7 @@ export function ProgramsTab({ patientId, activities, onRefresh }: Props) {
   const handleEnroll = (code: string) => {
     setEnrollError(null)
     startTransition(async () => {
-      supabase      const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
       const res = await fetch('/api/activity-sessions', {
@@ -83,7 +83,7 @@ export function ProgramsTab({ patientId, activities, onRefresh }: Props) {
 
   const handleComplete = (sessionId: string) => {
     startTransition(async () => {
-      supabase      const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
       await fetch('/api/activity-sessions', {

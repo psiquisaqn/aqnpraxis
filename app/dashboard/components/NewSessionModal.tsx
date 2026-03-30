@@ -28,7 +28,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
     if (!selected) return
     setError(null)
     startTransition(async () => {
-      supabase      const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('No autenticado'); return }
 
       const res = await fetch('/api/sessions', {

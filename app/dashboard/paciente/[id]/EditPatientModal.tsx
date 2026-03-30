@@ -40,7 +40,7 @@ export function EditPatientModal({ patient, open, onClose }: Props) {
     setError(null)
     const formData = new FormData(e.currentTarget)
     startTransition(async () => {
-      supabase      const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('No autenticado'); return }
 
       const payload = {
