@@ -37,7 +37,7 @@ export default function AgendaPage() {
   useEffect(() => {
     const loadAppointments = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setLoading(false); return }
 
       const { data, error } = await supabase
         .from('appointments')
@@ -79,7 +79,7 @@ export default function AgendaPage() {
     if (!newAppointment.patient_id || !newAppointment.date || !newAppointment.time) return
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setLoading(false); return }
 
     const { error } = await supabase
       .from('appointments')
