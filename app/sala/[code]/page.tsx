@@ -1,137 +1,104 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 import { useParams } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function SalaPage() {
   const params = useParams()
   const code = params.code as string
   
-  const [supabase] = useState(() =>
-    createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  )
-  
-  const [session, setSession] = useState<any>(null)
-  const [currentItem, setCurrentItem] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [encontrado, setEncontrado] = useState(false)
+
+  const addDebug = (msg: string) => {
+    console.log(msg)
+    setDebugInfo(prev => [...prev, msg])
+  }
 
   useEffect(() => {
-    const loadSession = async () => {
-      // Obtener la sesión por código
-      const { data: sessionData, error } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('code', code)
-        .single()
-
-      if (error) {
-        console.error('Error fetching session:', error)
-        setLoading(false)
-        return
-      }
-
-      setSession(sessionData)
-      
-      // Escuchar cambios en tiempo real para mostrar el ítem actual
-      const subscription = supabase
-        .channel(`session:${sessionData.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'sessions',
-            filter: `id=eq.${sessionData.id}`,
-          },
-          (payload) => {
-            // Cuando el psicólogo cambie el ítem actual
-            if (payload.new.current_item) {
-              setCurrentItem(payload.new.current_item)
-            }
-          }
+    const init = async () => {
+      try {
+        addDebug('1. Iniciando búsqueda para código: ' + code)
+        
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         )
-        .subscribe()
-
-      setLoading(false)
-
-      return () => {
-        subscription.unsubscribe()
+        
+        addDebug('2. Cliente Supabase creado')
+        addDebug('3. Buscando en dual_sessions con room_code: ' + code.toUpperCase())
+        
+        const { data, error } = await supabase
+          .from('dual_sessions')
+          .select('*')
+          .eq('room_code', code.toUpperCase())
+          .eq('is_active', true)
+        
+        addDebug('4. Resultado de búsqueda: ' + JSON.stringify({ data: data?.length, error: error?.message }))
+        
+        if (error) {
+          addDebug('❌ Error: ' + error.message)
+          setError(error.message)
+          return
+        }
+        
+        if (!data || data.length === 0) {
+          addDebug('❌ No se encontró ninguna sala con código: ' + code.toUpperCase())
+          setError(`No se encontró la sala "${code.toUpperCase()}"`)
+          return
+        }
+        
+        addDebug('✅ Sala encontrada! ID: ' + data[0].id)
+        addDebug('📝 Room code: ' + data[0].room_code)
+        addDebug('🔘 is_active: ' + data[0].is_active)
+        setEncontrado(true)
+        
+      } catch (err: any) {
+        addDebug('❌ Error inesperado: ' + err.message)
+        setError(err.message)
       }
     }
-
-    loadSession()
-  }, [code, supabase])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Cargando sala...</div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-600">Sala no encontrada</div>
-      </div>
-    )
-  }
+    
+    init()
+  }, [code])
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6 text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Evaluación Psicológica
-          </h1>
-          <p className="text-gray-600">
-            Sala: {code}
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h1 className="text-2xl font-bold mb-4">Sala de Evaluación</h1>
+          <p className="text-gray-600 mb-4">
+            Código ingresado: <span className="font-mono font-bold text-xl">{code}</span>
           </p>
-        </div>
-
-        {/* Contenido de la evaluación */}
-        <div className="bg-white rounded-lg shadow p-8">
-          {currentItem ? (
-            <div>
-              <h2 className="text-2xl font-semibold mb-6">
-                {currentItem.pregunta || currentItem.texto}
-              </h2>
-              
-              {/* Aquí se mostrarían las opciones si el paciente pudiera responder directamente */}
-              <div className="space-y-3">
-                {currentItem.opciones?.map((opcion: any, idx: number) => (
-                  <button
-                    key={idx}
-                    disabled
-                    className="w-full text-left p-4 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
-                  >
-                    {opcion.texto}
-                  </button>
-                ))}
-              </div>
-              
-              <p className="mt-6 text-sm text-gray-400 text-center">
-                Esperando indicaciones del psicólogo...
-              </p>
+          
+          {error ? (
+            <div className="bg-red-50 border border-red-200 rounded p-4 mb-4">
+              <p className="text-red-600 font-semibold">Error:</p>
+              <p className="text-red-600">{error}</p>
             </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="text-gray-400 mb-4">
-                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <p className="text-gray-500">
-                Esperando que el psicólogo inicie la evaluación...
-              </p>
+          ) : encontrado ? (
+            <div className="bg-green-50 border border-green-200 rounded p-4 mb-4">
+              <p className="text-green-600 font-semibold">✅ Sala encontrada!</p>
+              <p className="text-green-600 mt-2">Conectando a la evaluación...</p>
             </div>
-          )}
+          ) : null}
+          
+          <div className="bg-gray-100 rounded p-4">
+            <p className="text-sm font-semibold text-gray-700 mb-2">Debug info:</p>
+            <div className="space-y-1 text-xs font-mono text-gray-600 max-h-96 overflow-auto">
+              {debugInfo.map((msg, i) => (
+                <div key={i}>{msg}</div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="mt-6 text-center">
+            <a href="/sala" className="text-blue-600 hover:text-blue-800">
+              ← Volver a ingresar código
+            </a>
+          </div>
         </div>
       </div>
     </div>
