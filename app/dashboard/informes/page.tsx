@@ -141,13 +141,13 @@ export default function InformesPage() {
               onClick={() => setSortBy('date_asc')}
               className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'date_asc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
-              Fecha Ôåæ (m├ís antigua)
+              Fecha Ôåæ (mís antigua)
             </button>
             <button
               onClick={() => setSortBy('date_desc')}
               className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'date_desc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
-              Fecha Ôåô (m├ís reciente)
+              Fecha Ôåô (mís reciente)
             </button>
           </div>
         </div>

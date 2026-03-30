@@ -32,7 +32,7 @@ export default function DevicesPage() {
   useEffect(() => {
     const loadDevices = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setLoading(false); return }
 
       const { data } = await supabase
         .from('devices')
@@ -112,7 +112,7 @@ export default function DevicesPage() {
           >
             <option value="laptop">Laptop</option>
             <option value="tablet">Tablet</option>
-            <option value="phone">Tel├®fono</option>
+            <option value="phone">Teléfono</option>
             <option value="desktop">Desktop</option>
           </select>
           <button

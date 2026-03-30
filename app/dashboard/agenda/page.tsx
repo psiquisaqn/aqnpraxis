@@ -29,7 +29,7 @@ export default function AgendaPage() {
     patient_id: '',
     date: '',
     time: '',
-    type: 'Evaluaci├│n',
+    type: 'Evaluación',
     notes: ''
   })
 
@@ -95,7 +95,7 @@ export default function AgendaPage() {
 
     if (!error) {
       setShowNewForm(false)
-      setNewAppointment({ patient_id: '', date: '', time: '', type: 'Evaluaci├│n', notes: '' })
+      setNewAppointment({ patient_id: '', date: '', time: '', type: 'Evaluación', notes: '' })
       // Recargar citas
       window.location.reload()
     } else {
@@ -169,7 +169,7 @@ export default function AgendaPage() {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
           >
             <span className="text-lg">+</span>
-            Agendar sesi├│n
+            Agendar sesión
           </button>
           <Link
             href="/dashboard"
@@ -183,7 +183,7 @@ export default function AgendaPage() {
       {/* Formulario nueva cita */}
       {showNewForm && (
         <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Nueva sesi├│n</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Nueva sesión</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <select
               value={newAppointment.patient_id}
@@ -212,9 +212,9 @@ export default function AgendaPage() {
               onChange={(e) => setNewAppointment({...newAppointment, type: e.target.value})}
               className="px-3 py-2 border border-gray-200 rounded-lg"
             >
-              <option>Evaluaci├│n</option>
-              <option>Intervenci├│n</option>
-              <option>Devoluci├│n</option>
+              <option>Evaluación</option>
+              <option>Intervención</option>
+              <option>Devolución</option>
               <option>Seguimiento</option>
             </select>
             <textarea
@@ -250,7 +250,7 @@ export default function AgendaPage() {
             onClick={() => setShowNewForm(true)}
             className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
           >
-            Agendar primera sesi├│n
+            Agendar primera sesión
           </button>
         </div>
       ) : (
