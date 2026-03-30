@@ -1,11 +1,15 @@
-import { supabase } from '@/lib/supabase/client'
+﻿import { supabase } from '@/lib/supabase/client'
 
 export async function getDashboardData() {
-  const { data, error } = await supabase.from('dashboard').select('*')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
 
-  if (error) {
-    return { error: error.message }
-  }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name, email, plan, specialty, avatar_url')
+    .eq('id', user.id)
+    .single()
 
+  if (error) return { error: error.message }
   return { data }
 }
