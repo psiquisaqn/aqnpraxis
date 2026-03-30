@@ -108,6 +108,7 @@ export default function DevicesPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
           Registrar nuevo dispositivo
         </h2>
+        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
