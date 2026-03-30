@@ -1,16 +1,14 @@
 'use client'
-
 import { startTransition } from 'react'
 import { supabase } from '@/lib/supabase/client'
 
-export default function CancelSession({ sessionId }: { sessionId: string }) {
+export function CancelSessionButton({ sessionId }: { sessionId: string }) {
   const cancel = () => {
     startTransition(async () => {
       const { error } = await supabase
         .from('sessions')
         .update({ status: 'cancelled', completed_at: new Date().toISOString() })
         .eq('id', sessionId)
-
       if (error) {
         console.error('Error cancelling session:', error.message)
       } else {
@@ -18,6 +16,7 @@ export default function CancelSession({ sessionId }: { sessionId: string }) {
       }
     })
   }
-
-  return <button onClick={cancel}>Cancelar sesiÃ³n</button>
+  return <button onClick={cancel}>Cancelar sesión</button>
 }
+
+export default CancelSessionButton

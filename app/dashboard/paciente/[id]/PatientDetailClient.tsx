@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 
-export default function PatientDetailClient({ patientId }: { patientId: string }) {
+export function PatientDetailClient({ patientId }: { patientId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const router = useRouter()
@@ -32,3 +32,4 @@ export default function PatientDetailClient({ patientId }: { patientId: string }
     </div>
   )
 }
+export default PatientDetailClient

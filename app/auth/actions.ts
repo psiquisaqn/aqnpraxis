@@ -1,28 +1,21 @@
-import { supabase } from '@/lib/supabase/client'
+'use server'
+import { createServerActionClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function logout() {
+  const supabase = createServerActionClient({ cookies })
+  await supabase.auth.signOut()
+  redirect('/login')
+}
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-
-  // Usar directamente el cliente centralizado
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
-
+  const supabase = createServerActionClient({ cookies })
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) {
     return { error: error.message }
   }
-
-  return { user: data.user }
-}
-
-export async function logout() {
-  const { error } = await supabase.auth.signOut()
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  return { success: true }
+  redirect('/dashboard')
 }
