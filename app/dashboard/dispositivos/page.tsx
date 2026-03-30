@@ -53,23 +53,32 @@ export default function DevicesPage() {
   }, [])
 
   const addDevice = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || !deviceName) return
+    setSaving(true)
+    setError(null)
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError) { setError('Error de autenticacion: ' + authError.message); return }
+      if (!user) { setError('No autenticado'); return }
+      if (!deviceName) { setError('Ingresa un nombre para el dispositivo'); return }
 
-    const { data } = await supabase
-      .from('devices')
-      .insert({
-        user_id: user.id,
-        device_name: deviceName,
-        device_type: deviceType,
-        device_brand: navigator.platform || 'desconocido'
-      })
-      .select()
-      .single()
+      const { data, error: insertError } = await supabase
+        .from('devices')
+        .insert({
+          user_id: user.id,
+          device_name: deviceName,
+          device_type: deviceType,
+          device_brand: navigator.platform || 'desconocido'
+        })
+        .select()
+        .single()
 
-    if (data) {
-      setDevices([data, ...devices])
-      setDeviceName('')
+      if (insertError) { setError('Error al registrar: ' + insertError.message); return }
+      if (data) {
+        setDevices([data, ...devices])
+        setDeviceName('')
+      }
+    } finally {
+      setSaving(false)
     }
   }
 
