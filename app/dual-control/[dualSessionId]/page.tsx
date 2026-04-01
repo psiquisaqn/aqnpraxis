@@ -48,6 +48,10 @@ export default function DualControlPage() {
 
   const { sendMessage } = useRealtime(dualSessionId, (payload) => {
     console.log('Mensaje recibido en control:', payload)
+    if (payload.type === 'display_ready') {
+      console.log('Display listo, disparando evento...')
+      window.dispatchEvent(new Event('display_ready'))
+    }
   })
 
   const updatePatientScreen = async (content: any) => {

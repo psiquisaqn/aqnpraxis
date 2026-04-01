@@ -45,6 +45,15 @@ export default function SalaDisplayPage() {
     }
   })
 
+  // Cuando tenemos dualSessionId, avisar al control que el display esta listo
+  useEffect(() => {
+    if (!dualSessionId) return
+    const timer = setTimeout(() => {
+      sendMessage({ type: 'display_ready', message: 'Display listo' })
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [dualSessionId])
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
