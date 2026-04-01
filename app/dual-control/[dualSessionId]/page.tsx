@@ -108,6 +108,9 @@ export default function DualControlPage() {
               <h1 className="text-lg font-semibold text-gray-800">Control de evaluacion</h1>
               <p className="text-sm text-gray-500">Paciente: {sessionData.session?.patient?.full_name}</p>
               <p className="text-xs text-gray-400 mt-1">Test: {testLabel}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Codigo de sala: <span className="font-mono font-bold text-blue-600 text-sm">{sessionData?.room_code}</span>
+              </p>
             </div>
             <div className="flex gap-2">
               <button onClick={sendTestMessage} className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-medium transition-colors">

@@ -1,4 +1,7 @@
-'use client'
+const fs = require('fs')
+
+// Fix sala/page.tsx - formulario de ingreso de codigo
+const salaPage = `'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -48,3 +51,7 @@ export default function SalaPage() {
     </div>
   )
 }
+`
+
+fs.writeFileSync('app/sala/page.tsx', salaPage, 'utf8')
+console.log('sala/page.tsx OK')
