@@ -1,4 +1,5 @@
-﻿'use client'
+$content = @"
+'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PECA_ITEMS, type PecaResponses } from '@/lib/peca/engine'
@@ -78,7 +79,7 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
           <span className="text-gray-800 font-medium">{completed}/45 items</span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: +""+"${(completed/45)*100}%"+""+ }} />
+          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `+"`"+"`${(completed/45)*100}%`"+"`"+` }} />
         </div>
       </div>
 
@@ -95,7 +96,7 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         <div className="grid grid-cols-4 gap-2">
           {[1,2,3,4].map((val) => (
             <button key={val} onClick={() => handleResponse(val)}
-              className={+""+"py-2 rounded-lg font-medium text-sm transition-all +""+"}
+              className={`+"`"+"`py-2 rounded-lg font-medium text-sm transition-all ${responses[currentItem] === val ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`+"`"+"`}
             >{val}</button>
           ))}
         </div>
@@ -127,7 +128,7 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         <div className="grid grid-cols-10 gap-1 max-h-32 overflow-y-auto">
           {PECA_ITEMS.map((item) => (
             <button key={item.num} onClick={() => goToItem(item.num)}
-              className={+""+"	ext-xs py-1 rounded +""+"}>
+              className={`+"`"+"`text-xs py-1 rounded ${currentItem===item.num ? 'bg-blue-600 text-white' : responses[item.num] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`+"`"+"`}>
               {item.num}
             </button>
           ))}
@@ -136,3 +137,11 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
     </div>
   )
 }
+"@
+
+[System.IO.File]::WriteAllText(
+  "C:\Users\abaez\OneDrive\Documentos\aqnpraxis\aqnpraxis\app\dual-control\[dualSessionId]\peca.tsx",
+  $content,
+  [System.Text.Encoding]::UTF8
+)
+Write-Host "OK"
