@@ -1,1 +1,34 @@
-{}
+{
+  "hooks\\useReportPdf.ts -> html2canvas": {
+    "id": 1173,
+    "files": [
+      "static/chunks/ad2866b8.989f74a0aef466bf.js"
+    ]
+  },
+  "hooks\\useReportPdf.ts -> jspdf": {
+    "id": 7501,
+    "files": [
+      "static/chunks/164f4fb6.85eeeec98b7f854c.js",
+      "static/chunks/65.855e59001c27d38c.js"
+    ]
+  },
+  "node_modules\\jspdf\\dist\\jspdf.es.min.js -> canvg": {
+    "id": 2865,
+    "files": [
+      "static/chunks/bc98253f.3ac78ddb72bff23a.js",
+      "static/chunks/124.736e340b98818089.js"
+    ]
+  },
+  "node_modules\\jspdf\\dist\\jspdf.es.min.js -> dompurify": {
+    "id": 1838,
+    "files": [
+      "static/chunks/838.9b4eaceffec975ca.js"
+    ]
+  },
+  "node_modules\\jspdf\\dist\\jspdf.es.min.js -> html2canvas": {
+    "id": 1173,
+    "files": [
+      "static/chunks/ad2866b8.989f74a0aef466bf.js"
+    ]
+  }
+}

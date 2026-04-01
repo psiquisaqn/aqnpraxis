@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PECA_ITEMS, type PecaResponses } from '@/lib/peca/engine'
-import { finishEvaluation } from './finish'
 
 interface PecaControlProps {
   dualSessionId: string
@@ -67,7 +66,20 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const handleFinish = async () => {
     if (!allDone) return
     setFinishing(true)
-    await finishEvaluation({ dualSessionId, sessionId, responses, router })
+    try {
+      const { scorePeca } = await import('@/lib/peca/engine')
+      const result = scorePeca(responses)
+      const { supabase } = await import('@/lib/supabase/client')
+      const { error } = await supabase
+        .from('peca_scores')
+        .upsert({ session_id: sessionId, responses, ...result }, { onConflict: 'session_id' })
+      if (error) { alert('Error al guardar: ' + error.message); setFinishing(false); return }
+      await supabase.from('sessions').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', sessionId)
+      router.push('/dashboard')
+    } catch(e: any) {
+      alert('Error: ' + e.message)
+      setFinishing(false)
+    }
   }
 
   return (
