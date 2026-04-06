@@ -1,0 +1,6 @@
+const fs = require('fs')
+const content = fs.readFileSync('app/dual-control/[dualSessionId]/coopersmith.tsx', 'utf8')
+const lines = content.split('\n')
+console.log(JSON.stringify(lines[11]))
+console.log(JSON.stringify(lines[12]))
+console.log(JSON.stringify(lines[13]))

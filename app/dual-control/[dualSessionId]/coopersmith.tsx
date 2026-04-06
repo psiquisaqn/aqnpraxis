@@ -10,6 +10,7 @@ interface CoopersmithControlProps {
   sessionId: string
   onUpdatePatient: (content: any) => void
   onSaveResponse: (item: number, value: CooperResponse) => void
+  displayReady?: boolean
 }
 
 export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse, displayReady = false }: CoopersmithControlProps) {
