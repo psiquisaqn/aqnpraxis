@@ -95,7 +95,7 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       })
 
       // Mapear AAMR sets
-      const aamrMap: Record<string, number> = {}
+      const aamrMap: Record<string, any> = {}
       result.aamrSets.forEach((s: any) => {
         aamrMap['h' + s.code.slice(0,3)] = s.p2
         aamrMap['h' + s.code.slice(0,3) + '_level'] = s.needsSupport ? 'needs_support' : 'ok'
