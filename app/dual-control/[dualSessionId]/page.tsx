@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/useRealtime'
 import { CoopersmithControl } from './coopersmith'
 import { PecaControl } from './peca'
+import { Bdi2Control } from './bdi2'
 
 export default function DualControlPage() {
   const params = useParams()
@@ -137,6 +138,16 @@ export default function DualControlPage() {
         ) : currentTest === 'peca' ? (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <PecaControl
+              dualSessionId={dualSessionId}
+              sessionId={sessionId}
+              onUpdatePatient={updatePatientScreen}
+              onSaveResponse={saveResponse}
+              displayReady={displayReady}
+            />
+          </div>
+        ) : currentTest === 'bdi2' ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <Bdi2Control
               dualSessionId={dualSessionId}
               sessionId={sessionId}
               onUpdatePatient={updatePatientScreen}

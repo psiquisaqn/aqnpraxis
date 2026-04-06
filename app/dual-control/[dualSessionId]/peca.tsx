@@ -79,9 +79,39 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       const { scorePeca } = await import('@/lib/peca/engine')
       const result = scorePeca(responses)
       const { supabase } = await import('@/lib/supabase/client')
+
+      // Mapear respuestas a columnas p01-p45
+      const itemCols: Record<string, number> = {}
+      for (let i = 1; i <= 45; i++) {
+        const key = 'p' + String(i).padStart(2, '0')
+        if (responses[i] !== undefined) itemCols[key] = responses[i] as number
+      }
+
+      // Mapear dimensiones
+      const dimMap: Record<string, any> = {}
+      result.dimensions.forEach((d: any) => {
+        dimMap['score_' + d.code] = d.p2
+        dimMap['level_' + d.code] = d.intensity
+      })
+
+      // Mapear AAMR sets
+      const aamrMap: Record<string, number> = {}
+      result.aamrSets.forEach((s: any) => {
+        aamrMap['h' + s.code.slice(0,3)] = s.p2
+        aamrMap['h' + s.code.slice(0,3) + '_level'] = s.needsSupport ? 'needs_support' : 'ok'
+      })
+
       const { error } = await supabase
         .from('peca_scores')
-        .upsert({ session_id: sessionId, responses, ...result }, { onConflict: 'session_id' })
+        .upsert({
+          session_id: sessionId,
+          ...itemCols,
+          ...dimMap,
+          ...aamrMap,
+          participation_level: result.participationLevel,
+          completed_items: result.answeredItems,
+          calculated_at: new Date().toISOString(),
+        }, { onConflict: 'session_id' })
       if (error) { alert('Error al guardar: ' + error.message); setFinishing(false); return }
       await supabase.from('sessions').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', sessionId)
       router.push('/dashboard')

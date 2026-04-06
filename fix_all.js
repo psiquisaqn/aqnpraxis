@@ -1,4 +1,115 @@
-'use client'
+const fs = require('fs')
+
+// ============================================================
+// FIX 1: peca.tsx - guardar con columnas correctas
+// ============================================================
+let peca = fs.readFileSync('app/dual-control/[dualSessionId]/peca.tsx', 'utf8')
+
+peca = peca.replace(
+  `      const result = scorePeca(responses)
+      const { supabase } = await import('@/lib/supabase/client')
+      const { error } = await supabase
+        .from('peca_scores')
+        .upsert({ session_id: sessionId, responses, ...result }, { onConflict: 'session_id' })`,
+  `      const result = scorePeca(responses)
+      const { supabase } = await import('@/lib/supabase/client')
+
+      // Mapear respuestas a columnas p01-p45
+      const itemCols: Record<string, number> = {}
+      for (let i = 1; i <= 45; i++) {
+        const key = 'p' + String(i).padStart(2, '0')
+        if (responses[i] !== undefined) itemCols[key] = responses[i] as number
+      }
+
+      // Mapear dimensiones
+      const dimMap: Record<string, any> = {}
+      result.dimensions.forEach((d: any) => {
+        dimMap['score_' + d.code] = d.p2
+        dimMap['level_' + d.code] = d.intensity
+      })
+
+      // Mapear AAMR sets
+      const aamrMap: Record<string, number> = {}
+      result.aamrSets.forEach((s: any) => {
+        aamrMap['h' + s.code.slice(0,3)] = s.p2
+        aamrMap['h' + s.code.slice(0,3) + '_level'] = s.needsSupport ? 'needs_support' : 'ok'
+      })
+
+      const { error } = await supabase
+        .from('peca_scores')
+        .upsert({
+          session_id: sessionId,
+          ...itemCols,
+          ...dimMap,
+          ...aamrMap,
+          participation_level: result.participationLevel,
+          completed_items: result.answeredItems,
+          calculated_at: new Date().toISOString(),
+        }, { onConflict: 'session_id' })`
+)
+
+fs.writeFileSync('app/dual-control/[dualSessionId]/peca.tsx', peca, 'utf8')
+console.log('peca.tsx fix OK')
+
+// ============================================================
+// FIX 2: sala/[code]/page.tsx - agregar caso peca con leftPhrase/rightPhrase
+// ============================================================
+let sala = fs.readFileSync('app/sala/[code]/page.tsx', 'utf8')
+
+// Verificar si ya tiene caso peca
+if (!sala.includes("case 'peca'")) {
+  // Agregar antes del default
+  sala = sala.replace(
+    "      default:",
+    `      case 'peca':
+        const progressPeca = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 45)) * 100
+        return (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Progreso</span>
+                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 45}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressPeca + '%' }} />
+              </div>
+            </div>
+            <div className="text-sm text-gray-400 mb-6">Item {currentDisplay.item} de {currentDisplay.totalItems || 45}</div>
+            <div className="flex justify-between gap-6 mb-8">
+              <span className="flex-1 text-left text-lg font-medium text-gray-800">{currentDisplay.leftPhrase}</span>
+              <span className="text-gray-400 text-lg">vs</span>
+              <span className="flex-1 text-right text-lg font-medium text-gray-800">{currentDisplay.rightPhrase}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto">
+              {currentDisplay.options?.map((opt: any) => (
+                <div key={opt.value}
+                  className={"p-3 rounded-xl border text-sm font-medium " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}
+                >
+                  {opt.value}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between text-xs text-gray-400 mt-2 max-w-sm mx-auto px-2">
+              <span>Izquierda</span><span>Derecha</span>
+            </div>
+            {currentDisplay.selected && <p className="text-xs text-green-600 mt-4">Respuesta registrada</p>}
+          </div>
+        )
+
+      default:`
+  )
+  console.log('sala peca case added')
+} else {
+  console.log('sala already has peca case')
+}
+
+fs.writeFileSync('app/sala/[code]/page.tsx', sala, 'utf8')
+console.log('sala/[code]/page.tsx fix OK')
+
+// ============================================================
+// FIX 3: bdi2.tsx - implementar como BdiControl con arquitectura correcta
+// ============================================================
+const bdi2Content = `'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { BDI2_ITEMS, scoreBdi2, type BdiResponse } from '@/lib/bdi2/engine'
@@ -20,21 +131,15 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const [finishing, setFinishing] = useState(false)
   const firstItemSent = useRef(false)
 
-  const currentItemData = BDI2_ITEMS.find(item => item.num === currentItem)
-  const BDI_OPTIONS = [
-    { value: 0, label: '0 - No aplica' },
-    { value: 1, label: '1 - Leve' },
-    { value: 2, label: '2 - Moderado' },
-    { value: 3, label: '3 - Grave' },
-  ]
+  const currentItemData = BDI2_ITEMS.find(item => item.id === currentItem)
   const allDone = completed === 21
 
   const buildPayload = (num: number, sel?: BdiResponse) => {
-    const d = BDI2_ITEMS.find(i => i.num === num)
+    const d = BDI2_ITEMS.find(i => i.id === num)
     return {
       type: 'bdi2', item: num,
       label: d?.label,
-      options: BDI_OPTIONS,
+      options: d?.options ?? [],
       selected: sel,
       totalCompleted: completed,
       totalItems: 21
@@ -112,7 +217,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         </div>
         <p className="text-gray-800 font-medium mb-4">{currentItemData?.label}</p>
         <div className="space-y-2">
-          {BDI_OPTIONS.map((opt: any) => (
+          {currentItemData?.options?.map((opt: any) => (
             <button key={opt.value} onClick={() => handleResponse(opt.value as BdiResponse)}
               className={"w-full text-left p-3 rounded-lg border text-sm transition-all " + (responses[currentItem] === opt.value ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100')}
             >
@@ -144,9 +249,9 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         <p className="text-xs text-gray-400 mb-2">Ir a item:</p>
         <div className="grid grid-cols-7 gap-1">
           {BDI2_ITEMS.map((item) => (
-            <button key={item.num} onClick={() => goToItem(item.num)}
-              className={"text-xs py-1 rounded " + (currentItem===item.num ? 'bg-blue-600 text-white' : responses[item.num] !== undefined ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
-              {item.num}
+            <button key={item.id} onClick={() => goToItem(item.id)}
+              className={"text-xs py-1 rounded " + (currentItem===item.id ? 'bg-blue-600 text-white' : responses[item.id] !== undefined ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
+              {item.id}
             </button>
           ))}
         </div>
@@ -154,3 +259,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
     </div>
   )
 }
+`
+
+fs.writeFileSync('app/dual-control/[dualSessionId]/bdi2.tsx', bdi2Content, 'utf8')
+console.log('bdi2.tsx fix OK')
