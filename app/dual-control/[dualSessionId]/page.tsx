@@ -50,8 +50,11 @@ export default function DualControlPage() {
   const { sendMessage } = useRealtime(dualSessionId, (payload) => {
     console.log('Mensaje recibido en control:', payload)
     if (payload.type === 'display_ready') {
-      console.log('Display listo')
-      setDisplayReady(true)
+      console.log('=== DISPLAY READY RECIBIDO ===', payload)
+      setDisplayReady(prev => {
+        console.log('displayReady anterior:', prev, '-> true')
+        return true
+      })
     }
   })
 
