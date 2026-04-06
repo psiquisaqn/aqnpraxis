@@ -156,7 +156,7 @@ export default function SalaDisplayPage() {
 
         {waiting && !currentDisplay ? (
           <div className="text-center">
-            <div className="text-5xl mb-4">­ƒöì</div>
+            <div className="text-5xl mb-4">🔍</div>
             <h2 className="text-xl font-medium text-gray-700 mb-2">Esperando al psicólogo</h2>
             <p className="text-gray-400 text-sm">
               La evaluación comenzará en breve. Por favor, espera las instrucciones.

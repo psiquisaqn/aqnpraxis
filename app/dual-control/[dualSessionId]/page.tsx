@@ -70,10 +70,6 @@ export default function DualControlPage() {
     if (error) console.error('Error saving response:', error)
   }
 
-  const sendTestMessage = () => {
-    updatePatientScreen({ type: 'test', message: 'Mensaje de prueba' })
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -117,9 +113,6 @@ export default function DualControlPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <button onClick={sendTestMessage} className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-medium transition-colors">
-                Probar display
-              </button>
               <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 hover:text-gray-700">
                 Salir
               </button>
