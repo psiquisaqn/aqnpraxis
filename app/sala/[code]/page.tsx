@@ -38,21 +38,18 @@ export default function SalaDisplayPage() {
   }, [code])
 
   // Escuchar comandos del psicólogo
-  const { sendMessage } = useRealtime(dualSessionId || '', (payload) => {
+  const { sendMessage, connected } = useRealtime(dualSessionId || '', (payload) => {
     if (payload.type === 'update_display') {
       setCurrentDisplay(payload.content)
       setWaiting(false)
     }
   })
 
-  // Cuando tenemos dualSessionId, avisar al control que el display esta listo
+  // Cuando el canal esta conectado, avisar al control
   useEffect(() => {
-    if (!dualSessionId) return
-    const timer = setTimeout(() => {
-      sendMessage({ type: 'display_ready', message: 'Display listo' })
-    }, 1000)
-    return () => clearTimeout(timer)
-  }, [dualSessionId])
+    if (!connected || !dualSessionId) return
+    sendMessage({ type: 'display_ready', message: 'Display listo' })
+  }, [connected, dualSessionId])
 
   if (error) {
     return (
