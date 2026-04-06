@@ -45,9 +45,11 @@ export default function SalaDisplayPage() {
     }
   })
 
-  // Cuando el canal esta conectado, avisar al control
+  // Cuando el canal esta conectado, avisar al control (solo una vez)
+  const displayReadySent = useRef(false)
   useEffect(() => {
-    if (!connected || !dualSessionId) return
+    if (!connected || !dualSessionId || displayReadySent.current) return
+    displayReadySent.current = true
     sendMessage({ type: 'display_ready', message: 'Display listo' })
   }, [connected, dualSessionId])
 
