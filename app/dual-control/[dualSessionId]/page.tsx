@@ -17,6 +17,7 @@ export default function DualControlPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentTest, setCurrentTest] = useState<string>('')
   const [sessionId, setSessionId] = useState<string>('')
+  const [displayReady, setDisplayReady] = useState(false)
 
   useEffect(() => {
     const loadSession = async () => {
@@ -49,8 +50,8 @@ export default function DualControlPage() {
   const { sendMessage } = useRealtime(dualSessionId, (payload) => {
     console.log('Mensaje recibido en control:', payload)
     if (payload.type === 'display_ready') {
-      console.log('Display listo, disparando evento...')
-      window.dispatchEvent(new Event('display_ready'))
+      console.log('Display listo')
+      setDisplayReady(true)
     }
   })
 
@@ -127,6 +128,7 @@ export default function DualControlPage() {
               sessionId={sessionId}
               onUpdatePatient={updatePatientScreen}
               onSaveResponse={saveResponse}
+              displayReady={displayReady}
             />
           </div>
         ) : currentTest === 'peca' ? (
@@ -136,6 +138,7 @@ export default function DualControlPage() {
               sessionId={sessionId}
               onUpdatePatient={updatePatientScreen}
               onSaveResponse={saveResponse}
+              displayReady={displayReady}
             />
           </div>
         ) : (

@@ -8,9 +8,10 @@ interface PecaControlProps {
   sessionId: string
   onUpdatePatient: (content: any) => void
   onSaveResponse: (item: number, value: any) => void
+  displayReady?: boolean
 }
 
-export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse }: PecaControlProps) {
+export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse, displayReady = false }: PecaControlProps) {
   const router = useRouter()
   const [currentItem, setCurrentItem] = useState(1)
   const [responses, setResponses] = useState<PecaResponses>({})
@@ -48,6 +49,14 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
     }, 2000)
     return () => clearTimeout(timer)
   }, [])
+
+  // Reenviar item cuando display se conecta
+  useEffect(() => {
+    if (displayReady) {
+      onUpdatePatient(buildPayload(currentItem, responses[currentItem] as number | undefined))
+      firstItemSent.current = true
+    }
+  }, [displayReady])
 
   const handleResponse = (value: number) => {
     const newResponses = { ...responses, [currentItem]: value as 1|2|3|4 }

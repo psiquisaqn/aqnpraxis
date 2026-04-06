@@ -12,13 +12,13 @@ interface CoopersmithControlProps {
   onSaveResponse: (item: number, value: CooperResponse) => void
 }
 
-export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse }: CoopersmithControlProps) {
+export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse, displayReady = false }: CoopersmithControlProps) {
   const router = useRouter()
   const [currentItem, setCurrentItem] = useState(1)
   const [responses, setResponses] = useState<Record<number, CooperResponse>>({})
   const [completed, setCompleted] = useState(0)
   const [finishing, setFinishing] = useState(false)
-  const [displayReady, setDisplayReady] = useState(false)
+
   
   const firstItemSent = useRef(false)
 
@@ -43,16 +43,6 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
   }
 
   // Escuchar mensaje de display listo
-  useEffect(() => {
-    // Escuchar el mensaje de display_ready a través de una función global
-    const handleDisplayReady = () => {
-      console.log('Display listo, enviando ítem inicial...')
-      setDisplayReady(true)
-    }
-    
-    window.addEventListener('display_ready', handleDisplayReady)
-    return () => window.removeEventListener('display_ready', handleDisplayReady)
-  }, [])
 
   // Enviar ítem cuando display está listo o cuando cambia currentItem
   useEffect(() => {
