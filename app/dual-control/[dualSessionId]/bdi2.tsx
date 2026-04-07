@@ -79,11 +79,22 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       const result = scoreBdi2(responses)
       const itemCols: Record<string, number> = {}
       for (let i = 1; i <= 21; i++) {
-        if (responses[i] !== undefined) itemCols['item_' + String(i).padStart(2, '0')] = responses[i] as any
+        if (responses[i] !== undefined) itemCols['item_' + i] = responses[i] as number
       }
       const { error } = await supabase
         .from('bdi2_scores')
-        .upsert({ session_id: sessionId, ...itemCols, ...result }, { onConflict: 'session_id' })
+        .upsert({
+          session_id: sessionId,
+          ...itemCols,
+          total_score: result.totalScore,
+          severity: result.severity,
+          severity_label: result.severityLabel,
+          cognitive_affective_score: result.cognitiveAffectiveScore,
+          somatic_motivational_score: result.somaticMotivationalScore,
+          suicidal_ideation_score: result.suicidalIdeationScore,
+          is_complete: true,
+          calculated_at: new Date().toISOString(),
+        }, { onConflict: 'session_id' })
       if (error) { alert('Error al guardar: ' + error.message); setFinishing(false); return }
       await supabase.from('sessions').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', sessionId)
       router.push('/dashboard')

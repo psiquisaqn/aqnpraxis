@@ -87,18 +87,25 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         if (responses[i] !== undefined) itemCols[key] = responses[i] as number
       }
 
-      // Mapear dimensiones
+      // Mapear dimensiones (engine code -> columna DB)
+      const codeMap: Record<string, string> = {
+        com: 'com', aut: 'acu', avi: 'avd', hs: 'hs',
+        haf: 'haf', uco: 'uco', adi: 'adi', css: 'css', aor: 'aor'
+      }
       const dimMap: Record<string, any> = {}
       result.dimensions.forEach((d: any) => {
-        dimMap['score_' + d.code] = d.p2
-        dimMap['level_' + d.code] = d.intensity
+        const col = codeMap[d.code] || d.code
+        dimMap['score_' + col] = d.p2
+        dimMap['level_' + col] = d.intensity
       })
 
       // Mapear AAMR sets
+      const aamrCodeMap: Record<string, string> = { conceptual: 'con', social: 'soc', practical: 'pra' }
       const aamrMap: Record<string, any> = {}
       result.aamrSets.forEach((s: any) => {
-        aamrMap['h' + s.code.slice(0,3)] = s.p2
-        aamrMap['h' + s.code.slice(0,3) + '_level'] = s.needsSupport ? 'needs_support' : 'ok'
+        const col = aamrCodeMap[s.code] || s.code.slice(0,3)
+        aamrMap['h' + col] = s.p2
+        aamrMap['h' + col + '_level'] = s.needsSupport ? 'needs_support' : 'ok'
       })
 
       const { error } = await supabase
