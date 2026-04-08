@@ -121,17 +121,35 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
       const { scoreCoopersmith } = await import('@/lib/coopersmith/engine')
       const result = scoreCoopersmith(responses)
 
-      const { data: sessionData } = await supabase
+      console.log('=== RESULTADO COOPERSMITH ===')
+      console.log('result:', result)
+
+      const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select('patient_id')
         .eq('id', sessionId)
         .single()
 
-      const { data: { user } } = await supabase.auth.getUser()
+      console.log('sessionData:', sessionData)
+      console.log('sessionError:', sessionError)
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      console.log('user:', user)
+      console.log('userError:', userError)
+
       const patientId = sessionData?.patient_id
 
+      console.log('=== DATOS PARA INFORME ===')
+      console.log('sessionId:', sessionId)
+      console.log('patientId:', patientId)
+      console.log('psychologist_id:', user?.id)
+      console.log('test_id:', 'coopersmith')
+      console.log('puntaje_total:', result.totalScaled)
+      console.log('nivel:', result.levelLabel)
+
       // Guardar en coopersmith_scores
-      const { error } = await supabase
+      const { error: scoreError } = await supabase
         .from('coopersmith_scores')
         .upsert({
           session_id: sessionId,
@@ -144,23 +162,29 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
           calculated_at: new Date().toISOString()
         }, { onConflict: 'session_id' })
 
-      if (error) {
-        alert('Error al guardar: ' + error.message)
+      if (scoreError) {
+        console.error('Error guardando coopersmith_scores:', scoreError)
+        alert('Error al guardar: ' + scoreError.message)
         setFinishing(false)
         return
       }
 
+      console.log('Coopersmith scores guardado correctamente')
+
       // Guardar informe
       const recomendaciones = generarRecomendacionesCoopersmith(result.totalScaled, result.levelLabel)
       
-      const { data: existingInforme } = await supabase
+      const { data: existingInforme, error: checkError } = await supabase
         .from('informes')
         .select('id')
         .eq('session_id', sessionId)
         .maybeSingle()
 
+      console.log('Informe existente:', existingInforme)
+      console.log('Error al buscar informe:', checkError)
+
       if (existingInforme) {
-        await supabase
+        const { data, error: updateError } = await supabase
           .from('informes')
           .update({
             contenido: JSON.stringify({
@@ -176,8 +200,11 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
             updated_at: new Date().toISOString()
           })
           .eq('session_id', sessionId)
+          .select()
+        
+        console.log('Resultado UPDATE informe:', { data, error: updateError })
       } else {
-        await supabase
+        const { data, error: insertError } = await supabase
           .from('informes')
           .insert({
             session_id: sessionId,
@@ -196,6 +223,9 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
             nivel: result.levelLabel,
             recomendaciones: recomendaciones
           })
+          .select()
+        
+        console.log('Resultado INSERT informe:', { data, error: insertError })
       }
 
       await supabase
@@ -203,8 +233,12 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
         .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', sessionId)
 
+      console.log('Sesión actualizada a completed')
+      console.log('Redirigiendo a resultados...')
+      
       router.push(`/resultados/coopersmith?session=${sessionId}`)
     } catch(e: any) {
+      console.error('Error inesperado:', e)
       alert('Error: ' + e.message)
       setFinishing(false)
     }
