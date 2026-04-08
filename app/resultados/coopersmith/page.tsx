@@ -47,7 +47,7 @@ function CoopersmithReportPageInner() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--stone-100)' }}>
-      <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
+      <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3 flex-wrap" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
         <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--stone-500)' }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           Volver
@@ -72,6 +72,13 @@ function CoopersmithReportPageInner() {
             meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }}
           />
         )}
+        <button 
+          onClick={() => router.push('/dashboard')} 
+          className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-600 text-white hover:bg-blue-700"
+          style={{ borderColor: 'transparent' }}
+        >
+          Panel principal
+        </button>
       </div>
 
       <div ref={contentRef} className="max-w-3xl mx-auto px-6 py-8 space-y-6">
