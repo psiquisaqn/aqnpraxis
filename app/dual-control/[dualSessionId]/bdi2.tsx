@@ -97,7 +97,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         }, { onConflict: 'session_id' })
       if (error) { alert('Error al guardar: ' + error.message); setFinishing(false); return }
       await supabase.from('sessions').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', sessionId)
-      router.push('/dashboard')
+      router.push('/bdi2/' + sessionId + '/report')
     } catch(e: any) {
       alert('Error: ' + e.message)
       setFinishing(false)
