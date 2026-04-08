@@ -138,9 +138,9 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
           total_scaled: result.totalScaled,
           level_label: result.levelLabel,
           level_color: result.levelColor,
+          level_description: result.levelDescription,
           lie_scale_raw: result.lieScaleRaw,
           lie_scale_invalid: result.lieScaleInvalid,
-          level_description: result.levelDescription,
           calculated_at: new Date().toISOString()
         }, { onConflict: 'session_id' })
 
@@ -152,25 +152,51 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
 
       // Guardar informe
       const recomendaciones = generarRecomendacionesCoopersmith(result.totalScaled, result.levelLabel)
-      await supabase
+      
+      const { data: existingInforme } = await supabase
         .from('informes')
-        .upsert({
-          session_id: sessionId,
-          patient_id: patientId,
-          psychologist_id: user?.id,
-          test_id: 'coopersmith',
-          titulo: `Coopersmith SEI - Inventario de Autoestima`,
-          contenido: JSON.stringify({
-            totalScaled: result.totalScaled,
-            levelLabel: result.levelLabel,
-            levelDescription: result.levelDescription,
-            lieScaleRaw: result.lieScaleRaw,
-            lieScaleInvalid: result.lieScaleInvalid
-          }),
-          puntaje_total: result.totalScaled,
-          nivel: result.levelLabel,
-          recomendaciones: recomendaciones
-        }, { onConflict: 'session_id' })
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle()
+
+      if (existingInforme) {
+        await supabase
+          .from('informes')
+          .update({
+            contenido: JSON.stringify({
+              totalScaled: result.totalScaled,
+              levelLabel: result.levelLabel,
+              levelDescription: result.levelDescription,
+              lieScaleRaw: result.lieScaleRaw,
+              lieScaleInvalid: result.lieScaleInvalid
+            }),
+            puntaje_total: result.totalScaled,
+            nivel: result.levelLabel,
+            recomendaciones: recomendaciones,
+            updated_at: new Date().toISOString()
+          })
+          .eq('session_id', sessionId)
+      } else {
+        await supabase
+          .from('informes')
+          .insert({
+            session_id: sessionId,
+            patient_id: patientId,
+            psychologist_id: user?.id,
+            test_id: 'coopersmith',
+            titulo: `Coopersmith SEI - Inventario de Autoestima`,
+            contenido: JSON.stringify({
+              totalScaled: result.totalScaled,
+              levelLabel: result.levelLabel,
+              levelDescription: result.levelDescription,
+              lieScaleRaw: result.lieScaleRaw,
+              lieScaleInvalid: result.lieScaleInvalid
+            }),
+            puntaje_total: result.totalScaled,
+            nivel: result.levelLabel,
+            recomendaciones: recomendaciones
+          })
+      }
 
       await supabase
         .from('sessions')

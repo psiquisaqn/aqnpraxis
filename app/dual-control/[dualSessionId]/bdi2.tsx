@@ -143,25 +143,51 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
 
       // Guardar informe
       const recomendaciones = generarRecomendacionesBDI2(result)
-      await supabase
+      
+      const { data: existingInforme } = await supabase
         .from('informes')
-        .upsert({
-          session_id: sessionId,
-          patient_id: patientId,
-          psychologist_id: user?.id,
-          test_id: 'bdi2',
-          titulo: `BDI-II - Inventario de Depresión`,
-          contenido: JSON.stringify({
-            totalScore: result.totalScore,
-            severity: result.severityLabel,
-            cognitiveAffectiveScore: result.cognitiveAffectiveScore,
-            somaticMotivationalScore: result.somaticMotivationalScore,
-            suicidalIdeationScore: result.suicidalIdeationScore
-          }),
-          puntaje_total: result.totalScore,
-          nivel: result.severityLabel,
-          recomendaciones: recomendaciones
-        }, { onConflict: 'session_id' })
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle()
+
+      if (existingInforme) {
+        await supabase
+          .from('informes')
+          .update({
+            contenido: JSON.stringify({
+              totalScore: result.totalScore,
+              severity: result.severityLabel,
+              cognitiveAffectiveScore: result.cognitiveAffectiveScore,
+              somaticMotivationalScore: result.somaticMotivationalScore,
+              suicidalIdeationScore: result.suicidalIdeationScore
+            }),
+            puntaje_total: result.totalScore,
+            nivel: result.severityLabel,
+            recomendaciones: recomendaciones,
+            updated_at: new Date().toISOString()
+          })
+          .eq('session_id', sessionId)
+      } else {
+        await supabase
+          .from('informes')
+          .insert({
+            session_id: sessionId,
+            patient_id: patientId,
+            psychologist_id: user?.id,
+            test_id: 'bdi2',
+            titulo: `BDI-II - Inventario de Depresión`,
+            contenido: JSON.stringify({
+              totalScore: result.totalScore,
+              severity: result.severityLabel,
+              cognitiveAffectiveScore: result.cognitiveAffectiveScore,
+              somaticMotivationalScore: result.somaticMotivationalScore,
+              suicidalIdeationScore: result.suicidalIdeationScore
+            }),
+            puntaje_total: result.totalScore,
+            nivel: result.severityLabel,
+            recomendaciones: recomendaciones
+          })
+      }
 
       await supabase
         .from('sessions')

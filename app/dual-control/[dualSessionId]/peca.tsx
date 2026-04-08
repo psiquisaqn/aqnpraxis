@@ -127,8 +127,6 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         haf: 'haf', uco: 'uco', adi: 'adi', css: 'css', aor: 'aor'
       }
       
-      // Mapeo de intensity a valores permitidos por la constraint
-      // Valores permitidos: 'buen_nivel', 'limitado', 'extenso', 'generalizado'
       const intensityMap: Record<string, string> = {
         'bueno': 'buen_nivel',
         'buen_nivel': 'buen_nivel',
@@ -143,11 +141,9 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       result.dimensions.forEach((d: any) => {
         const col = codeMap[d.code] || d.code
         dimMap['score_' + col] = d.p2
-        // Usar el mapeo para intensity
         dimMap['level_' + col] = intensityMap[d.intensity] || 'buen_nivel'
       })
 
-      // Mapear AAMR sets con valores válidos para CHECK constraint
       const aamrCodeMap: Record<string, string> = { conceptual: 'con', social: 'soc', practical: 'pra' }
       const aamrMap: Record<string, any> = {}
       result.aamrSets.forEach((s: any) => {
@@ -156,7 +152,6 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         aamrMap['h' + col + '_level'] = s.needsSupport === true ? 'requiere_apoyo' : 'buen_nivel'
       })
 
-      // Asegurar valores explícitos para las columnas con CHECK constraint
       const hcon_level = aamrMap.hcon_level || 'buen_nivel'
       const hsoc_level = aamrMap.hsoc_level || 'buen_nivel'
       const hpra_level = aamrMap.hpra_level || 'buen_nivel'
@@ -187,24 +182,48 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       const recomendaciones = generarRecomendacionesPECA(result)
       const nivelTexto = result.participationLevel >= 75 ? 'Alto' : result.participationLevel >= 50 ? 'Medio' : result.participationLevel >= 25 ? 'Bajo' : 'Muy bajo'
       
-      await supabase
+      const { data: existingInforme } = await supabase
         .from('informes')
-        .upsert({
-          session_id: sessionId,
-          patient_id: patientId,
-          psychologist_id: user?.id,
-          test_id: 'peca',
-          titulo: `PECA - Evaluación de Conducta Adaptativa`,
-          contenido: JSON.stringify({
-            participationLevel: result.participationLevel,
-            answeredItems: result.answeredItems,
-            dimensions: result.dimensions,
-            aamrSets: result.aamrSets
-          }),
-          puntaje_total: result.participationLevel,
-          nivel: nivelTexto,
-          recomendaciones: recomendaciones
-        }, { onConflict: 'session_id' })
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle()
+
+      if (existingInforme) {
+        await supabase
+          .from('informes')
+          .update({
+            contenido: JSON.stringify({
+              participationLevel: result.participationLevel,
+              answeredItems: result.answeredItems,
+              dimensions: result.dimensions,
+              aamrSets: result.aamrSets
+            }),
+            puntaje_total: result.participationLevel,
+            nivel: nivelTexto,
+            recomendaciones: recomendaciones,
+            updated_at: new Date().toISOString()
+          })
+          .eq('session_id', sessionId)
+      } else {
+        await supabase
+          .from('informes')
+          .insert({
+            session_id: sessionId,
+            patient_id: patientId,
+            psychologist_id: user?.id,
+            test_id: 'peca',
+            titulo: `PECA - Evaluación de Conducta Adaptativa`,
+            contenido: JSON.stringify({
+              participationLevel: result.participationLevel,
+              answeredItems: result.answeredItems,
+              dimensions: result.dimensions,
+              aamrSets: result.aamrSets
+            }),
+            puntaje_total: result.participationLevel,
+            nivel: nivelTexto,
+            recomendaciones: recomendaciones
+          })
+      }
 
       await supabase
         .from('sessions')
