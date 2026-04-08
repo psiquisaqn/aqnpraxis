@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import { COOPERSMITH_ITEMS, type CooperResponse } from '@/lib/coopersmith/engine'
-import { finishEvaluation } from './finish'
+import { DualTestWrapper } from './DualTestWrapper'
 
 interface CoopersmithControlProps {
   dualSessionId: string
@@ -13,24 +14,33 @@ interface CoopersmithControlProps {
   displayReady?: boolean
 }
 
+function generarRecomendacionesCoopersmith(totalScaled: number, level: string): string {
+  if (totalScaled >= 70) {
+    return "Autoestima alta. Mantener estrategias de refuerzo positivo y desarrollo de habilidades sociales."
+  } else if (totalScaled >= 50) {
+    return "Autoestima media. Trabajar en áreas específicas para fortalecer la autoconfianza."
+  } else if (totalScaled >= 30) {
+    return "Autoestima baja. Se recomienda intervención psicoterapéutica focalizada en autoestima."
+  } else {
+    return "Autoestima muy baja. Requiere intervención intensiva y seguimiento psicológico."
+  }
+}
+
 export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse, displayReady = false }: CoopersmithControlProps) {
   const router = useRouter()
   const [currentItem, setCurrentItem] = useState(1)
   const [responses, setResponses] = useState<Record<number, CooperResponse>>({})
   const [completed, setCompleted] = useState(0)
   const [finishing, setFinishing] = useState(false)
-
-  
+  const [showQuestionZero, setShowQuestionZero] = useState(true)
   const firstItemSent = useRef(false)
 
   const currentItemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
   const allDone = completed === 58
 
-  // Función para enviar el ítem actual al display
   const sendCurrentItemToDisplay = () => {
     const itemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
     if (itemData) {
-      console.log('Enviando ítem al display:', currentItem)
       onUpdatePatient({
         type: 'coopersmith',
         item: currentItem,
@@ -43,26 +53,28 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
     }
   }
 
-  // Escuchar mensaje de display listo
-
-  // Enviar ítem cuando display está listo o cuando cambia currentItem
-  useEffect(() => {
-    if (displayReady) {
-      sendCurrentItemToDisplay()
-    }
-  }, [displayReady, currentItem, completed])
-
-  // También enviar después de 2 segundos si no se ha recibido señal de display
-  useEffect(() => {
-    const timer = setTimeout(() => {
+  const handleStartTest = () => {
+    setShowQuestionZero(false)
+    setTimeout(() => {
       if (!firstItemSent.current) {
-        console.log('Timeout: enviando ítem inicial automáticamente')
         sendCurrentItemToDisplay()
         firstItemSent.current = true
       }
-    }, 2000)
-    return () => clearTimeout(timer)
-  }, [])
+    }, 500)
+  }
+
+  useEffect(() => {
+    if (!showQuestionZero && !firstItemSent.current) {
+      sendCurrentItemToDisplay()
+      firstItemSent.current = true
+    }
+  }, [showQuestionZero])
+
+  useEffect(() => {
+    if (displayReady && !showQuestionZero) {
+      sendCurrentItemToDisplay()
+    }
+  }, [displayReady, currentItem, completed, showQuestionZero])
 
   const handleResponse = (value: CooperResponse) => {
     const newResponses = { ...responses, [currentItem]: value }
@@ -70,7 +82,6 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
     setCompleted(Object.keys(newResponses).length)
     onSaveResponse(currentItem, value)
 
-    // Actualizar pantalla del paciente con la respuesta seleccionada
     const itemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
     onUpdatePatient({
       type: 'coopersmith',
@@ -81,38 +92,6 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
       totalCompleted: Object.keys(newResponses).length,
       totalItems: 58
     })
-  }
-
-  const goToNext = () => {
-    if (currentItem < 58) {
-      setCurrentItem(currentItem + 1)
-      const nextItem = COOPERSMITH_ITEMS.find(item => item.num === currentItem + 1)
-      onUpdatePatient({
-        type: 'coopersmith',
-        item: currentItem + 1,
-        text: nextItem?.text,
-        options: ['Igual que yo', 'No es como yo'],
-        selected: responses[currentItem + 1],
-        totalCompleted: completed,
-        totalItems: 58
-      })
-    }
-  }
-
-  const goToPrev = () => {
-    if (currentItem > 1) {
-      setCurrentItem(currentItem - 1)
-      const prevItem = COOPERSMITH_ITEMS.find(item => item.num === currentItem - 1)
-      onUpdatePatient({
-        type: 'coopersmith',
-        item: currentItem - 1,
-        text: prevItem?.text,
-        options: ['Igual que yo', 'No es como yo'],
-        selected: responses[currentItem - 1],
-        totalCompleted: completed,
-        totalItems: 58
-      })
-    }
   }
 
   const goToItem = (num: number) => {
@@ -129,125 +108,156 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
     })
   }
 
-const handleFinish = async () => {
-  if (!allDone) return
-  setFinishing(true)
-  console.log('Finalizando evaluación con', Object.keys(responses).length, 'respuestas')
-  await finishEvaluation({
-    dualSessionId,
-    sessionId,
-    responses,
-    router
-  })
-}
+  const handleFinish = async () => {
+    if (!allDone) return
+    setFinishing(true)
 
-  const currentResponse = responses[currentItem]
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
+      const { scoreCoopersmith } = await import('@/lib/coopersmith/engine')
+      const result = scoreCoopersmith(responses)
+
+      const { data: sessionData } = await supabase
+        .from('sessions')
+        .select('patient_id')
+        .eq('id', sessionId)
+        .single()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      const patientId = sessionData?.patient_id
+
+      // Guardar en coopersmith_scores
+      const { error } = await supabase
+        .from('coopersmith_scores')
+        .upsert({
+          session_id: sessionId,
+          total_scaled: result.totalScaled,
+          level_label: result.levelLabel,
+          level_color: result.levelColor,
+          lie_scale_raw: result.lieScaleRaw,
+          lie_scale_invalid: result.lieScaleInvalid,
+          level_description: result.levelDescription,
+          calculated_at: new Date().toISOString()
+        }, { onConflict: 'session_id' })
+
+      if (error) {
+        alert('Error al guardar: ' + error.message)
+        setFinishing(false)
+        return
+      }
+
+      // Guardar informe
+      const recomendaciones = generarRecomendacionesCoopersmith(result.totalScaled, result.levelLabel)
+      await supabase
+        .from('informes')
+        .upsert({
+          session_id: sessionId,
+          patient_id: patientId,
+          psychologist_id: user?.id,
+          test_id: 'coopersmith',
+          titulo: `Coopersmith SEI - Inventario de Autoestima`,
+          contenido: JSON.stringify({
+            totalScaled: result.totalScaled,
+            levelLabel: result.levelLabel,
+            levelDescription: result.levelDescription,
+            lieScaleRaw: result.lieScaleRaw,
+            lieScaleInvalid: result.lieScaleInvalid
+          }),
+          puntaje_total: result.totalScaled,
+          nivel: result.levelLabel,
+          recomendaciones: recomendaciones
+        }, { onConflict: 'session_id' })
+
+      await supabase
+        .from('sessions')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', sessionId)
+
+      router.push(`/resultados/coopersmith?session=${sessionId}`)
+    } catch(e: any) {
+      alert('Error: ' + e.message)
+      setFinishing(false)
+    }
+  }
+
+  const coopersmithItemsList = COOPERSMITH_ITEMS.map(item => ({ num: item.num }))
 
   return (
-    <div className="space-y-4">
-      {/* Progreso */}
-      <div className="bg-gray-50 rounded-lg p-3">
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-600">Progreso</span>
-          <span className="text-gray-800 font-medium">{completed}/58 ítems</span>
+    <DualTestWrapper
+      title="Evaluación Coopersmith - Autoestima"
+      totalItems={58}
+      currentItem={currentItem}
+      completed={completed}
+      onItemSelect={goToItem}
+      items={coopersmithItemsList}
+      showQuestionZero={showQuestionZero}
+      onStart={handleStartTest}
+    >
+      <div className="space-y-4">
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-600">Progreso</span>
+            <span className="text-gray-800 font-medium">{completed}/58 ítems</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(completed / 58) * 100}%` }} />
+          </div>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-blue-500 rounded-full transition-all"
-            style={{ width: `${(completed / 58) * 100}%` }}
-          />
-        </div>
-      </div>
 
-      {/* Ítem actual */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">
-            Ítem {currentItem}/58
-          </span>
-          {currentResponse && (
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-              Respondido
-            </span>
-          )}
-        </div>
-        <p className="text-gray-800 text-base leading-relaxed mb-4">
-          {currentItemData?.text}
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => handleResponse('igual')}
-            className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-              currentResponse === 'igual'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            ✓ Igual que yo
-          </button>
-          <button
-            onClick={() => handleResponse('diferente')}
-            className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-              currentResponse === 'diferente'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            ✗ No es como yo
-          </button>
-        </div>
-      </div>
-
-      {/* Navegación */}
-      <div className="flex gap-3">
-        <button
-          onClick={goToPrev}
-          disabled={currentItem === 1}
-          className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-        >
-          ← Anterior
-        </button>
-        <button
-          onClick={goToNext}
-          disabled={currentItem === 58}
-          className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-        >
-          Siguiente →
-        </button>
-      </div>
-
-      {/* Botón finalizar */}
-      {allDone && (
-        <button
-          onClick={handleFinish}
-          disabled={finishing}
-          className="w-full py-3 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-        >
-          {finishing ? 'Finalizando...' : '✓ Finalizar evaluación'}
-        </button>
-      )}
-
-      {/* Índice rápido */}
-      <div className="mt-4">
-        <p className="text-xs text-gray-400 mb-2">Ir a ítem:</p>
-        <div className="grid grid-cols-10 gap-1 max-h-32 overflow-y-auto">
-          {COOPERSMITH_ITEMS.map((item) => (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">Ítem {currentItem}/58</span>
+            {responses[currentItem] && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Respondido</span>}
+          </div>
+          <p className="text-gray-800 text-base leading-relaxed mb-4">
+            {currentItemData?.text}
+          </p>
+          <div className="flex gap-3">
             <button
-              key={item.num}
-              onClick={() => goToItem(item.num)}
-              className={`text-xs py-1 rounded transition-all ${
-                currentItem === item.num
+              onClick={() => handleResponse('igual')}
+              className={`flex-1 py-2 rounded-lg font-medium transition-all ${
+                responses[currentItem] === 'igual'
                   ? 'bg-blue-600 text-white'
-                  : responses[item.num]
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {item.num}
+              ✓ Igual que yo
             </button>
-          ))}
+            <button
+              onClick={() => handleResponse('diferente')}
+              className={`flex-1 py-2 rounded-lg font-medium transition-all ${
+                responses[currentItem] === 'diferente'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              ✗ No es como yo
+            </button>
+          </div>
         </div>
+
+        <div className="flex gap-3">
+          <button onClick={() => goToItem(Math.max(1, currentItem-1))} disabled={currentItem===1}
+            className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-50">
+            ← Anterior
+          </button>
+          <button onClick={() => goToItem(Math.min(58, currentItem+1))} disabled={currentItem===58}
+            className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-50">
+            Siguiente →
+          </button>
+        </div>
+
+        {allDone && (
+          <button onClick={handleFinish} disabled={finishing}
+            className="w-full py-3 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 disabled:opacity-50">
+            {finishing ? 'Finalizando...' : '✓ Finalizar evaluación'}
+          </button>
+        )}
       </div>
-    </div>
+    </DualTestWrapper>
   )
 }

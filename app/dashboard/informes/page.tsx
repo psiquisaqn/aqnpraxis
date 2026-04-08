@@ -2,82 +2,72 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase/client'
+import { createBrowserClient } from '@supabase/ssr'
 
 interface Report {
   id: string
+  session_id: string
   patient_name: string
+  patient_id: string
   test_name: string
   date: string
   score: number
   classification: string
-  session_id: string
+  recomendaciones: string
 }
 
 export default function InformesPage() {
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc')
-  
 
   useEffect(() => {
     const loadReports = async () => {
-      // Obtener sesiones completadas con datos de pacientes y tests
-      const { data: sessions, error } = await supabase
-        .from('sessions')
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
+      // Obtener informes de la tabla informes
+      const { data: informes, error } = await supabase
+        .from('informes')
         .select(`
           id,
-          created_at,
+          session_id,
+          patient_id,
           test_id,
-          patient:patients(full_name),
-          coopersmith_scores!left(total_scaled, level_label),
-          bdi2_scores!left(total_score, severity),
-          peca_scores!left(participation_level)
+          titulo,
+          puntaje_total,
+          nivel,
+          recomendaciones,
+          created_at,
+          profiles:patient_id(full_name)
         `)
-        .eq('status', 'completed')
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error(error)
+        console.error('Error cargando informes:', error)
         setLoading(false)
         return
       }
 
-      const formatted: Report[] = sessions.map((s: any) => {
-        let score = 0
-        let classification = ''
-        let testName = ''
+      const testNames: Record<string, string> = {
+        peca: 'PECA - Conducta Adaptativa',
+        bdi2: 'BDI-II - Depresión',
+        coopersmith: 'Coopersmith SEI - Autoestima'
+      }
 
-        switch (s.test_id) {
-          case 'coopersmith':
-            testName = 'Coopersmith SEI'
-            score = s.coopersmith_scores?.total_scaled || 0
-            classification = s.coopersmith_scores?.level_label || ''
-            break
-          case 'bdi2':
-            testName = 'BDI-II'
-            score = s.bdi2_scores?.total_score || 0
-            classification = s.bdi2_scores?.severity || ''
-            break
-          case 'peca':
-            testName = 'PECA'
-            score = Math.round((s.peca_scores?.participation_level || 0) * 100)
-            classification = score >= 75 ? 'Buen nivel' : 'Requiere apoyos'
-            break
-          default:
-            testName = s.test_id
-        }
-
-        return {
-          id: s.id,
-          patient_name: s.patient?.full_name || 'Paciente eliminado',
-          test_name: testName,
-          date: s.created_at,
-          score,
-          classification,
-          session_id: s.id
-        }
-      })
+      const formatted: Report[] = informes.map((i: any) => ({
+        id: i.id,
+        session_id: i.session_id,
+        patient_name: i.profiles?.full_name || 'Paciente',
+        patient_id: i.patient_id,
+        test_name: testNames[i.test_id] || i.test_id,
+        date: i.created_at,
+        score: i.puntaje_total || 0,
+        classification: i.nivel || '',
+        recomendaciones: i.recomendaciones || ''
+      }))
 
       setReports(formatted)
       setLoading(false)
@@ -100,6 +90,19 @@ export default function InformesPage() {
         return 0
     }
   })
+
+  const getTestPath = (testId: string, sessionId: string) => {
+    switch (testId) {
+      case 'peca':
+        return `/resultados/peca?session=${sessionId}`
+      case 'bdi2':
+        return `/bdi2/${sessionId}/report`
+      case 'coopersmith':
+        return `/resultados/coopersmith?session=${sessionId}`
+      default:
+        return `/dashboard`
+    }
+  }
 
   if (loading) {
     return (
@@ -165,13 +168,20 @@ export default function InformesPage() {
                 <div className="font-medium text-gray-800">{report.patient_name}</div>
                 <div className="text-sm text-gray-500">{report.test_name}</div>
                 <div className="text-xs text-gray-400">{new Date(report.date).toLocaleDateString()}</div>
+                {report.recomendaciones && (
+                  <div className="text-xs text-gray-500 mt-1 line-clamp-1">{report.recomendaciones.substring(0, 100)}</div>
+                )}
               </div>
               <div className="text-right">
                 <div className="font-semibold text-blue-600">{report.score}</div>
                 <div className="text-xs text-gray-400">{report.classification}</div>
               </div>
               <Link
-                href={`/resultados/${report.session_id.includes('coopersmith') ? 'coopersmith' : report.session_id.includes('bdi2') ? 'bdi2' : 'peca'}?session=${report.session_id}`}
+                href={getTestPath(
+                  report.test_name.includes('PECA') ? 'peca' : 
+                  report.test_name.includes('BDI') ? 'bdi2' : 'coopersmith',
+                  report.session_id
+                )}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
               >
                 Ver informe
