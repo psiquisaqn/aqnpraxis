@@ -2,19 +2,25 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import Link from 'next/link'
+import { createBrowserClient } from '@supabase/ssr'
 import { useRealtime } from '@/hooks/useRealtime'
 
 export default function SalaDisplayPage() {
   const params = useParams()
   const code = params.code as string
 
+  const [supabase] = useState(() =>
+    createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  )
+
   const [currentDisplay, setCurrentDisplay] = useState<any>(null)
   const [waiting, setWaiting] = useState(true)
   const [dualSessionId, setDualSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  
 
   // Buscar sesión dual por código
   useEffect(() => {
@@ -35,7 +41,7 @@ export default function SalaDisplayPage() {
     }
 
     findSession()
-  }, [code])
+  }, [code, supabase])
 
   // Escuchar comandos del psicólogo
   const { sendMessage, connected } = useRealtime(dualSessionId || '', (payload) => {
@@ -45,13 +51,13 @@ export default function SalaDisplayPage() {
     }
   })
 
-  // Cuando el canal esta conectado, avisar al control (solo una vez)
+  // Cuando el canal esta conectado, avisar al control
   const displayReadySent = useRef(false)
   useEffect(() => {
     if (!connected || !dualSessionId || displayReadySent.current) return
     displayReadySent.current = true
     sendMessage({ type: 'display_ready', message: 'Display listo' })
-  }, [connected, dualSessionId])
+  }, [connected, dualSessionId, sendMessage])
 
   if (error) {
     return (
@@ -62,12 +68,12 @@ export default function SalaDisplayPage() {
           <p className="text-gray-400 text-sm mb-4">
             No se encontró una evaluación activa con este código.
           </p>
-          <a
+          <Link
             href="/sala"
             className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
           >
             Volver al inicio
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -98,14 +104,11 @@ export default function SalaDisplayPage() {
                 <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 58}</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${progress}%` }}
-                />
+                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
               </div>
             </div>
             <div className="text-sm text-gray-400 mb-4">
-              ├ìtem {currentDisplay.item} de {currentDisplay.totalItems || 58}
+              Ítem {currentDisplay.item} de {currentDisplay.totalItems || 58}
             </div>
             <div className="text-2xl font-medium text-gray-800 mb-6 leading-relaxed">
               {currentDisplay.text}
@@ -126,7 +129,7 @@ export default function SalaDisplayPage() {
             </div>
             {currentDisplay.selected && (
               <p className="text-xs text-green-600 mt-6 flex items-center justify-center gap-1">
-                <span>Ô£ô</span> Respuesta registrada
+                ✓ Respuesta registrada
               </p>
             )}
           </div>
@@ -210,7 +213,20 @@ export default function SalaDisplayPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+      {/* Botón flotante "Volver al panel principal" */}
+      <div className="fixed top-4 right-4 z-50">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M12 8H4M8 12L4 8L8 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Volver al panel principal
+        </Link>
+      </div>
+
       <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-4">
           <div className="text-sm text-gray-400">Código de sala: {code}</div>

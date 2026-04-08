@@ -126,15 +126,28 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         com: 'com', aut: 'acu', avi: 'avd', hs: 'hs',
         haf: 'haf', uco: 'uco', adi: 'adi', css: 'css', aor: 'aor'
       }
+      
+      // Mapeo de intensity a valores permitidos por la constraint
+      // Valores permitidos: 'buen_nivel', 'limitado', 'extenso', 'generalizado'
+      const intensityMap: Record<string, string> = {
+        'bueno': 'buen_nivel',
+        'buen_nivel': 'buen_nivel',
+        'limitado': 'limitado',
+        'extenso': 'extenso',
+        'generalizado': 'generalizado',
+        'needs_support': 'limitado',
+        'needs_support_acu': 'limitado'
+      }
+      
       const dimMap: Record<string, any> = {}
       result.dimensions.forEach((d: any) => {
         const col = codeMap[d.code] || d.code
         dimMap['score_' + col] = d.p2
-        dimMap['level_' + col] = d.intensity
+        // Usar el mapeo para intensity
+        dimMap['level_' + col] = intensityMap[d.intensity] || 'buen_nivel'
       })
 
       // Mapear AAMR sets con valores válidos para CHECK constraint
-      // Valores permitidos: 'buen_nivel' o 'requiere_apoyo'
       const aamrCodeMap: Record<string, string> = { conceptual: 'con', social: 'soc', practical: 'pra' }
       const aamrMap: Record<string, any> = {}
       result.aamrSets.forEach((s: any) => {
