@@ -106,13 +106,28 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
 
       const result = scoreBdi2(responses)
 
-      const { data: sessionData } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select('patient_id')
         .eq('id', sessionId)
         .single()
 
-      const { data: { user } } = await supabase.auth.getUser()
+      if (sessionError) {
+        console.error('Error obteniendo sesión:', sessionError)
+        alert('Error al obtener información de la sesión')
+        setFinishing(false)
+        return
+      }
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        console.error('Error obteniendo usuario:', userError)
+        alert('Error de autenticación')
+        setFinishing(false)
+        return
+      }
+
       const patientId = sessionData?.patient_id
 
       const itemCols: Record<string, number> = {}
@@ -120,7 +135,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         if (responses[i] !== undefined) itemCols['item_' + i] = responses[i] as number
       }
 
-      const { error } = await supabase
+      const { error: scoreError } = await supabase
         .from('bdi2_scores')
         .upsert({
           session_id: sessionId,
@@ -135,58 +150,42 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
           calculated_at: new Date().toISOString(),
         }, { onConflict: 'session_id' })
 
-      if (error) {
-        alert('Error al guardar: ' + error.message)
+      if (scoreError) {
+        console.error('Error guardando bdi2_scores:', scoreError)
+        alert('Error al guardar: ' + scoreError.message)
         setFinishing(false)
         return
       }
 
-      // Guardar informe
+      // Guardar informe usando upsert
       const recomendaciones = generarRecomendacionesBDI2(result)
-      
-      const { data: existingInforme } = await supabase
-        .from('informes')
-        .select('id')
-        .eq('session_id', sessionId)
-        .maybeSingle()
 
-      if (existingInforme) {
-        await supabase
-          .from('informes')
-          .update({
-            contenido: JSON.stringify({
-              totalScore: result.totalScore,
-              severity: result.severityLabel,
-              cognitiveAffectiveScore: result.cognitiveAffectiveScore,
-              somaticMotivationalScore: result.somaticMotivationalScore,
-              suicidalIdeationScore: result.suicidalIdeationScore
-            }),
-            puntaje_total: result.totalScore,
-            nivel: result.severityLabel,
-            recomendaciones: recomendaciones,
-            updated_at: new Date().toISOString()
-          })
-          .eq('session_id', sessionId)
+      const { data: informeData, error: informeError } = await supabase
+        .from('informes')
+        .upsert({
+          session_id: sessionId,
+          patient_id: patientId,
+          psychologist_id: user.id,
+          test_id: 'bdi2',
+          titulo: `BDI-II - Inventario de Depresión`,
+          contenido: JSON.stringify({
+            totalScore: result.totalScore,
+            severity: result.severityLabel,
+            cognitiveAffectiveScore: result.cognitiveAffectiveScore,
+            somaticMotivationalScore: result.somaticMotivationalScore,
+            suicidalIdeationScore: result.suicidalIdeationScore
+          }),
+          puntaje_total: result.totalScore,
+          nivel: result.severityLabel,
+          recomendaciones: recomendaciones,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'session_id' })
+        .select()
+
+      if (informeError) {
+        console.error('Error guardando informe:', informeError)
       } else {
-        await supabase
-          .from('informes')
-          .insert({
-            session_id: sessionId,
-            patient_id: patientId,
-            psychologist_id: user?.id,
-            test_id: 'bdi2',
-            titulo: `BDI-II - Inventario de Depresión`,
-            contenido: JSON.stringify({
-              totalScore: result.totalScore,
-              severity: result.severityLabel,
-              cognitiveAffectiveScore: result.cognitiveAffectiveScore,
-              somaticMotivationalScore: result.somaticMotivationalScore,
-              suicidalIdeationScore: result.suicidalIdeationScore
-            }),
-            puntaje_total: result.totalScore,
-            nivel: result.severityLabel,
-            recomendaciones: recomendaciones
-          })
+        console.log('Informe guardado correctamente:', informeData)
       }
 
       await supabase
@@ -196,6 +195,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
 
       router.push(`/bdi2/${sessionId}/report`)
     } catch(e: any) {
+      console.error('Error inesperado:', e)
       alert('Error: ' + e.message)
       setFinishing(false)
     }

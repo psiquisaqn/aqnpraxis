@@ -106,13 +106,28 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       const { scorePeca } = await import('@/lib/peca/engine')
       const result = scorePeca(responses)
 
-      const { data: sessionData } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select('patient_id')
         .eq('id', sessionId)
         .single()
 
-      const { data: { user } } = await supabase.auth.getUser()
+      if (sessionError) {
+        console.error('Error obteniendo sesión:', sessionError)
+        alert('Error al obtener información de la sesión')
+        setFinishing(false)
+        return
+      }
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        console.error('Error obteniendo usuario:', userError)
+        alert('Error de autenticación')
+        setFinishing(false)
+        return
+      }
+
       const patientId = sessionData?.patient_id
 
       // Mapear respuestas a columnas p01-p45
@@ -178,51 +193,35 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         return
       }
 
-      // Guardar informe
+      // Guardar informe usando upsert
       const recomendaciones = generarRecomendacionesPECA(result)
       const nivelTexto = result.participationLevel >= 75 ? 'Alto' : result.participationLevel >= 50 ? 'Medio' : result.participationLevel >= 25 ? 'Bajo' : 'Muy bajo'
-      
-      const { data: existingInforme } = await supabase
-        .from('informes')
-        .select('id')
-        .eq('session_id', sessionId)
-        .maybeSingle()
 
-      if (existingInforme) {
-        await supabase
-          .from('informes')
-          .update({
-            contenido: JSON.stringify({
-              participationLevel: result.participationLevel,
-              answeredItems: result.answeredItems,
-              dimensions: result.dimensions,
-              aamrSets: result.aamrSets
-            }),
-            puntaje_total: result.participationLevel,
-            nivel: nivelTexto,
-            recomendaciones: recomendaciones,
-            updated_at: new Date().toISOString()
-          })
-          .eq('session_id', sessionId)
+      const { data: informeData, error: informeError } = await supabase
+        .from('informes')
+        .upsert({
+          session_id: sessionId,
+          patient_id: patientId,
+          psychologist_id: user.id,
+          test_id: 'peca',
+          titulo: `PECA - Evaluación de Conducta Adaptativa`,
+          contenido: JSON.stringify({
+            participationLevel: result.participationLevel,
+            answeredItems: result.answeredItems,
+            dimensions: result.dimensions,
+            aamrSets: result.aamrSets
+          }),
+          puntaje_total: result.participationLevel,
+          nivel: nivelTexto,
+          recomendaciones: recomendaciones,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'session_id' })
+        .select()
+
+      if (informeError) {
+        console.error('Error guardando informe:', informeError)
       } else {
-        await supabase
-          .from('informes')
-          .insert({
-            session_id: sessionId,
-            patient_id: patientId,
-            psychologist_id: user?.id,
-            test_id: 'peca',
-            titulo: `PECA - Evaluación de Conducta Adaptativa`,
-            contenido: JSON.stringify({
-              participationLevel: result.participationLevel,
-              answeredItems: result.answeredItems,
-              dimensions: result.dimensions,
-              aamrSets: result.aamrSets
-            }),
-            puntaje_total: result.participationLevel,
-            nivel: nivelTexto,
-            recomendaciones: recomendaciones
-          })
+        console.log('Informe guardado correctamente:', informeData)
       }
 
       await supabase
