@@ -157,35 +157,66 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         return
       }
 
-      // Guardar informe usando upsert
+      // Guardar informe
       const recomendaciones = generarRecomendacionesBDI2(result)
 
-      const { data: informeData, error: informeError } = await supabase
+      const { data: existingInforme } = await supabase
         .from('informes')
-        .upsert({
-          session_id: sessionId,
-          patient_id: patientId,
-          psychologist_id: user.id,
-          test_id: 'bdi2',
-          titulo: `BDI-II - Inventario de Depresión`,
-          contenido: JSON.stringify({
-            totalScore: result.totalScore,
-            severity: result.severityLabel,
-            cognitiveAffectiveScore: result.cognitiveAffectiveScore,
-            somaticMotivationalScore: result.somaticMotivationalScore,
-            suicidalIdeationScore: result.suicidalIdeationScore
-          }),
-          puntaje_total: result.totalScore,
-          nivel: result.severityLabel,
-          recomendaciones: recomendaciones,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'session_id' })
-        .select()
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle()
 
-      if (informeError) {
-        console.error('Error guardando informe:', informeError)
+      if (existingInforme) {
+        const { data, error: updateError } = await supabase
+          .from('informes')
+          .update({
+            contenido: JSON.stringify({
+              totalScore: result.totalScore,
+              severity: result.severityLabel,
+              cognitiveAffectiveScore: result.cognitiveAffectiveScore,
+              somaticMotivationalScore: result.somaticMotivationalScore,
+              suicidalIdeationScore: result.suicidalIdeationScore
+            }),
+            puntaje_total: result.totalScore,
+            nivel: result.severityLabel,
+            recomendaciones: recomendaciones,
+            updated_at: new Date().toISOString()
+          })
+          .eq('session_id', sessionId)
+          .select()
+
+        if (updateError) {
+          console.error('Error actualizando informe:', updateError)
+        } else {
+          console.log('Informe actualizado correctamente:', data)
+        }
       } else {
-        console.log('Informe guardado correctamente:', informeData)
+        const { data, error: insertError } = await supabase
+          .from('informes')
+          .insert({
+            session_id: sessionId,
+            patient_id: patientId,
+            psychologist_id: user.id,
+            test_id: 'bdi2',
+            titulo: `BDI-II - Inventario de Depresión`,
+            contenido: JSON.stringify({
+              totalScore: result.totalScore,
+              severity: result.severityLabel,
+              cognitiveAffectiveScore: result.cognitiveAffectiveScore,
+              somaticMotivationalScore: result.somaticMotivationalScore,
+              suicidalIdeationScore: result.suicidalIdeationScore
+            }),
+            puntaje_total: result.totalScore,
+            nivel: result.severityLabel,
+            recomendaciones: recomendaciones
+          })
+          .select()
+
+        if (insertError) {
+          console.error('Error insertando informe:', insertError)
+        } else {
+          console.log('Informe insertado correctamente:', data)
+        }
       }
 
       await supabase

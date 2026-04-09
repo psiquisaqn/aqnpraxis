@@ -193,35 +193,65 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         return
       }
 
-      // Guardar informe usando upsert
+      // Guardar informe
       const recomendaciones = generarRecomendacionesPECA(result)
       const nivelTexto = result.participationLevel >= 75 ? 'Alto' : result.participationLevel >= 50 ? 'Medio' : result.participationLevel >= 25 ? 'Bajo' : 'Muy bajo'
 
-      const { data: informeData, error: informeError } = await supabase
+      const { data: existingInforme } = await supabase
         .from('informes')
-        .upsert({
-          session_id: sessionId,
-          patient_id: patientId,
-          psychologist_id: user.id,
-          test_id: 'peca',
-          titulo: `PECA - Evaluación de Conducta Adaptativa`,
-          contenido: JSON.stringify({
-            participationLevel: result.participationLevel,
-            answeredItems: result.answeredItems,
-            dimensions: result.dimensions,
-            aamrSets: result.aamrSets
-          }),
-          puntaje_total: result.participationLevel,
-          nivel: nivelTexto,
-          recomendaciones: recomendaciones,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'session_id' })
-        .select()
+        .select('id')
+        .eq('session_id', sessionId)
+        .maybeSingle()
 
-      if (informeError) {
-        console.error('Error guardando informe:', informeError)
+      if (existingInforme) {
+        const { data, error: updateError } = await supabase
+          .from('informes')
+          .update({
+            contenido: JSON.stringify({
+              participationLevel: result.participationLevel,
+              answeredItems: result.answeredItems,
+              dimensions: result.dimensions,
+              aamrSets: result.aamrSets
+            }),
+            puntaje_total: result.participationLevel,
+            nivel: nivelTexto,
+            recomendaciones: recomendaciones,
+            updated_at: new Date().toISOString()
+          })
+          .eq('session_id', sessionId)
+          .select()
+
+        if (updateError) {
+          console.error('Error actualizando informe:', updateError)
+        } else {
+          console.log('Informe actualizado correctamente:', data)
+        }
       } else {
-        console.log('Informe guardado correctamente:', informeData)
+        const { data, error: insertError } = await supabase
+          .from('informes')
+          .insert({
+            session_id: sessionId,
+            patient_id: patientId,
+            psychologist_id: user.id,
+            test_id: 'peca',
+            titulo: `PECA - Evaluación de Conducta Adaptativa`,
+            contenido: JSON.stringify({
+              participationLevel: result.participationLevel,
+              answeredItems: result.answeredItems,
+              dimensions: result.dimensions,
+              aamrSets: result.aamrSets
+            }),
+            puntaje_total: result.participationLevel,
+            nivel: nivelTexto,
+            recomendaciones: recomendaciones
+          })
+          .select()
+
+        if (insertError) {
+          console.error('Error insertando informe:', insertError)
+        } else {
+          console.log('Informe insertado correctamente:', data)
+        }
       }
 
       await supabase
