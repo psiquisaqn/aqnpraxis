@@ -121,32 +121,29 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
       const { scoreCoopersmith } = await import('@/lib/coopersmith/engine')
       const result = scoreCoopersmith(responses)
 
-      console.log('=== RESULTADO COOPERSMITH ===')
-      console.log('result:', result)
-
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select('patient_id')
         .eq('id', sessionId)
         .single()
 
-      console.log('sessionData:', sessionData)
-      console.log('sessionError:', sessionError)
+      if (sessionError) {
+        console.error('Error obteniendo sesión:', sessionError)
+        alert('Error al obtener información de la sesión')
+        setFinishing(false)
+        return
+      }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       
-      console.log('user:', user)
-      console.log('userError:', userError)
+      if (userError || !user) {
+        console.error('Error obteniendo usuario:', userError)
+        alert('Error de autenticación')
+        setFinishing(false)
+        return
+      }
 
       const patientId = sessionData?.patient_id
-
-      console.log('=== DATOS PARA INFORME ===')
-      console.log('sessionId:', sessionId)
-      console.log('patientId:', patientId)
-      console.log('psychologist_id:', user?.id)
-      console.log('test_id:', 'coopersmith')
-      console.log('puntaje_total:', result.totalScaled)
-      console.log('nivel:', result.levelLabel)
 
       // Guardar en coopersmith_scores
       const { error: scoreError } = await supabase
@@ -169,73 +166,43 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
         return
       }
 
-      console.log('Coopersmith scores guardado correctamente')
-
-      // Guardar informe
+      // Guardar informe usando upsert para evitar conflictos
       const recomendaciones = generarRecomendacionesCoopersmith(result.totalScaled, result.levelLabel)
-      
-      const { data: existingInforme, error: checkError } = await supabase
+
+      const { data: informeData, error: informeError } = await supabase
         .from('informes')
-        .select('id')
-        .eq('session_id', sessionId)
-        .maybeSingle()
+        .upsert({
+          session_id: sessionId,
+          patient_id: patientId,
+          psychologist_id: user.id,
+          test_id: 'coopersmith',
+          titulo: `Coopersmith SEI - Inventario de Autoestima`,
+          contenido: JSON.stringify({
+            totalScaled: result.totalScaled,
+            levelLabel: result.levelLabel,
+            levelDescription: result.levelDescription,
+            lieScaleRaw: result.lieScaleRaw,
+            lieScaleInvalid: result.lieScaleInvalid
+          }),
+          puntaje_total: result.totalScaled,
+          nivel: result.levelLabel,
+          recomendaciones: recomendaciones,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'session_id' })
+        .select()
 
-      console.log('Informe existente:', existingInforme)
-      console.log('Error al buscar informe:', checkError)
-
-      if (existingInforme) {
-        const { data, error: updateError } = await supabase
-          .from('informes')
-          .update({
-            contenido: JSON.stringify({
-              totalScaled: result.totalScaled,
-              levelLabel: result.levelLabel,
-              levelDescription: result.levelDescription,
-              lieScaleRaw: result.lieScaleRaw,
-              lieScaleInvalid: result.lieScaleInvalid
-            }),
-            puntaje_total: result.totalScaled,
-            nivel: result.levelLabel,
-            recomendaciones: recomendaciones,
-            updated_at: new Date().toISOString()
-          })
-          .eq('session_id', sessionId)
-          .select()
-        
-        console.log('Resultado UPDATE informe:', { data, error: updateError })
+      if (informeError) {
+        console.error('Error guardando informe:', informeError)
       } else {
-        const { data, error: insertError } = await supabase
-          .from('informes')
-          .insert({
-            session_id: sessionId,
-            patient_id: patientId,
-            psychologist_id: user?.id,
-            test_id: 'coopersmith',
-            titulo: `Coopersmith SEI - Inventario de Autoestima`,
-            contenido: JSON.stringify({
-              totalScaled: result.totalScaled,
-              levelLabel: result.levelLabel,
-              levelDescription: result.levelDescription,
-              lieScaleRaw: result.lieScaleRaw,
-              lieScaleInvalid: result.lieScaleInvalid
-            }),
-            puntaje_total: result.totalScaled,
-            nivel: result.levelLabel,
-            recomendaciones: recomendaciones
-          })
-          .select()
-        
-        console.log('Resultado INSERT informe:', { data, error: insertError })
+        console.log('Informe guardado correctamente:', informeData)
       }
 
+      // Actualizar sesión como completada
       await supabase
         .from('sessions')
         .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', sessionId)
 
-      console.log('Sesión actualizada a completed')
-      console.log('Redirigiendo a resultados...')
-      
       router.push(`/resultados/coopersmith?session=${sessionId}`)
     } catch(e: any) {
       console.error('Error inesperado:', e)
