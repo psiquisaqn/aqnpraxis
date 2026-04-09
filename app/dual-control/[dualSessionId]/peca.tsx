@@ -1,4 +1,9 @@
-﻿'use client'
+'use client'
+// app/dual-control/[dualSessionId]/peca.tsx
+// FIX #4: Mismo fix que Coopersmith — usar completedCount derivado de responses
+//         en vez de un state separado para evitar desincronización.
+// FIX #6: Cambiar router.push('/dashboard') por router.push('/resultados/peca?session=...')
+
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -30,15 +35,18 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const router = useRouter()
   const [currentItem, setCurrentItem] = useState(1)
   const [responses, setResponses] = useState<PecaResponses>({})
-  const [completed, setCompleted] = useState(0)
   const [finishing, setFinishing] = useState(false)
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const firstItemSent = useRef(false)
 
   const currentItemData = PECA_ITEMS.find(item => item.num === currentItem)
-  const allDone = completed === 45
 
-  const buildPayload = (num: number, sel?: number) => {
+  // FIX #4: valor derivado, no state separado
+  const completedCount = Object.keys(responses).length
+  const allDone = completedCount === 45
+  const answeredItems = new Set(Object.keys(responses).map(Number))
+
+  const buildPayload = (num: number, sel?: number, resp = responses) => {
     const d = PECA_ITEMS.find(i => i.num === num)
     return {
       type: 'peca', item: num,
@@ -51,7 +59,7 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         { value: 4, label: '4 - Muy parecido a la derecha' },
       ],
       selected: sel,
-      totalCompleted: completed,
+      totalCompleted: Object.keys(resp).length,
       totalItems: 45
     }
   }
@@ -82,10 +90,8 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const handleResponse = (value: number) => {
     const newResponses = { ...responses, [currentItem]: value as 1|2|3|4 }
     setResponses(newResponses)
-    const newCompleted = Object.keys(newResponses).length
-    setCompleted(newCompleted)
     onSaveResponse(currentItem, value)
-    onUpdatePatient({ ...buildPayload(currentItem, value), totalCompleted: newCompleted })
+    onUpdatePatient(buildPayload(currentItem, value, newResponses))
   }
 
   const goToItem = (num: number) => {
@@ -120,7 +126,6 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
       if (userError || !user) {
         console.error('Error obteniendo usuario:', userError)
         alert('Error de autenticación')
@@ -143,13 +148,10 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       }
       
       const intensityMap: Record<string, string> = {
-        'bueno': 'buen_nivel',
-        'buen_nivel': 'buen_nivel',
-        'limitado': 'limitado',
-        'extenso': 'extenso',
+        'bueno': 'buen_nivel', 'buen_nivel': 'buen_nivel',
+        'limitado': 'limitado', 'extenso': 'extenso',
         'generalizado': 'generalizado',
-        'needs_support': 'limitado',
-        'needs_support_acu': 'limitado'
+        'needs_support': 'limitado', 'needs_support_acu': 'limitado'
       }
       
       const dimMap: Record<string, any> = {}
@@ -167,10 +169,6 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         aamrMap['h' + col + '_level'] = s.needsSupport === true ? 'requiere_apoyo' : 'buen_nivel'
       })
 
-      const hcon_level = aamrMap.hcon_level || 'buen_nivel'
-      const hsoc_level = aamrMap.hsoc_level || 'buen_nivel'
-      const hpra_level = aamrMap.hpra_level || 'buen_nivel'
-
       const { error: pecaError } = await supabase
         .from('peca_scores')
         .upsert({
@@ -178,9 +176,9 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
           ...itemCols,
           ...dimMap,
           ...aamrMap,
-          hcon_level,
-          hsoc_level,
-          hpra_level,
+          hcon_level: aamrMap.hcon_level || 'buen_nivel',
+          hsoc_level: aamrMap.hsoc_level || 'buen_nivel',
+          hpra_level: aamrMap.hpra_level || 'buen_nivel',
           participation_level: result.participationLevel,
           completed_items: result.answeredItems,
           calculated_at: new Date().toISOString(),
@@ -195,7 +193,9 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
 
       // Guardar informe
       const recomendaciones = generarRecomendacionesPECA(result)
-      const nivelTexto = result.participationLevel >= 75 ? 'Alto' : result.participationLevel >= 50 ? 'Medio' : result.participationLevel >= 25 ? 'Bajo' : 'Muy bajo'
+      const nivelTexto = result.participationLevel >= 75 ? 'Alto'
+        : result.participationLevel >= 50 ? 'Medio'
+        : result.participationLevel >= 25 ? 'Bajo' : 'Muy bajo'
 
       const { data: existingInforme } = await supabase
         .from('informes')
@@ -204,7 +204,7 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         .maybeSingle()
 
       if (existingInforme) {
-        const { data, error: updateError } = await supabase
+        await supabase
           .from('informes')
           .update({
             contenido: JSON.stringify({
@@ -215,26 +215,19 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
             }),
             puntaje_total: result.participationLevel,
             nivel: nivelTexto,
-            recomendaciones: recomendaciones,
+            recomendaciones,
             updated_at: new Date().toISOString()
           })
           .eq('session_id', sessionId)
-          .select()
-
-        if (updateError) {
-          console.error('Error actualizando informe:', updateError)
-        } else {
-          console.log('Informe actualizado correctamente:', data)
-        }
       } else {
-        const { data, error: insertError } = await supabase
+        await supabase
           .from('informes')
           .insert({
             session_id: sessionId,
             patient_id: patientId,
             psychologist_id: user.id,
             test_id: 'peca',
-            titulo: `PECA - Evaluación de Conducta Adaptativa`,
+            titulo: 'PECA - Evaluación de Conducta Adaptativa',
             contenido: JSON.stringify({
               participationLevel: result.participationLevel,
               answeredItems: result.answeredItems,
@@ -243,15 +236,8 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
             }),
             puntaje_total: result.participationLevel,
             nivel: nivelTexto,
-            recomendaciones: recomendaciones
+            recomendaciones
           })
-          .select()
-
-        if (insertError) {
-          console.error('Error insertando informe:', insertError)
-        } else {
-          console.log('Informe insertado correctamente:', data)
-        }
       }
 
       await supabase
@@ -259,7 +245,8 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', sessionId)
 
-      router.push('/dashboard')
+      // FIX #6: redirigir al informe PECA en vez del dashboard
+      router.push(`/resultados/peca?session=${sessionId}`)
     } catch(e: any) {
       console.error('Error inesperado:', e)
       alert('Error: ' + e.message)
@@ -274,9 +261,10 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       title="Evaluación PECA - Conducta Adaptativa"
       totalItems={45}
       currentItem={currentItem}
-      completed={completed}
+      completed={completedCount}
       onItemSelect={goToItem}
       items={pecaItemsList}
+      answeredItems={answeredItems}
       showQuestionZero={showQuestionZero}
       onStart={handleStartTest}
     >
@@ -284,10 +272,10 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex justify-between text-sm mb-1">
             <span className="text-gray-600">Progreso</span>
-            <span className="text-gray-800 font-medium">{completed}/45 items</span>
+            <span className="text-gray-800 font-medium">{completedCount}/45 items</span>
           </div>
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: ((completed/45)*100) + "%" }} />
+            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: ((completedCount/45)*100) + "%" }} />
           </div>
         </div>
 
@@ -327,7 +315,7 @@ export function PecaControl({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         {allDone && (
           <button onClick={handleFinish} disabled={finishing}
             className="w-full py-3 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 disabled:opacity-50">
-            {finishing ? 'Finalizando...' : 'Finalizar evaluacion PECA'}
+            {finishing ? 'Finalizando...' : 'Finalizar evaluación PECA'}
           </button>
         )}
       </div>

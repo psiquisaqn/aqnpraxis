@@ -1,4 +1,8 @@
 'use client'
+// app/dual-control/[dualSessionId]/bdi2.tsx
+// FIX #4: Igual que coopersmith y peca — eliminar el state "completed" y
+// calcular directamente desde Object.keys(responses).length.
+
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -31,28 +35,32 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const router = useRouter()
   const [currentItem, setCurrentItem] = useState(1)
   const [responses, setResponses] = useState<Record<number, BdiResponse>>({})
-  const [completed, setCompleted] = useState(0)
   const [finishing, setFinishing] = useState(false)
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const firstItemSent = useRef(false)
 
   const currentItemData = BDI2_ITEMS.find(item => item.num === currentItem)
+
+  // FIX #4: valor derivado, no state separado
+  const completedCount = Object.keys(responses).length
+  const allDone = completedCount === 21
+  const answeredItems = new Set(Object.keys(responses).map(Number))
+
   const BDI_OPTIONS = [
     { value: 0, label: '0 - No aplica' },
     { value: 1, label: '1 - Leve' },
     { value: 2, label: '2 - Moderado' },
     { value: 3, label: '3 - Grave' },
   ]
-  const allDone = completed === 21
 
-  const buildPayload = (num: number, sel?: BdiResponse) => {
+  const buildPayload = (num: number, sel?: BdiResponse, resp = responses) => {
     const d = BDI2_ITEMS.find(i => i.num === num)
     return {
       type: 'bdi2', item: num,
       label: d?.label,
       options: BDI_OPTIONS,
       selected: sel,
-      totalCompleted: completed,
+      totalCompleted: Object.keys(resp).length,
       totalItems: 21
     }
   }
@@ -84,10 +92,8 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const handleResponse = (value: BdiResponse) => {
     const newResponses = { ...responses, [currentItem]: value }
     setResponses(newResponses)
-    const newCompleted = Object.keys(newResponses).length
-    setCompleted(newCompleted)
     onSaveResponse(currentItem, value)
-    onUpdatePatient({ ...buildPayload(currentItem, value), totalCompleted: newCompleted })
+    onUpdatePatient(buildPayload(currentItem, value, newResponses))
   }
 
   const goToItem = (num: number) => {
@@ -113,16 +119,13 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         .single()
 
       if (sessionError) {
-        console.error('Error obteniendo sesión:', sessionError)
         alert('Error al obtener información de la sesión')
         setFinishing(false)
         return
       }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
       if (userError || !user) {
-        console.error('Error obteniendo usuario:', userError)
         alert('Error de autenticación')
         setFinishing(false)
         return
@@ -151,13 +154,11 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         }, { onConflict: 'session_id' })
 
       if (scoreError) {
-        console.error('Error guardando bdi2_scores:', scoreError)
         alert('Error al guardar: ' + scoreError.message)
         setFinishing(false)
         return
       }
 
-      // Guardar informe
       const recomendaciones = generarRecomendacionesBDI2(result)
 
       const { data: existingInforme } = await supabase
@@ -167,7 +168,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         .maybeSingle()
 
       if (existingInforme) {
-        const { data, error: updateError } = await supabase
+        await supabase
           .from('informes')
           .update({
             contenido: JSON.stringify({
@@ -179,26 +180,19 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
             }),
             puntaje_total: result.totalScore,
             nivel: result.severityLabel,
-            recomendaciones: recomendaciones,
+            recomendaciones,
             updated_at: new Date().toISOString()
           })
           .eq('session_id', sessionId)
-          .select()
-
-        if (updateError) {
-          console.error('Error actualizando informe:', updateError)
-        } else {
-          console.log('Informe actualizado correctamente:', data)
-        }
       } else {
-        const { data, error: insertError } = await supabase
+        await supabase
           .from('informes')
           .insert({
             session_id: sessionId,
             patient_id: patientId,
             psychologist_id: user.id,
             test_id: 'bdi2',
-            titulo: `BDI-II - Inventario de Depresión`,
+            titulo: 'BDI-II - Inventario de Depresión',
             contenido: JSON.stringify({
               totalScore: result.totalScore,
               severity: result.severityLabel,
@@ -208,15 +202,8 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
             }),
             puntaje_total: result.totalScore,
             nivel: result.severityLabel,
-            recomendaciones: recomendaciones
+            recomendaciones
           })
-          .select()
-
-        if (insertError) {
-          console.error('Error insertando informe:', insertError)
-        } else {
-          console.log('Informe insertado correctamente:', data)
-        }
       }
 
       await supabase
@@ -239,9 +226,10 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
       title="Evaluación BDI-II - Inventario de Depresión"
       totalItems={21}
       currentItem={currentItem}
-      completed={completed}
+      completed={completedCount}
       onItemSelect={goToItem}
       items={bdiItemsList}
+      answeredItems={answeredItems}
       showQuestionZero={showQuestionZero}
       onStart={handleStartTest}
     >
@@ -249,10 +237,10 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex justify-between text-sm mb-1">
             <span className="text-gray-600">Progreso</span>
-            <span className="text-gray-800 font-medium">{completed}/21 items</span>
+            <span className="text-gray-800 font-medium">{completedCount}/21 items</span>
           </div>
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: ((completed/21)*100) + '%' }} />
+            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: ((completedCount/21)*100) + '%' }} />
           </div>
         </div>
 
@@ -287,7 +275,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
         {allDone && (
           <button onClick={handleFinish} disabled={finishing}
             className="w-full py-3 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 disabled:opacity-50">
-            {finishing ? 'Finalizando...' : 'Finalizar evaluacion BDI-II'}
+            {finishing ? 'Finalizando...' : 'Finalizar evaluación BDI-II'}
           </button>
         )}
       </div>
