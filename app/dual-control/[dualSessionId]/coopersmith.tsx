@@ -79,7 +79,8 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
   const handleResponse = (value: CooperResponse) => {
     const newResponses = { ...responses, [currentItem]: value }
     setResponses(newResponses)
-    setCompleted(Object.keys(newResponses).length)
+    const newCompleted = Object.keys(newResponses).length
+    setCompleted(newCompleted)
     onSaveResponse(currentItem, value)
 
     const itemData = COOPERSMITH_ITEMS.find(item => item.num === currentItem)
@@ -89,7 +90,7 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
       text: itemData?.text,
       options: ['Igual que yo', 'No es como yo'],
       selected: value,
-      totalCompleted: Object.keys(newResponses).length,
+      totalCompleted: newCompleted,
       totalItems: 58
     })
   }
@@ -113,6 +114,9 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
     setFinishing(true)
 
     try {
+      console.log('=== INICIANDO FINALIZACIÓN COOPERSMITH ===')
+      console.log('Respuestas totales:', Object.keys(responses).length)
+      
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -120,6 +124,13 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
 
       const { scoreCoopersmith } = await import('@/lib/coopersmith/engine')
       const result = scoreCoopersmith(responses)
+      
+      console.log('Resultado del scoring:', {
+        totalRaw: result.totalRaw,
+        totalScaled: result.totalScaled,
+        levelLabel: result.levelLabel,
+        levelDescription: result.levelDescription
+      })
 
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
@@ -146,18 +157,22 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
       const patientId = sessionData?.patient_id
 
       // Guardar en coopersmith_scores
+      const scoreData = {
+        session_id: sessionId,
+        total_scaled: result.totalScaled,
+        level_label: result.levelLabel,
+        level_color: result.levelColor,
+        level_description: result.levelDescription,
+        lie_scale_raw: result.lieScaleRaw,
+        lie_scale_invalid: result.lieScaleInvalid,
+        calculated_at: new Date().toISOString()
+      }
+      
+      console.log('Guardando en coopersmith_scores:', scoreData)
+
       const { error: scoreError } = await supabase
         .from('coopersmith_scores')
-        .upsert({
-          session_id: sessionId,
-          total_scaled: result.totalScaled,
-          level_label: result.levelLabel,
-          level_color: result.levelColor,
-          level_description: result.levelDescription,
-          lie_scale_raw: result.lieScaleRaw,
-          lie_scale_invalid: result.lieScaleInvalid,
-          calculated_at: new Date().toISOString()
-        }, { onConflict: 'session_id' })
+        .upsert(scoreData, { onConflict: 'session_id' })
 
       if (scoreError) {
         console.error('Error guardando coopersmith_scores:', scoreError)
@@ -166,66 +181,37 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
         return
       }
 
-      // Guardar informe - usando select + insert/update
+      console.log('Coopersmith scores guardado correctamente')
+
+      // Guardar informe
       const recomendaciones = generarRecomendacionesCoopersmith(result.totalScaled, result.levelLabel)
 
-      const { data: existingInforme } = await supabase
+      const informeData = {
+        session_id: sessionId,
+        test_id: 'coopersmith',
+        titulo: `Coopersmith SEI - Inventario de Autoestima`,
+        contenido: JSON.stringify({
+          totalScaled: result.totalScaled,
+          levelLabel: result.levelLabel,
+          levelDescription: result.levelDescription,
+          lieScaleRaw: result.lieScaleRaw,
+          lieScaleInvalid: result.lieScaleInvalid
+        }),
+        puntaje_total: result.totalScaled,
+        nivel: result.levelLabel,
+        recomendaciones: recomendaciones
+      }
+
+      console.log('Guardando informe:', informeData)
+
+      const { error: insertError } = await supabase
         .from('informes')
-        .select('id')
-        .eq('session_id', sessionId)
-        .maybeSingle()
+        .insert(informeData)
 
-      if (existingInforme) {
-        const { data, error: updateError } = await supabase
-          .from('informes')
-          .update({
-            contenido: JSON.stringify({
-              totalScaled: result.totalScaled,
-              levelLabel: result.levelLabel,
-              levelDescription: result.levelDescription,
-              lieScaleRaw: result.lieScaleRaw,
-              lieScaleInvalid: result.lieScaleInvalid
-            }),
-            puntaje_total: result.totalScaled,
-            nivel: result.levelLabel,
-            recomendaciones: recomendaciones,
-            updated_at: new Date().toISOString()
-          })
-          .eq('session_id', sessionId)
-          .select()
-
-        if (updateError) {
-          console.error('Error actualizando informe:', updateError)
-        } else {
-          console.log('Informe actualizado correctamente:', data)
-        }
+      if (insertError) {
+        console.error('Error insertando informe:', insertError)
       } else {
-        const { data, error: insertError } = await supabase
-          .from('informes')
-          .insert({
-            session_id: sessionId,
-            patient_id: patientId,
-            psychologist_id: user.id,
-            test_id: 'coopersmith',
-            titulo: `Coopersmith SEI - Inventario de Autoestima`,
-            contenido: JSON.stringify({
-              totalScaled: result.totalScaled,
-              levelLabel: result.levelLabel,
-              levelDescription: result.levelDescription,
-              lieScaleRaw: result.lieScaleRaw,
-              lieScaleInvalid: result.lieScaleInvalid
-            }),
-            puntaje_total: result.totalScaled,
-            nivel: result.levelLabel,
-            recomendaciones: recomendaciones
-          })
-          .select()
-
-        if (insertError) {
-          console.error('Error insertando informe:', insertError)
-        } else {
-          console.log('Informe insertado correctamente:', data)
-        }
+        console.log('Informe insertado correctamente')
       }
 
       await supabase
@@ -233,6 +219,7 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
         .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', sessionId)
 
+      console.log('Redirigiendo a resultados...')
       router.push(`/resultados/coopersmith?session=${sessionId}`)
     } catch(e: any) {
       console.error('Error inesperado:', e)
