@@ -1,9 +1,9 @@
 'use client'
 // app/dashboard/informes/page.tsx
-// FIX INFORMES (400): La query usaba profiles:patient_id(full_name) — un join
-// a la tabla profiles. Pero informes.patient_id apunta a patients, no profiles.
-// Supabase devuelve 400 porque no existe esa foreign key.
-// Solución: cambiar a patients:patient_id(full_name).
+// FIX: La tabla informes no tiene una foreign key declarada a patients en
+// Supabase, por eso tanto profiles:patient_id como patients:patient_id
+// devuelven 400. Solución: hacer dos queries separadas — primero los informes,
+// luego los pacientes — y combinarlos en el cliente.
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -33,21 +33,10 @@ export default function InformesPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
 
-      // FIX: patients:patient_id(full_name) en vez de profiles:patient_id(full_name)
+      // Query 1: informes sin join
       const { data: informes, error } = await supabase
         .from('informes')
-        .select(`
-          id,
-          session_id,
-          patient_id,
-          test_id,
-          titulo,
-          puntaje_total,
-          nivel,
-          recomendaciones,
-          created_at,
-          patients:patient_id(full_name)
-        `)
+        .select('id, session_id, patient_id, test_id, titulo, puntaje_total, nivel, recomendaciones, created_at')
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -56,23 +45,43 @@ export default function InformesPage() {
         return
       }
 
-      const testNames: Record<string, string> = {
-        peca: 'PECA - Conducta Adaptativa',
-        bdi2: 'BDI-II - Depresión',
-        coopersmith: 'Coopersmith SEI - Autoestima'
+      if (!informes || informes.length === 0) {
+        setReports([])
+        setLoading(false)
+        return
       }
 
-      const formatted: Report[] = (informes ?? []).map((i: any) => ({
-        id: i.id,
-        session_id: i.session_id,
-        // FIX: usar patients en vez de profiles
-        patient_name: i.patients?.full_name || 'Paciente',
-        patient_id: i.patient_id,
-        test_name: testNames[i.test_id] || i.test_id,
-        date: i.created_at,
-        score: i.puntaje_total || 0,
+      // Query 2: pacientes correspondientes
+      const patientIds = [...new Set(informes.map((i: any) => i.patient_id).filter(Boolean))]
+      let patientMap: Record<string, string> = {}
+
+      if (patientIds.length > 0) {
+        const { data: patients } = await supabase
+          .from('patients')
+          .select('id, full_name')
+          .in('id', patientIds)
+
+        if (patients) {
+          patients.forEach((p: any) => { patientMap[p.id] = p.full_name })
+        }
+      }
+
+      const testNames: Record<string, string> = {
+        peca:        'PECA - Conducta Adaptativa',
+        bdi2:        'BDI-II - Depresión',
+        coopersmith: 'Coopersmith SEI - Autoestima',
+      }
+
+      const formatted: Report[] = informes.map((i: any) => ({
+        id:             i.id,
+        session_id:     i.session_id,
+        patient_name:   patientMap[i.patient_id] || 'Paciente',
+        patient_id:     i.patient_id,
+        test_name:      testNames[i.test_id] || i.test_id,
+        date:           i.created_at,
+        score:          i.puntaje_total || 0,
         classification: i.nivel || '',
-        recomendaciones: i.recomendaciones || ''
+        recomendaciones: i.recomendaciones || '',
       }))
 
       setReports(formatted)
@@ -113,10 +122,7 @@ export default function InformesPage() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Informes</h1>
-        <Link
-          href="/dashboard"
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
-        >
+        <Link href="/dashboard" className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors">
           ↩ Volver al dashboard
         </Link>
       </div>
@@ -131,11 +137,8 @@ export default function InformesPage() {
               { key: 'date_asc',  label: 'Fecha ↑ (más antigua)' },
               { key: 'date_desc', label: 'Fecha ↓ (más reciente)' },
             ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setSortBy(key as typeof sortBy)}
-                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
+              <button key={key} onClick={() => setSortBy(key as typeof sortBy)}
+                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                 {label}
               </button>
             ))}

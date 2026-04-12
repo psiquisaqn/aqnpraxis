@@ -1,13 +1,19 @@
 'use client'
+// app/resultados/coopersmith/page.tsx
+// FIX #4: La página leía los puntajes via /api/scores/coopersmith (API route
+// del servidor) que tenía problemas de autenticación/RLS en Vercel.
+// Solución: leer directamente desde el browser con createBrowserClient,
+// igual que hace la página BDI-2 que sí funciona correctamente.
+// Se hace JOIN a sessions+patients en la misma query del browser.
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreCoopersmith, type CooperResult } from '@/lib/coopersmith/engine'
 
 function CoopersmithReportPageInner() {
-  const router    = useRouter()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
 
@@ -20,24 +26,58 @@ function CoopersmithReportPageInner() {
 
   useEffect(() => {
     if (!sessionId) return
-    fetch('/api/scores/coopersmith?session=' + sessionId)
-      .then(r => r.json())
-      .then((data) => {
-        if (!data || data.error) { setLoading(false); return }
-        const resp: Record<number, 'igual' | 'diferente'> = {}
-        for (let i = 1; i <= 58; i++) {
-          const key = `r${String(i).padStart(2, '0')}` as keyof typeof data
-          if (data[key] !== null && data[key] !== undefined) {
-            resp[i] = data[key] as 'igual' | 'diferente'
-          }
-        }
-        setResult(scoreCoopersmith(resp))
-        setPatientName((data.session as any)?.patient?.full_name ?? '')
-        setPatientId((data.session as any)?.patient?.id ?? '')
-        const d = (data.session as any)?.started_at
-        if (d) setEvalDate(new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }))
+
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    async function load() {
+      // 1. Leer coopersmith_scores directamente (r01-r58 + totales)
+      const { data: scores, error: scoresError } = await supabase
+        .from('coopersmith_scores')
+        .select('*')
+        .eq('session_id', sessionId)
+        .single()
+
+      if (scoresError || !scores) {
         setLoading(false)
-      })
+        return
+      }
+
+      // 2. Reconstruir respuestas desde r01-r58
+      const resp: Record<number, 'igual' | 'diferente'> = {}
+      for (let i = 1; i <= 58; i++) {
+        const key = `r${String(i).padStart(2, '0')}` as keyof typeof scores
+        const val = scores[key]
+        if (val !== null && val !== undefined) {
+          resp[i] = val as 'igual' | 'diferente'
+        }
+      }
+      setResult(scoreCoopersmith(resp))
+
+      // 3. Leer datos de sesión + paciente
+      const { data: sessionData } = await supabase
+        .from('sessions')
+        .select('started_at, patient:patients(id, full_name)')
+        .eq('id', sessionId)
+        .single()
+
+      if (sessionData?.patient) {
+        const p = sessionData.patient as any
+        setPatientName(p.full_name ?? '')
+        setPatientId(p.id ?? '')
+      }
+      if (sessionData?.started_at) {
+        setEvalDate(new Date(sessionData.started_at).toLocaleDateString('es-CL', {
+          day: '2-digit', month: 'long', year: 'numeric'
+        }))
+      }
+
+      setLoading(false)
+    }
+
+    load()
   }, [sessionId])
 
   if (loading) return <Spinner />
@@ -55,11 +95,9 @@ function CoopersmithReportPageInner() {
         <div className="flex-1" />
         <span className="text-xs" style={{ color: 'var(--stone-400)' }}>Coopersmith SEI — Inventario de Autoestima</span>
         {patientId && (
-          <button 
-            onClick={() => router.push(`/dashboard/paciente/${patientId}`)} 
+          <button onClick={() => router.push(`/dashboard/paciente/${patientId}`)}
             className="text-xs font-medium px-3 py-1.5 rounded-lg border"
-            style={{ color: 'var(--stone-600)', borderColor: 'var(--stone-200)' }}
-          >
+            style={{ color: 'var(--stone-600)', borderColor: 'var(--stone-200)' }}>
             Ver ficha del paciente
           </button>
         )}
@@ -67,16 +105,13 @@ function CoopersmithReportPageInner() {
           Imprimir
         </button>
         {result && (
-          <PdfDownloadButton
-            contentRef={contentRef}
+          <PdfDownloadButton contentRef={contentRef}
             meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }}
           />
         )}
-        <button 
-          onClick={() => router.push('/dashboard')} 
+        <button onClick={() => router.push('/dashboard')}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-600 text-white hover:bg-blue-700"
-          style={{ borderColor: 'transparent' }}
-        >
+          style={{ borderColor: 'transparent' }}>
           Panel principal
         </button>
       </div>
@@ -118,10 +153,8 @@ function CoopersmithReportPageInner() {
                   ))}
                 </div>
                 <div className="relative mt-1">
-                  <div
-                    className="absolute w-3 h-3 rounded-full border-2 border-white shadow -translate-x-1/2"
-                    style={{ left: `${result.totalScaled}%`, top: 0, background: levelColor }}
-                  />
+                  <div className="absolute w-3 h-3 rounded-full border-2 border-white shadow -translate-x-1/2"
+                    style={{ left: `${result.totalScaled}%`, top: 0, background: levelColor }} />
                 </div>
                 <div className="flex justify-between text-[10px] mt-4" style={{ color: 'var(--stone-400)' }}>
                   <span>0 Baja</span><span>25</span><span>50</span><span>75</span><span>100 Alta</span>
@@ -151,10 +184,7 @@ function CoopersmithReportPageInner() {
                   </div>
                 </div>
                 <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--stone-100)' }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${s.pct * 100}%`, background: levelColor }}
-                  />
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.pct * 100}%`, background: levelColor }} />
                 </div>
               </div>
             ))}
@@ -174,17 +204,17 @@ function CoopersmithReportPageInner() {
 function Spinner() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
-      <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--teal-500)', borderTopColor: 'transparent' }} />
+      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--teal-500)', borderTopColor: 'transparent' }} />
     </div>
   )
 }
 
-function Error({ onBack }: { onBack: () => void }) {
+function Error({ onBack }: { onBack?: () => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
       <div className="text-center">
-        <p className="text-sm" style={{ color: 'var(--stone-600)' }}>No se encontraron resultados</p>
-        <button onClick={onBack} className="mt-3 text-sm" style={{ color: 'var(--teal-600)' }}>← Volver</button>
+        <p className="text-sm font-medium mb-3" style={{ color: 'var(--stone-700)' }}>No se encontraron resultados para esta sesión.</p>
+        <button onClick={onBack ?? (() => window.history.back())} className="text-sm" style={{ color: 'var(--teal-600)' }}>← Volver</button>
       </div>
     </div>
   )
@@ -192,7 +222,7 @@ function Error({ onBack }: { onBack: () => void }) {
 
 export default function CoopersmithReportPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
       <CoopersmithReportPageInner />
     </Suspense>
   )

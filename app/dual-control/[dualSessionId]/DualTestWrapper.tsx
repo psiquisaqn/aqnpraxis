@@ -1,12 +1,10 @@
 'use client'
 // app/dual-control/[dualSessionId]/DualTestWrapper.tsx
-// FIX #2/#3/#4 (layout dual-control): La barra de navegación rápida quedaba
-// muy abajo porque el contenedor usaba h-screen con flex, pero el contenido
-// principal no tenía altura limitada. Se usa un layout más compacto donde:
-// - El área de contenido (children) tiene overflow-y-auto
-// - La navegación rápida está pegada justo debajo, SIN espacio extra
-// - Los botones Anterior/Siguiente están DENTRO de children (en cada test)
-//   y la navegación rápida queda fija al fondo
+// FIX #2: La distancia excesiva entre el contenido y la navegación rápida
+// se debía a que h-screen/100dvh con flex-col hacía que el área de contenido
+// ocupara todo el espacio disponible aunque el contenido fuera pequeño.
+// Solución: usar posición fija para la barra de navegación (bottom: 0),
+// y paddingBottom en el contenido para que no quede tapado.
 
 import { ReactNode } from 'react'
 
@@ -56,21 +54,24 @@ export function DualTestWrapper({
     )
   }
 
-  return (
-    // FIX: usar 100dvh para respetar la barra del navegador en móvil
-    <div style={{ height: '100dvh' }} className="flex flex-col bg-gray-100 overflow-hidden">
+  // Altura estimada de la barra de navegación: ~76px
+  const NAV_HEIGHT = 76
 
-      {/* Área de contenido — ocupa todo el espacio disponible, con scroll interno */}
-      <div className="flex-1 overflow-y-auto p-3">
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Contenido — padding inferior para que no quede tapado por la barra fija */}
+      <div className="p-3" style={{ paddingBottom: NAV_HEIGHT + 12 }}>
         {children}
       </div>
 
-      {/* Navegación rápida — pegada al fondo, tamaño fijo y compacto */}
-      <div className="bg-white border-t border-gray-200 shadow-lg flex-shrink-0 px-3 pt-2 pb-3">
+      {/* Navegación rápida — FIJA al fondo de la pantalla, siempre visible */}
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-20"
+        style={{ paddingTop: 8, paddingBottom: 10, paddingLeft: 12, paddingRight: 12 }}
+      >
         <p className="text-xs text-gray-500 mb-1.5 text-center">
-          📋 Navegación rápida — {completed}/{totalItems} respondidos
+          📋 {completed}/{totalItems} respondidos — toca un número para navegar
         </p>
-        {/* max-h-16 = ~2 filas de botones, scrolleable si hay muchos ítems */}
         <div className="flex flex-wrap justify-center gap-1 max-h-16 overflow-y-auto">
           {items.map((item) => {
             const isAnswered = answeredItems ? answeredItems.has(item.num) : false
