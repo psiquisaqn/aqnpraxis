@@ -1,4 +1,9 @@
-﻿'use client'
+'use client'
+// app/dashboard/informes/page.tsx
+// FIX INFORMES (400): La query usaba profiles:patient_id(full_name) — un join
+// a la tabla profiles. Pero informes.patient_id apunta a patients, no profiles.
+// Supabase devuelve 400 porque no existe esa foreign key.
+// Solución: cambiar a patients:patient_id(full_name).
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -28,7 +33,7 @@ export default function InformesPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
 
-      // Obtener informes de la tabla informes
+      // FIX: patients:patient_id(full_name) en vez de profiles:patient_id(full_name)
       const { data: informes, error } = await supabase
         .from('informes')
         .select(`
@@ -41,7 +46,7 @@ export default function InformesPage() {
           nivel,
           recomendaciones,
           created_at,
-          profiles:patient_id(full_name)
+          patients:patient_id(full_name)
         `)
         .order('created_at', { ascending: false })
 
@@ -57,10 +62,11 @@ export default function InformesPage() {
         coopersmith: 'Coopersmith SEI - Autoestima'
       }
 
-      const formatted: Report[] = informes.map((i: any) => ({
+      const formatted: Report[] = (informes ?? []).map((i: any) => ({
         id: i.id,
         session_id: i.session_id,
-        patient_name: i.profiles?.full_name || 'Paciente',
+        // FIX: usar patients en vez de profiles
+        patient_name: i.patients?.full_name || 'Paciente',
         patient_id: i.patient_id,
         test_name: testNames[i.test_id] || i.test_id,
         date: i.created_at,
@@ -78,29 +84,20 @@ export default function InformesPage() {
 
   const sortedReports = [...reports].sort((a, b) => {
     switch (sortBy) {
-      case 'name_asc':
-        return a.patient_name.localeCompare(b.patient_name)
-      case 'name_desc':
-        return b.patient_name.localeCompare(a.patient_name)
-      case 'date_asc':
-        return new Date(a.date).getTime() - new Date(b.date).getTime()
-      case 'date_desc':
-        return new Date(b.date).getTime() - new Date(a.date).getTime()
-      default:
-        return 0
+      case 'name_asc':  return a.patient_name.localeCompare(b.patient_name)
+      case 'name_desc': return b.patient_name.localeCompare(a.patient_name)
+      case 'date_asc':  return new Date(a.date).getTime() - new Date(b.date).getTime()
+      case 'date_desc': return new Date(b.date).getTime() - new Date(a.date).getTime()
+      default: return 0
     }
   })
 
   const getTestPath = (testId: string, sessionId: string) => {
     switch (testId) {
-      case 'peca':
-        return `/resultados/peca?session=${sessionId}`
-      case 'bdi2':
-        return `/bdi2/${sessionId}/report`
-      case 'coopersmith':
-        return `/resultados/coopersmith?session=${sessionId}`
-      default:
-        return `/dashboard`
+      case 'peca':        return `/resultados/peca?session=${sessionId}`
+      case 'bdi2':        return `/bdi2/${sessionId}/report`
+      case 'coopersmith': return `/resultados/coopersmith?session=${sessionId}`
+      default:            return `/dashboard`
     }
   }
 
@@ -128,30 +125,20 @@ export default function InformesPage() {
         <div className="flex flex-wrap items-center gap-4">
           <span className="text-sm text-gray-500">Ordenar por:</span>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setSortBy('name_asc')}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'name_asc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              Nombre A-Z
-            </button>
-            <button
-              onClick={() => setSortBy('name_desc')}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'name_desc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              Nombre Z-A
-            </button>
-            <button
-              onClick={() => setSortBy('date_asc')}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'date_asc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              Fecha ↑ (más antigua)
-            </button>
-            <button
-              onClick={() => setSortBy('date_desc')}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === 'date_desc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              Fecha ↓ (más reciente)
-            </button>
+            {[
+              { key: 'name_asc',  label: 'Nombre A-Z' },
+              { key: 'name_desc', label: 'Nombre Z-A' },
+              { key: 'date_asc',  label: 'Fecha ↑ (más antigua)' },
+              { key: 'date_desc', label: 'Fecha ↓ (más reciente)' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSortBy(key as typeof sortBy)}
+                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${sortBy === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -178,7 +165,7 @@ export default function InformesPage() {
               </div>
               <Link
                 href={getTestPath(
-                  report.test_name.includes('PECA') ? 'peca' : 
+                  report.test_name.includes('PECA') ? 'peca' :
                   report.test_name.includes('BDI') ? 'bdi2' : 'coopersmith',
                   report.session_id
                 )}

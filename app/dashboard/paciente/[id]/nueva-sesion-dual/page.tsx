@@ -1,4 +1,9 @@
 'use client'
+// app/dashboard/paciente/[id]/nueva-sesion-dual/page.tsx
+// FIX #1: El header tenía "Volver" arriba, luego "Nueva evaluación dual" abajo,
+// ocupando demasiado espacio vertical. Se unifica en una sola fila compacta.
+// También se reduce el padding del contenido scrolleable para que las opciones
+// de test y dispositivos quepan sin scroll en pantallas normales.
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -34,17 +39,15 @@ export default function NewDualSessionPage() {
 
   const tests = [
     { id: 'coopersmith', name: 'Coopersmith SEI', description: 'Inventario de Autoestima', items: 58 },
-    { id: 'bdi2', name: 'BDI-II', description: 'Inventario de Depresión de Beck', items: 21 },
-    { id: 'peca', name: 'PECA', description: 'Prueba de Conducta Adaptativa', items: 45 },
-    { id: 'wisc5', name: 'WISC-V', description: 'Escala de Inteligencia', items: 15 }
+    { id: 'bdi2',        name: 'BDI-II',          description: 'Inventario de Depresión',   items: 21 },
+    { id: 'peca',        name: 'PECA',             description: 'Conducta Adaptativa',       items: 45 },
+    { id: 'wisc5',       name: 'WISC-V',           description: 'Escala de Inteligencia',    items: 15 },
   ]
 
   const generateRoomCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
     let code = ''
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
+    for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length))
     return code
   }
 
@@ -52,18 +55,8 @@ export default function NewDualSessionPage() {
     const loadDevices = async () => {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        
-        if (userError) {
-          setDebugError(`Error de autenticación: ${userError.message}`)
-          setLoading(false)
-          return
-        }
-        
-        if (!user) {
-          setDebugError('Usuario no autenticado. Por favor, inicia sesión.')
-          setLoading(false)
-          return
-        }
+        if (userError) { setDebugError(`Error de autenticación: ${userError.message}`); setLoading(false); return }
+        if (!user)     { setDebugError('Usuario no autenticado'); setLoading(false); return }
 
         const { data, error } = await supabase
           .from('devices')
@@ -75,18 +68,15 @@ export default function NewDualSessionPage() {
           setDebugError(`Error al cargar dispositivos: ${error.message}`)
         } else {
           setDevices(data || [])
-          if (!data || data.length === 0) {
+          if (!data || data.length === 0)
             setDebugError('No hay dispositivos registrados. Ve a "Dispositivos" para registrar uno.')
-          }
         }
         setLoading(false)
       } catch (err: any) {
-        console.error('Unexpected error:', err)
         setDebugError(`Error inesperado: ${err.message}`)
         setLoading(false)
       }
     }
-
     loadDevices()
   }, [supabase])
 
@@ -95,68 +85,32 @@ export default function NewDualSessionPage() {
       setError('Por favor, completa todos los campos')
       return
     }
-
     setCreating(true)
     setError(null)
-
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
-      if (userError || !user) {
-        setError('Usuario no autenticado')
-        setCreating(false)
-        return
-      }
+      if (userError || !user) { setError('Usuario no autenticado'); setCreating(false); return }
 
-      // Crear sesión normal
       const { data: session, error: sessionError } = await supabase
         .from('sessions')
-        .insert({
-          patient_id: patientId,
-          psychologist_id: user.id,
-          test_id: selectedTest,
-          status: 'in_progress'
-        })
+        .insert({ patient_id: patientId, psychologist_id: user.id, test_id: selectedTest, status: 'in_progress' })
         .select()
         .single()
 
-      if (sessionError) {
-        setError(`Error al crear la sesión: ${sessionError.message}`)
-        setCreating(false)
-        return
-      }
+      if (sessionError) { setError(`Error al crear la sesión: ${sessionError.message}`); setCreating(false); return }
 
-      // Generar código de sala
-      const roomCode = generateRoomCode()
-
-      // Crear sesión dual
+      const code = generateRoomCode()
       const { data: dualSession, error: dualError } = await supabase
         .from('dual_sessions')
-        .insert({
-          session_id: session.id,
-          psychologist_id: user.id,
-          screen1_device_id: screen1Device,
-          screen2_device_id: screen2Device,
-          room_code: roomCode,
-          is_active: true
-        })
+        .insert({ session_id: session.id, psychologist_id: user.id, screen1_device_id: screen1Device, screen2_device_id: screen2Device, room_code: code, is_active: true })
         .select()
         .single()
 
-      if (dualError) {
-        setError(`Error al configurar la sesión dual: ${dualError.message}`)
-        setCreating(false)
-        return
-      }
+      if (dualError) { setError(`Error al configurar la sesión dual: ${dualError.message}`); setCreating(false); return }
 
-      setRoomCode(roomCode)
-      
-      setTimeout(() => {
-        router.push(`/dual-control/${dualSession.id}`)
-      }, 2000)
-      
+      setRoomCode(code)
+      setTimeout(() => router.push(`/dual-control/${dualSession.id}`), 2000)
     } catch (err: any) {
-      console.error('Error inesperado:', err)
       setError(`Error inesperado: ${err.message}`)
       setCreating(false)
     }
@@ -168,12 +122,7 @@ export default function NewDualSessionPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
           <h2 className="text-red-700 font-semibold mb-2">Error:</h2>
           <p className="text-red-600">{debugError}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            Reintentar
-          </button>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Reintentar</button>
         </div>
       </div>
     )
@@ -192,61 +141,53 @@ export default function NewDualSessionPage() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-      {/* Header fijo */}
-      <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
+
+      {/* FIX #1: Header compacto — Volver a la izquierda, título a la derecha, todo en una sola fila */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex-shrink-0 flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 flex-shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Volver
         </button>
-        <h1 className="text-xl font-semibold text-gray-800 mt-2">Nueva evaluación dual</h1>
-        <p className="text-gray-500 text-sm">Configura las pantallas para esta sesión</p>
+        <div className="w-px h-4 bg-gray-200 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base font-semibold text-gray-800 truncate">Nueva evaluación dual</h1>
+          <p className="text-xs text-gray-400">Configura las pantallas para esta sesión</p>
+        </div>
       </div>
 
-      {/* Contenido scrolleable */}
-      <div className="flex-1 overflow-y-auto p-4 pb-28">
-        <div className="max-w-3xl mx-auto space-y-4">
+      {/* Contenido scrolleable — pb reducido para que el botón fijo no tape tanto */}
+      <div className="flex-1 overflow-y-auto p-3 pb-20">
+        <div className="max-w-3xl mx-auto space-y-3">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
           )}
 
           {roomCode && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
               <p className="text-sm text-green-700 mb-1">✅ Sesión dual creada con éxito</p>
               <p className="text-xs text-green-600 mb-2">Comparte este código con el paciente:</p>
-              <p className="text-3xl font-mono font-bold tracking-wider text-green-800 bg-white inline-block px-6 py-2 rounded-lg border border-green-200">
-                {roomCode}
-              </p>
-              <p className="text-xs text-green-500 mt-2">
-                El paciente debe ingresar en: <span className="font-mono">aqnpraxis.vercel.app/sala</span>
-              </p>
-              <p className="text-xs text-green-500 mt-1">
-                Redirigiendo a la pantalla de control...
-              </p>
+              <p className="text-3xl font-mono font-bold tracking-wider text-green-800 bg-white inline-block px-6 py-2 rounded-lg border border-green-200">{roomCode}</p>
+              <p className="text-xs text-green-500 mt-2">El paciente debe ingresar en: <span className="font-mono">aqnpraxis.vercel.app/sala</span></p>
+              <p className="text-xs text-green-500 mt-1">Redirigiendo a la pantalla de control...</p>
             </div>
           )}
 
           {/* Selección de test */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-3">
-              1. Seleccionar test
-            </h2>
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">1. Seleccionar test</h2>
             <div className="grid grid-cols-2 gap-2">
               {tests.map((test) => (
                 <button
                   key={test.id}
                   onClick={() => setSelectedTest(test.id)}
                   disabled={!!roomCode}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    selectedTest === test.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:bg-gray-50'
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                    selectedTest === test.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
                   } ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="font-medium text-gray-800 text-sm">{test.name}</div>
@@ -257,70 +198,34 @@ export default function NewDualSessionPage() {
           </div>
 
           {/* Pantalla 1 - Paciente */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-3">
-              2. Pantalla del paciente
-            </h2>
-            <div className="space-y-2">
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">2. Pantalla del paciente</h2>
+            <div className="space-y-1.5">
               {devices.map((device) => (
-                <label
-                  key={device.id}
-                  className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
-                    screen1Device === device.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:bg-gray-50'
-                  } ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="screen1"
-                    value={device.id}
-                    checked={screen1Device === device.id}
-                    onChange={(e) => setScreen1Device(e.target.value)}
-                    disabled={!!roomCode}
-                    className="text-blue-600 w-4 h-4"
-                  />
+                <label key={device.id} className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${screen1Device === device.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'} ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <input type="radio" name="screen1" value={device.id} checked={screen1Device === device.id} onChange={(e) => setScreen1Device(e.target.value)} disabled={!!roomCode} className="text-blue-600 w-4 h-4" />
                   <div>
                     <div className="font-medium text-gray-800 text-sm">{device.device_name}</div>
                     <div className="text-xs text-gray-400">{device.device_type}</div>
                   </div>
                 </label>
               ))}
+              {devices.length === 0 && !debugError && (
+                <div className="text-center py-3">
+                  <p className="text-gray-400 text-sm mb-2">No tienes dispositivos registrados</p>
+                  <a href="/dashboard/dispositivos" className="text-sm text-blue-600 hover:text-blue-700">Ir a registrar dispositivos →</a>
+                </div>
+              )}
             </div>
-            {devices.length === 0 && !debugError && (
-              <div className="text-center py-3">
-                <p className="text-gray-400 text-sm mb-2">No tienes dispositivos registrados</p>
-                <a href="/dashboard/dispositivos" className="text-sm text-blue-600 hover:text-blue-700">
-                  Ir a registrar dispositivos →
-                </a>
-              </div>
-            )}
           </div>
 
           {/* Pantalla 2 - Psicólogo */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-3">
-              3. Pantalla del psicólogo
-            </h2>
-            <div className="space-y-2">
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">3. Pantalla del psicólogo</h2>
+            <div className="space-y-1.5">
               {devices.map((device) => (
-                <label
-                  key={device.id}
-                  className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
-                    screen2Device === device.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:bg-gray-50'
-                  } ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="screen2"
-                    value={device.id}
-                    checked={screen2Device === device.id}
-                    onChange={(e) => setScreen2Device(e.target.value)}
-                    disabled={!!roomCode}
-                    className="text-blue-600 w-4 h-4"
-                  />
+                <label key={device.id} className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${screen2Device === device.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'} ${roomCode ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <input type="radio" name="screen2" value={device.id} checked={screen2Device === device.id} onChange={(e) => setScreen2Device(e.target.value)} disabled={!!roomCode} className="text-blue-600 w-4 h-4" />
                   <div>
                     <div className="font-medium text-gray-800 text-sm">{device.device_name}</div>
                     <div className="text-xs text-gray-400">{device.device_type}</div>
@@ -332,7 +237,7 @@ export default function NewDualSessionPage() {
         </div>
       </div>
 
-      {/* Botón fijo en la parte inferior */}
+      {/* Botón fijo inferior */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 shadow-lg z-10">
         <div className="max-w-3xl mx-auto">
           <button
