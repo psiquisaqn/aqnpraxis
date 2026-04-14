@@ -1,16 +1,84 @@
 'use client'
 // app/resultados/coopersmith/page.tsx
-// FIX #4: La página leía los puntajes via /api/scores/coopersmith (API route
-// del servidor) que tenía problemas de autenticación/RLS en Vercel.
-// Solución: leer directamente desde el browser con createBrowserClient,
-// igual que hace la página BDI-2 que sí funciona correctamente.
-// Se hace JOIN a sessions+patients en la misma query del browser.
+// FIX #4: Sesiones antiguas no tienen r01-r58 en coopersmith_scores.
+// Si r01-r58 no están disponibles, se usan los valores ya calculados
+// (total_scaled, level_label, score_general, etc.) que SÍ están guardados.
+// Se construye un CooperResult sintético desde esos valores.
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreCoopersmith, type CooperResult } from '@/lib/coopersmith/engine'
+
+// Construye un CooperResult sintético desde los campos planos guardados en BD
+function buildResultFromDb(db: any): CooperResult | null {
+  if (!db) return null
+
+  // Si hay respuestas r01-r58, recalcular
+  const resp: Record<number, 'igual' | 'diferente'> = {}
+  for (let i = 1; i <= 58; i++) {
+    const key = `r${String(i).padStart(2, '0')}`
+    if (db[key] !== null && db[key] !== undefined) {
+      resp[i] = db[key] as 'igual' | 'diferente'
+    }
+  }
+  if (Object.keys(resp).length > 0) {
+    return scoreCoopersmith(resp)
+  }
+
+  // Si no hay r01-r58 (sesión antigua), construir desde totales guardados
+  const totalScaled = db.total_scaled ?? 0
+  if (totalScaled === 0 && !db.level_label) return null
+
+  // Determinar nivel y color desde el puntaje guardado
+  let level: 'muy_alta' | 'alta' | 'media_alta' | 'media_baja' | 'baja' | 'muy_baja'
+  let levelLabel: string
+  let levelColor: string
+  let levelDescription: string
+
+  if (db.level_label) {
+    levelLabel = db.level_label
+  } else {
+    levelLabel = totalScaled >= 75 ? 'Alta' : totalScaled >= 50 ? 'Media alta' : totalScaled >= 25 ? 'Media baja' : 'Baja'
+  }
+
+  if (totalScaled >= 75) {
+    level = 'alta'; levelColor = '#3B6D11'
+    levelDescription = 'El estudiante presenta una autoestima alta y bien consolidada.'
+  } else if (totalScaled >= 50) {
+    level = 'media_alta'; levelColor = '#639922'
+    levelDescription = 'El estudiante presenta una autoestima en rango medio-alto.'
+  } else if (totalScaled >= 25) {
+    level = 'media_baja'; levelColor = '#854F0B'
+    levelDescription = 'El estudiante presenta una autoestima en rango medio-bajo.'
+  } else {
+    level = 'baja'; levelColor = '#A32D2D'
+    levelDescription = 'El estudiante presenta una autoestima baja.'
+  }
+
+  if (db.level_color) levelColor = db.level_color
+
+  // Construir subescalas desde los campos guardados
+  const subscales = [
+    { code: 'general', label: 'General (G)',   rawScore: 0, scaledScore: db.score_general ?? 0, maxScaled: 26, pct: (db.score_general ?? 0) / 26 },
+    { code: 'social',  label: 'Social (S)',    rawScore: 0, scaledScore: db.score_social  ?? 0, maxScaled: 8,  pct: (db.score_social  ?? 0) / 8  },
+    { code: 'hogar',   label: 'Hogar (H)',     rawScore: 0, scaledScore: db.score_hogar   ?? 0, maxScaled: 8,  pct: (db.score_hogar   ?? 0) / 8  },
+    { code: 'escolar', label: 'Escolar (E)',   rawScore: 0, scaledScore: db.score_escolar ?? 0, maxScaled: 8,  pct: (db.score_escolar ?? 0) / 8  },
+  ]
+
+  return {
+    totalRaw:        db.total_raw ?? 0,
+    totalScaled,
+    level,
+    levelLabel,
+    levelColor,
+    levelDescription,
+    lieScaleRaw:     db.lie_scale_raw     ?? 0,
+    lieScaleInvalid: db.lie_scale_invalid ?? false,
+    subscales,
+  } as CooperResult
+}
 
 function CoopersmithReportPageInner() {
   const router = useRouter()
@@ -33,30 +101,17 @@ function CoopersmithReportPageInner() {
     )
 
     async function load() {
-      // 1. Leer coopersmith_scores directamente (r01-r58 + totales)
       const { data: scores, error: scoresError } = await supabase
         .from('coopersmith_scores')
         .select('*')
         .eq('session_id', sessionId)
         .single()
 
-      if (scoresError || !scores) {
-        setLoading(false)
-        return
-      }
+      if (scoresError || !scores) { setLoading(false); return }
 
-      // 2. Reconstruir respuestas desde r01-r58
-      const resp: Record<number, 'igual' | 'diferente'> = {}
-      for (let i = 1; i <= 58; i++) {
-        const key = `r${String(i).padStart(2, '0')}` as keyof typeof scores
-        const val = scores[key]
-        if (val !== null && val !== undefined) {
-          resp[i] = val as 'igual' | 'diferente'
-        }
-      }
-      setResult(scoreCoopersmith(resp))
+      const built = buildResultFromDb(scores)
+      setResult(built)
 
-      // 3. Leer datos de sesión + paciente
       const { data: sessionData } = await supabase
         .from('sessions')
         .select('started_at, patient:patients(id, full_name)')
@@ -73,10 +128,8 @@ function CoopersmithReportPageInner() {
           day: '2-digit', month: 'long', year: 'numeric'
         }))
       }
-
       setLoading(false)
     }
-
     load()
   }, [sessionId])
 
@@ -106,12 +159,11 @@ function CoopersmithReportPageInner() {
         </button>
         {result && (
           <PdfDownloadButton contentRef={contentRef}
-            meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }}
-          />
+            meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }} />
         )}
         <button onClick={() => router.push('/dashboard')}
-          className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-600 text-white hover:bg-blue-700"
-          style={{ borderColor: 'transparent' }}>
+          className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
+          style={{ background: '#2563eb', border: 'none' }}>
           Panel principal
         </button>
       </div>
@@ -144,20 +196,18 @@ function CoopersmithReportPageInner() {
               <div className="flex-1">
                 <div className="flex h-2 rounded-full overflow-hidden">
                   {[
-                    { min: 0, max: 25, color: '#A32D2D', label: 'Baja' },
-                    { min: 25, max: 50, color: '#854F0B', label: 'Media baja' },
-                    { min: 50, max: 75, color: '#639922', label: 'Media alta' },
-                    { min: 75, max: 100, color: '#3B6D11', label: 'Alta' },
-                  ].map((z) => (
-                    <div key={z.label} className="flex-1" style={{ background: `${z.color}30` }} />
-                  ))}
+                    { color: '#A32D2D', label: 'Baja' },
+                    { color: '#854F0B', label: 'Media baja' },
+                    { color: '#639922', label: 'Media alta' },
+                    { color: '#3B6D11', label: 'Alta' },
+                  ].map(z => <div key={z.label} className="flex-1" style={{ background: `${z.color}30` }} />)}
                 </div>
                 <div className="relative mt-1">
                   <div className="absolute w-3 h-3 rounded-full border-2 border-white shadow -translate-x-1/2"
-                    style={{ left: `${result.totalScaled}%`, top: 0, background: levelColor }} />
+                    style={{ left: `${Math.min(result.totalScaled, 99)}%`, top: 0, background: levelColor }} />
                 </div>
                 <div className="flex justify-between text-[10px] mt-4" style={{ color: 'var(--stone-400)' }}>
-                  <span>0 Baja</span><span>25</span><span>50</span><span>75</span><span>100 Alta</span>
+                  <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
                 </div>
               </div>
             </div>
@@ -166,7 +216,7 @@ function CoopersmithReportPageInner() {
 
           {result.lieScaleInvalid && (
             <div className="mt-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}>
-              <strong>⚠ Escala de mentira:</strong> {result.lieScaleRaw}/8. Un puntaje ≥ 5 sugiere tendencia a responder en forma socialmente deseable. Considerar la validez del protocolo.
+              <strong>⚠ Escala de mentira:</strong> {result.lieScaleRaw}/8. Un puntaje ≥ 5 sugiere tendencia a responder en forma socialmente deseable.
             </div>
           )}
         </div>
@@ -174,7 +224,7 @@ function CoopersmithReportPageInner() {
         <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: 'var(--stone-200)' }}>
           <h2 className="text-sm font-semibold uppercase tracking-widest mb-5" style={{ color: 'var(--stone-400)' }}>Subescalas</h2>
           <div className="space-y-4">
-            {result.subscales.map((s) => (
+            {result.subscales.map(s => (
               <div key={s.code}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm font-medium" style={{ color: 'var(--stone-700)' }}>{s.label}</span>
@@ -204,7 +254,7 @@ function CoopersmithReportPageInner() {
 function Spinner() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
-      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--teal-500)', borderTopColor: 'transparent' }} />
+      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#0d9488', borderTopColor: 'transparent' }} />
     </div>
   )
 }
@@ -213,8 +263,8 @@ function Error({ onBack }: { onBack?: () => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--stone-50)' }}>
       <div className="text-center">
-        <p className="text-sm font-medium mb-3" style={{ color: 'var(--stone-700)' }}>No se encontraron resultados para esta sesión.</p>
-        <button onClick={onBack ?? (() => window.history.back())} className="text-sm" style={{ color: 'var(--teal-600)' }}>← Volver</button>
+        <p className="text-sm font-medium mb-3" style={{ color: 'var(--stone-700)' }}>No se encontraron resultados.</p>
+        <button onClick={onBack ?? (() => window.history.back())} className="text-sm" style={{ color: '#0d9488' }}>← Volver</button>
       </div>
     </div>
   )

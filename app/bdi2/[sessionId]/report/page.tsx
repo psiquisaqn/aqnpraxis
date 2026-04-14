@@ -1,21 +1,28 @@
 'use client'
-import { useEffect, useState } from 'react'
+// app/bdi2/[sessionId]/report/page.tsx
+// FIX #5: Agregar botón "Guardar PDF" a la izquierda del botón "Volver al dashboard"
+// en la barra superior del informe BDI-2.
+
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 
 export default function Bdi2ReportPage() {
   const { sessionId } = useParams()
   const router = useRouter()
   const [data, setData] = useState<any>(null)
   const [patient, setPatient] = useState<any>(null)
+  const [patientId, setPatientId] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function load() {
       const { data: score, error } = await supabase
         .from('bdi2_scores')
         .select('*')
-        .eq('session_id', sessionId)
+        .eq('session_id', sessionId as string)
         .single()
 
       if (error || !score) { setLoading(false); return }
@@ -23,11 +30,15 @@ export default function Bdi2ReportPage() {
 
       const { data: session } = await supabase
         .from('sessions')
-        .select('patient:patients(full_name, birth_date)')
-        .eq('id', sessionId)
+        .select('patient:patients(id, full_name, birth_date)')
+        .eq('id', sessionId as string)
         .single()
 
-      if (session?.patient) setPatient(session.patient)
+      if (session?.patient) {
+        const p = session.patient as any
+        setPatient(p)
+        setPatientId(p.id ?? '')
+      }
       setLoading(false)
     }
     load()
@@ -50,29 +61,54 @@ export default function Bdi2ReportPage() {
     </div>
   )
 
-  const severityColors: Record<string, string> = {
-    minima: 'bg-green-50 text-green-700',
-    leve: 'bg-yellow-50 text-yellow-700',
-    moderada: 'bg-orange-50 text-orange-700',
-    grave: 'bg-red-50 text-red-700',
+  const severityColors: Record<string, { bg: string; text: string }> = {
+    minima:   { bg: 'bg-green-50',  text: 'text-green-700'  },
+    leve:     { bg: 'bg-yellow-50', text: 'text-yellow-700' },
+    moderada: { bg: 'bg-orange-50', text: 'text-orange-700' },
+    grave:    { bg: 'bg-red-50',    text: 'text-red-700'    },
   }
+  const sev = severityColors[data.severity] ?? { bg: 'bg-blue-50', text: 'text-blue-700' }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      {/* Barra superior fija */}
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">BDI-II</span>
+        <div className="flex-1" />
+        {/* FIX #5: botón PDF a la izquierda del botón volver */}
+        <PdfDownloadButton
+          contentRef={contentRef}
+          meta={{
+            sessionId: sessionId as string,
+            patientId,
+            testId: 'beck_bdi2',
+            patientName: patient?.full_name ?? '',
+            content: { totalScore: data.total_score, severity: data.severity_label }
+          }}
+          label="Guardar PDF"
+        />
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition-colors"
+        >
+          Volver al dashboard
+        </button>
+      </div>
+
+      {/* Contenido imprimible */}
+      <div ref={contentRef} className="max-w-3xl mx-auto p-6">
         <div className="bg-white rounded-xl shadow p-6 mb-6">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Inventario de Depresion de Beck (BDI-II)</h1>
-              <p className="text-gray-500 mt-1">Paciente: {patient?.full_name || 'Sin nombre'}</p>
-              <p className="text-gray-400 text-sm">Fecha: {data.calculated_at ? new Date(data.calculated_at).toLocaleDateString('es-CL') : new Date().toLocaleDateString('es-CL')}</p>
-            </div>
-            <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">
-              Volver al dashboard
-            </button>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">Inventario de Depresión de Beck (BDI-II)</h1>
+            <p className="text-gray-500 mt-1">Paciente: {patient?.full_name || 'Sin nombre'}</p>
+            <p className="text-gray-400 text-sm">
+              Fecha: {data.calculated_at
+                ? new Date(data.calculated_at).toLocaleDateString('es-CL')
+                : new Date().toLocaleDateString('es-CL')}
+            </p>
           </div>
 
-          <div className={"rounded-xl p-6 mb-6 text-center " + (severityColors[data.severity] || 'bg-blue-50 text-blue-700')}>
+          <div className={`rounded-xl p-6 mb-6 text-center ${sev.bg} ${sev.text}`}>
             <p className="text-sm mb-1">Puntaje Total</p>
             <p className="text-5xl font-bold">{data.total_score}</p>
             <p className="text-lg font-medium mt-2">{data.severity_label}</p>
@@ -80,9 +116,9 @@ export default function Bdi2ReportPage() {
 
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Cognitivo-Afectivo', value: data.cognitive_affective_score },
-              { label: 'Somatico-Motivacional', value: data.somatic_motivational_score },
-              { label: 'Ideacion Suicida', value: data.suicidal_ideation_score },
+              { label: 'Cognitivo-Afectivo',    value: data.cognitive_affective_score },
+              { label: 'Somático-Motivacional',  value: data.somatic_motivational_score },
+              { label: 'Ideación Suicida',       value: data.suicidal_ideation_score },
             ].map(s => (
               <div key={s.label} className="bg-gray-50 rounded-lg p-4 text-center">
                 <p className="text-xs text-gray-500">{s.label}</p>
@@ -90,6 +126,10 @@ export default function Bdi2ReportPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="text-center py-4">
+          <p className="text-xs text-gray-400">Generado por AQN Praxis · Beck, Steer & Brown (1996)</p>
         </div>
       </div>
     </div>

@@ -1,10 +1,8 @@
 'use client'
 // app/dual-control/[dualSessionId]/DualTestWrapper.tsx
-// FIX #2: La distancia excesiva entre el contenido y la navegación rápida
-// se debía a que h-screen/100dvh con flex-col hacía que el área de contenido
-// ocupara todo el espacio disponible aunque el contenido fuera pequeño.
-// Solución: usar posición fija para la barra de navegación (bottom: 0),
-// y paddingBottom en el contenido para que no quede tapado.
+// FIX #1: El panel de navegación era demasiado estrecho (max-h-16) y requería
+// scroll interno para ver todos los ítems. Se aumenta a max-h-28 (~4 filas)
+// y se ajusta el paddingBottom del contenido para compensar.
 
 import { ReactNode } from 'react'
 
@@ -43,10 +41,7 @@ export function DualTestWrapper({
               Para iniciar, haz clic en el botón para que el primer ítem se vea en la pantalla del paciente
             </p>
           </div>
-          <button
-            onClick={() => onStart?.()}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
+          <button onClick={() => onStart?.()} className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
             Comenzar evaluación
           </button>
         </div>
@@ -54,25 +49,26 @@ export function DualTestWrapper({
     )
   }
 
-  // Altura estimada de la barra de navegación: ~76px
-  const NAV_HEIGHT = 76
+  // Altura de la barra de navegación: título(20) + botones hasta 4 filas(4×32=128) + padding(20) = ~168px
+  const NAV_HEIGHT = 170
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Contenido — padding inferior para que no quede tapado por la barra fija */}
-      <div className="p-3" style={{ paddingBottom: NAV_HEIGHT + 12 }}>
+      {/* Contenido con padding inferior para no quedar tapado */}
+      <div className="p-3" style={{ paddingBottom: NAV_HEIGHT + 8 }}>
         {children}
       </div>
 
-      {/* Navegación rápida — FIJA al fondo de la pantalla, siempre visible */}
+      {/* Barra de navegación fija al fondo */}
       <div
         className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-20"
-        style={{ paddingTop: 8, paddingBottom: 10, paddingLeft: 12, paddingRight: 12 }}
+        style={{ padding: '8px 12px 12px' }}
       >
-        <p className="text-xs text-gray-500 mb-1.5 text-center">
-          📋 {completed}/{totalItems} respondidos — toca un número para navegar
+        <p className="text-xs text-gray-500 mb-2 text-center font-medium">
+          Navegación rápida — {completed}/{totalItems} respondidos
         </p>
-        <div className="flex flex-wrap justify-center gap-1 max-h-16 overflow-y-auto">
+        {/* max-h-28 = ~4 filas de botones de 28px, sin scroll interno en la mayoría de casos */}
+        <div className="flex flex-wrap justify-center gap-1 overflow-y-auto" style={{ maxHeight: 120 }}>
           {items.map((item) => {
             const isAnswered = answeredItems ? answeredItems.has(item.num) : false
             const isCurrent = currentItem === item.num
@@ -80,13 +76,14 @@ export function DualTestWrapper({
               <button
                 key={item.num}
                 onClick={() => onItemSelect(item.num)}
-                className={`w-7 h-7 text-xs font-medium rounded-full transition-all flex-shrink-0 ${
+                className={`flex-shrink-0 text-xs font-medium rounded-full transition-all ${
                   isCurrent
                     ? 'bg-blue-600 text-white ring-2 ring-blue-300'
                     : isAnswered
                     ? 'bg-green-100 text-green-700 border border-green-300'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
+                style={{ width: 28, height: 28 }}
               >
                 {item.num}
               </button>
