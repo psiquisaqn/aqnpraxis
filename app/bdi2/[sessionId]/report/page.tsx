@@ -1,18 +1,28 @@
 'use client'
 // app/bdi2/[sessionId]/report/page.tsx
-// Versión mejorada con gráficos de barras, textos dinámicos según rangos
+// Versión mejorada con:
+// - Fondo blanco, sin recuadros de colores
+// - Logo y firma configurables
+// - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
+// - Saltos de página controlados
+// - Isotipo AQN Praxis al final
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { ReporteHeader } from '@/components/ReporteHeader'
+import { ReporteFooter } from '@/components/ReporteFooter'
 
 // Estilos para impresión
 const printStyles = `
   @media print {
-    body { margin: 0; padding: 0; }
+    body { margin: 0; padding: 0; background: white; }
     .no-print { display: none; }
     .reporte-container { padding: 1.5cm; width: 100%; }
+    .page-break-before { page-break-before: avoid; }
+    .page-break-inside { page-break-inside: avoid; }
+    h2, h3, .grafico-barras-container { page-break-inside: avoid; }
   }
 `
 
@@ -79,7 +89,7 @@ function getInterpretacionDimension(nombre: string, puntaje: number, maximo: num
 function getConclusionGeneral(puntaje: number, severityLabel: string, nombrePaciente: string): string {
   const interpretacion = getInterpretacionSeveridad(puntaje)
   
-  return `${nombrePaciente || 'El evaluado'} presenta un cuadro de ${interpretacion.nivel.toLowerCase()} según el BDI-II, con una puntuación total de ${puntaje} puntos. ${interpretacion.descripcion.substring(0, 200)} ${interpretacion.recomendacion} Es importante destacar que este instrumento es una medida de tamizaje, no un diagnóstico definitivo. Cualquier plan de intervención debe basarse en una evaluación clínica integral que considere el contexto biopsicosocial del evaluado. El presente informe debe ser interpretado por un profesional de la salud mental capacitado.`
+  return `${nombrePaciente || 'El evaluado'} presenta un cuadro de ${interpretacion.nivel.toLowerCase()} según el BDI-II, con una puntuación total de ${puntaje} puntos. ${interpretacion.descripcion} ${interpretacion.recomendacion} Es importante destacar que este instrumento es una medida de tamizaje, no un diagnóstico definitivo. Cualquier plan de intervención debe basarse en una evaluación clínica integral que considere el contexto biopsicosocial del evaluado. El presente informe debe ser interpretado por un profesional de la salud mental capacitado.`
 }
 
 // Gráfico de barras
@@ -87,14 +97,14 @@ function GraficoBarras({ data }: { data: Array<{ label: string; value: number; m
   const maxVal = Math.max(...data.map(d => d.value), 30)
   
   return (
-    <div className="grafico-barras-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif' }}>
+    <div className="grafico-barras-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
       <div className="grafico-barras" style={{ 
         display: 'flex', 
         justifyContent: 'space-around', 
         alignItems: 'flex-end', 
         minHeight: '200px',
-        borderBottom: '2px solid #333',
-        borderLeft: '2px solid #333',
+        borderBottom: '1px solid #333',
+        borderLeft: '1px solid #333',
         paddingLeft: '10px',
         paddingBottom: '10px'
       }}>
@@ -125,6 +135,11 @@ export default function Bdi2ReportPage() {
   const [data, setData] = useState<any>(null)
   const [patient, setPatient] = useState<any>(null)
   const [patientId, setPatientId] = useState<string>('')
+  const [patientRut, setPatientRut] = useState('')
+  const [patientBirthDate, setPatientBirthDate] = useState('')
+  const [patientAge, setPatientAge] = useState<number | undefined>(undefined)
+  const [patientSchool, setPatientSchool] = useState('')
+  const [evalDate, setEvalDate] = useState('')
   const [loading, setLoading] = useState(true)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -146,7 +161,7 @@ export default function Bdi2ReportPage() {
 
       const { data: session } = await supabase
         .from('sessions')
-        .select('patient:patients(id, full_name, birth_date)')
+        .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
         .eq('id', sessionId as string)
         .single()
 
@@ -154,6 +169,19 @@ export default function Bdi2ReportPage() {
         const p = session.patient as any
         setPatient(p)
         setPatientId(p.id ?? '')
+        setPatientRut(p.rut ?? '')
+        setPatientSchool(p.school ?? '')
+        
+        if (p.birth_date) {
+          setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
+          const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
+          setPatientAge(age)
+        }
+      }
+      if (session?.started_at) {
+        setEvalDate(new Date(session.started_at).toLocaleDateString('es-CL', {
+          day: '2-digit', month: 'long', year: 'numeric'
+        }))
       }
       setLoading(false)
     }
@@ -161,13 +189,13 @@ export default function Bdi2ReportPage() {
   }, [sessionId])
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#f5f5f0' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
       <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#4a4a4a', borderTopColor: 'transparent' }} />
     </div>
   )
 
   if (!data) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#f5f5f0' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
       <div className="text-center">
         <p className="text-gray-500 mb-4">No se encontraron resultados.</p>
         <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
@@ -179,15 +207,8 @@ export default function Bdi2ReportPage() {
 
   const interpretacion = getInterpretacionSeveridad(data.total_score)
   
-  const severityColors: Record<string, { bg: string; text: string; border: string }> = {
-    minima:   { bg: '#e8f5e9', text: '#2e7d32', border: '#a5d6a7' },
-    leve:     { bg: '#fff3e0', text: '#e65100', border: '#ffcc80' },
-    moderada: { bg: '#fff3e0', text: '#e65100', border: '#ffcc80' },
-    grave:    { bg: '#ffebee', text: '#c62828', border: '#ef9a9a' },
-  }
-  
-  const severityKey = data.severity || (data.total_score <= 13 ? 'minima' : data.total_score <= 19 ? 'leve' : data.total_score <= 28 ? 'moderada' : 'grave')
-  const sev = severityColors[severityKey] ?? { bg: '#e8f5e9', text: '#2e7d32', border: '#a5d6a7' }
+  // Determinar color según severidad (solo para texto, no para fondos)
+  const severityColor = data.total_score <= 13 ? '#2e7d32' : data.total_score <= 19 ? '#e65100' : data.total_score <= 28 ? '#e65100' : '#c62828'
 
   const datosGrafico = [
     { label: 'Cognitivo-Afectivo', value: data.cognitive_affective_score || 0, max: 42 },
@@ -196,7 +217,7 @@ export default function Bdi2ReportPage() {
   ]
 
   return (
-    <div className="min-h-screen" style={{ background: '#f5f5f0' }}>
+    <div className="min-h-screen" style={{ background: 'white' }}>
       <style>{printStyles}</style>
       
       {/* Barra superior - no imprimible */}
@@ -223,70 +244,80 @@ export default function Bdi2ReportPage() {
         </button>
       </div>
 
-      {/* Contenido imprimible */}
-      <div ref={contentRef} className="reporte-container max-w-3xl mx-auto p-6" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
-        <div className="rounded-xl p-6 mb-6" style={{ background: 'white', border: '1px solid #e5e5e0' }}>
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>Inventario de Depresión de Beck (BDI-II)</h1>
-            <p className="mt-1" style={{ color: '#4b5563' }}>Paciente: {patient?.full_name || 'Sin nombre'}</p>
-            <p className="text-sm" style={{ color: '#9ca3af' }}>
-              Fecha: {data.calculated_at
-                ? new Date(data.calculated_at).toLocaleDateString('es-CL')
-                : new Date().toLocaleDateString('es-CL')}
-            </p>
-          </div>
+      {/* Contenido del informe */}
+      <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
+        
+        {/* Header con logo y datos del paciente */}
+        <ReporteHeader
+          patientName={patient?.full_name || 'Paciente'}
+          patientRut={patientRut}
+          patientBirthDate={patientBirthDate}
+          patientAge={patientAge}
+          patientSchool={patientSchool}
+          evalDate={evalDate}
+          testName="BDI-II - Inventario de Depresión de Beck"
+        />
 
-          {/* Puntaje total */}
-          <div className={`rounded-xl p-6 mb-6 text-center`} style={{ background: sev.bg, border: `1px solid ${sev.border}` }}>
-            <p className="text-sm mb-1" style={{ color: sev.text }}>Puntaje Total</p>
-            <p className="text-5xl font-bold" style={{ color: sev.text }}>{data.total_score}</p>
-            <p className="text-lg font-medium mt-2" style={{ color: sev.text }}>{data.severity_label || interpretacion.nivel}</p>
-            <p className="text-sm mt-3" style={{ color: '#4b5563' }}>{interpretacion.descripcion}</p>
-            <p className="text-sm mt-2 font-medium" style={{ color: sev.text }}>Recomendación: {interpretacion.recomendacion}</p>
+        {/* Puntaje total */}
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Puntaje total</h2>
           </div>
-
-          {/* Gráfico de barras */}
-          <div className="mb-6">
-            <h2 className="text-sm font-semibold uppercase tracking-widest mb-4" style={{ color: '#9ca3af' }}>Perfil de Dimensiones</h2>
-            <GraficoBarras data={datosGrafico} />
+          <div className="text-center mb-4">
+            <p className="text-5xl font-bold" style={{ color: severityColor }}>{data.total_score}</p>
+            <p className="text-lg font-medium mt-1" style={{ color: severityColor }}>{data.severity_label || interpretacion.nivel}</p>
           </div>
+          <p className="text-sm leading-relaxed mb-3" style={{ color: '#4b5563' }}>{interpretacion.descripcion}</p>
+          <p className="text-sm font-medium" style={{ color: severityColor }}>Recomendación: {interpretacion.recomendacion}</p>
+        </div>
 
-          {/* Dimensiones con interpretación */}
+        {/* Gráfico de barras */}
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Dimensiones</h2>
+          </div>
+          <GraficoBarras data={datosGrafico} />
+        </div>
+
+        {/* Interpretación de dimensiones - con salto de página antes */}
+        <div className="mb-6" style={{ pageBreakBefore: 'avoid', pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Dimensiones</h2>
+          </div>
           <div className="space-y-4">
-            <div className="rounded-lg p-4" style={{ background: '#fafaf5', border: '1px solid #e8e8e3' }}>
+            <div className="pb-3" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="text-md font-semibold mb-2" style={{ color: '#1a1a1a' }}>Dimensión Cognitivo-Afectiva</h3>
-              <p className="text-sm" style={{ color: '#4b5563' }}>
+              <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>
                 {getInterpretacionDimension("Cognitivo-Afectivo", data.cognitive_affective_score || 0, 42)}
               </p>
             </div>
-            <div className="rounded-lg p-4" style={{ background: '#fafaf5', border: '1px solid #e8e8e3' }}>
+            <div className="pb-3" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="text-md font-semibold mb-2" style={{ color: '#1a1a1a' }}>Dimensión Somático-Motivacional</h3>
-              <p className="text-sm" style={{ color: '#4b5563' }}>
+              <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>
                 {getInterpretacionDimension("Somático-Motivacional", data.somatic_motivational_score || 0, 21)}
               </p>
             </div>
-            <div className="rounded-lg p-4" style={{ background: '#fafaf5', border: '1px solid #e8e8e3' }}>
+            <div className="pb-3" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="text-md font-semibold mb-2" style={{ color: '#1a1a1a' }}>Ideación Suicida</h3>
-              <p className="text-sm" style={{ color: '#4b5563' }}>
+              <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>
                 {getInterpretacionDimension("Ideación Suicida", data.suicidal_ideation_score || 0, 6)}
               </p>
             </div>
           </div>
-
-          {/* Conclusión general */}
-          <div className="mt-6 rounded-lg p-4" style={{ background: '#f0f0eb', border: '1px solid #e0e0d8' }}>
-            <h2 className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: '#9ca3af' }}>Conclusión y Recomendaciones</h2>
-            <p className="text-sm leading-relaxed" style={{ color: '#4b5563', textAlign: 'justify' }}>
-              {getConclusionGeneral(data.total_score, data.severity_label || interpretacion.nivel, patient?.full_name)}
-            </p>
-          </div>
         </div>
 
-        <div className="text-center py-4">
-          <p className="text-xs" style={{ color: '#9ca3af' }}>
-            Generado por AQN Praxis · Beck, Steer & Brown (1996)
+        {/* Conclusión general */}
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
+          </div>
+          <p className="text-sm leading-relaxed" style={{ color: '#4b5563', textAlign: 'justify' }}>
+            {getConclusionGeneral(data.total_score, data.severity_label || interpretacion.nivel, patient?.full_name)}
           </p>
         </div>
+
+        {/* Footer con firma e isotipo */}
+        <ReporteFooter showFirma={true} />
       </div>
     </div>
   )

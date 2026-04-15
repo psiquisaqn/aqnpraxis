@@ -71,6 +71,17 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    href: '/dashboard/configuracion',
+    label: 'Logos y firmas',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 11a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M14 9c0 .3.1.6.3.8l1.2 1.2c.4.4.4 1 0 1.4l-1.2 1.2c-.4.4-1 .4-1.4 0l-1.2-1.2c-.2-.2-.5-.3-.8-.3m-4.6 0c-.3 0-.6.1-.8.3l-1.2 1.2c-.4.4-1 .4-1.4 0l-1.2-1.2c-.4-.4-.4-1 0-1.4l1.2-1.2c.2-.2.3-.5.3-.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M2 5h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ]
 
 export function DashboardShell({ profile, children }: Props) {

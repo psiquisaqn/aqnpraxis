@@ -1,20 +1,29 @@
 'use client'
 // app/resultados/coopersmith/page.tsx
-// Versión mejorada con gráficos de barras, textos dinámicos y optimización para impresión
+// Versión mejorada con:
+// - Fondo blanco, sin recuadros de colores
+// - Logo y firma configurables
+// - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
+// - Saltos de página controlados
+// - Isotipo AQN Praxis al final
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scoreCoopersmith, type CooperResult } from '@/lib/coopersmith/engine'
+import { ReporteHeader } from '@/components/ReporteHeader'
+import { ReporteFooter } from '@/components/ReporteFooter'
 
-// Estilos para impresión y gráficos
+// Estilos para impresión
 const printStyles = `
   @media print {
-    body { margin: 0; padding: 0; }
+    body { margin: 0; padding: 0; background: white; }
     .no-print { display: none; }
     .reporte-container { padding: 1.5cm; width: 100%; }
-    .page-break { page-break-before: avoid; page-break-inside: avoid; }
+    .page-break-before { page-break-before: avoid; }
+    .page-break-inside { page-break-inside: avoid; }
+    h2, h3, .grafico-barras-container { page-break-inside: avoid; }
   }
 `
 
@@ -34,19 +43,18 @@ function getInterpretacionSubescala(puntaje: number, maximo: number, nombre: str
 
 // Función para generar conclusión general
 function getConclusionGeneral(result: CooperResult, nombrePaciente: string): string {
-  const nivel = result.levelLabel
   const puntaje = result.totalScaled
   
   let conclusion = ""
   
   if (puntaje >= 75) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima ${nivel.toLowerCase()}. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en el percentil superior, lo que refleja una percepción positiva y bien consolidada de sí mismo. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima alta y bien consolidada. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en el percentil superior, lo que refleja una percepción positiva y bien consolidada de sí mismo. `
   } else if (puntaje >= 50) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima ${nivel.toLowerCase()}. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en un rango medio-alto, mostrando una percepción generalmente positiva de sí mismo, aunque con algunas áreas de inseguridad. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima media-alta. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en un rango medio-alto, mostrando una percepción generalmente positiva de sí mismo, aunque con algunas áreas de inseguridad. `
   } else if (puntaje >= 25) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima ${nivel.toLowerCase()}. Con un puntaje total de ${puntaje} puntos (sobre 100), se observan dificultades significativas en la percepción de autoeficacia y valía personal. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima media-baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se observan dificultades significativas en la percepción de autoeficacia y valía personal. `
   } else {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima ${nivel.toLowerCase()}. Con un puntaje total de ${puntaje} puntos (sobre 100), se evidencia un patrón consistente de autodescalificación que requiere intervención prioritaria. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se evidencia un patrón consistente de autodescalificación que requiere intervención prioritaria. `
   }
   
   conclusion += `Las subescalas permiten identificar áreas específicas de fortaleza y vulnerabilidad. `
@@ -65,14 +73,14 @@ function GraficoBarras({ data, maxValue = 100 }: { data: Array<{ label: string; 
   const maxVal = Math.max(...data.map(d => d.value), maxValue)
   
   return (
-    <div className="grafico-barras-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif' }}>
+    <div className="grafico-barras-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
       <div className="grafico-barras" style={{ 
         display: 'flex', 
         justifyContent: 'space-around', 
         alignItems: 'flex-end', 
         minHeight: '220px',
-        borderBottom: '2px solid #333',
-        borderLeft: '2px solid #333',
+        borderBottom: '1px solid #333',
+        borderLeft: '1px solid #333',
         paddingLeft: '10px',
         paddingBottom: '10px',
         margin: '10px 0'
@@ -172,6 +180,10 @@ function CoopersmithReportPageInner() {
   const [result, setResult] = useState<CooperResult | null>(null)
   const [patientName, setPatientName] = useState('')
   const [patientId, setPatientId] = useState('')
+  const [patientRut, setPatientRut] = useState('')
+  const [patientBirthDate, setPatientBirthDate] = useState('')
+  const [patientAge, setPatientAge] = useState<number | undefined>(undefined)
+  const [patientSchool, setPatientSchool] = useState('')
   const [evalDate, setEvalDate] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -197,7 +209,7 @@ function CoopersmithReportPageInner() {
 
       const { data: sessionData } = await supabase
         .from('sessions')
-        .select('started_at, patient:patients(id, full_name)')
+        .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
         .eq('id', sessionId)
         .single()
 
@@ -205,6 +217,14 @@ function CoopersmithReportPageInner() {
         const p = sessionData.patient as any
         setPatientName(p.full_name ?? '')
         setPatientId(p.id ?? '')
+        setPatientRut(p.rut ?? '')
+        setPatientSchool(p.school ?? '')
+        
+        if (p.birth_date) {
+          setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
+          const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
+          setPatientAge(age)
+        }
       }
       if (sessionData?.started_at) {
         setEvalDate(new Date(sessionData.started_at).toLocaleDateString('es-CL', {
@@ -225,10 +245,13 @@ function CoopersmithReportPageInner() {
     max: s.maxScaled
   }))
 
+  const levelColorHex = result.levelColor
+
   return (
-    <div className="min-h-screen" style={{ background: '#f5f5f0' }}>
+    <div className="min-h-screen" style={{ background: 'white' }}>
       <style>{printStyles}</style>
       
+      {/* Barra superior - no imprimible */}
       <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3 flex-wrap no-print" style={{ background: 'white', borderColor: '#e5e5e0' }}>
         <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm" style={{ color: '#6b7280' }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -257,54 +280,55 @@ function CoopersmithReportPageInner() {
         </button>
       </div>
 
-      <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8 space-y-6" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
-        {/* Encabezado */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: '#e5e5e0' }}>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded" style={{ background: '#e8e8e3', color: '#4a4a4a' }}>Coopersmith SEI</span>
-              <h1 className="text-2xl font-medium mt-2" style={{ fontFamily: 'Georgia, Times New Roman, serif', color: '#1a1a1a' }}>{patientName || 'Paciente'}</h1>
-            </div>
-            <div className="text-right text-sm" style={{ color: '#9ca3af' }}>
-              <div>Fecha</div>
-              <div className="font-medium" style={{ color: '#4b5563' }}>{evalDate || '—'}</div>
-            </div>
-          </div>
+      {/* Contenido del informe */}
+      <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
+        
+        {/* Header con logo y datos del paciente */}
+        <ReporteHeader
+          patientName={patientName}
+          patientRut={patientRut}
+          patientBirthDate={patientBirthDate}
+          patientAge={patientAge}
+          patientSchool={patientSchool}
+          evalDate={evalDate}
+          testName="Coopersmith SEI - Inventario de Autoestima"
+        />
 
-          {/* Puntaje total */}
-          <div className="mt-5 px-5 py-4 rounded-xl" style={{ background: '#fafaf5', border: '1px solid #e8e8e3' }}>
-            <div className="flex flex-col sm:flex-row items-center gap-6 mb-3">
-              <div className="text-center sm:text-left">
-                <p className="text-xs font-medium uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>Puntaje total</p>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-5xl font-bold" style={{ fontFamily: 'Georgia, Times New Roman, serif', color: result.levelColor }}>{result.totalScaled}</span>
-                  <div>
-                    <div className="text-sm font-semibold" style={{ color: result.levelColor }}>{result.levelLabel}</div>
-                    <div className="text-xs" style={{ color: '#9ca3af' }}>de 100 puntos</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex h-2 rounded-full overflow-hidden">
-                  {[
-                    { color: '#A32D2D', label: 'Baja' },
-                    { color: '#854F0B', label: 'Media baja' },
-                    { color: '#639922', label: 'Media alta' },
-                    { color: '#3B6D11', label: 'Alta' },
-                  ].map(z => <div key={z.label} className="flex-1" style={{ background: `${z.color}30` }} />)}
-                </div>
-                <div className="relative mt-1">
-                  <div className="absolute w-3 h-3 rounded-full border-2 border-white shadow -translate-x-1/2"
-                    style={{ left: `${Math.min(result.totalScaled, 99)}%`, top: 0, background: result.levelColor }} />
-                </div>
-                <div className="flex justify-between text-[10px] mt-4" style={{ color: '#9ca3af' }}>
-                  <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+        {/* Puntaje total */}
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Puntaje total</h2>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-6 mb-3">
+            <div className="text-center sm:text-left">
+              <div className="flex items-baseline gap-3">
+                <span className="text-5xl font-bold" style={{ fontFamily: 'Georgia, Times New Roman, serif', color: levelColorHex }}>{result.totalScaled}</span>
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: levelColorHex }}>{result.levelLabel}</div>
+                  <div className="text-xs" style={{ color: '#9ca3af' }}>de 100 puntos</div>
                 </div>
               </div>
             </div>
-            <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>{result.levelDescription}</p>
+            <div className="flex-1">
+              <div className="flex h-2 rounded-full overflow-hidden">
+                {[
+                  { color: '#A32D2D', label: 'Baja' },
+                  { color: '#854F0B', label: 'Media baja' },
+                  { color: '#639922', label: 'Media alta' },
+                  { color: '#3B6D11', label: 'Alta' },
+                ].map(z => <div key={z.label} className="flex-1" style={{ background: `${z.color}30` }} />)}
+              </div>
+              <div className="relative mt-1">
+                <div className="absolute w-3 h-3 rounded-full border-2 border-white shadow -translate-x-1/2"
+                  style={{ left: `${Math.min(result.totalScaled, 99)}%`, top: 0, background: levelColorHex }} />
+              </div>
+              <div className="flex justify-between text-[10px] mt-4" style={{ color: '#9ca3af' }}>
+                <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+              </div>
+            </div>
           </div>
-
+          <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>{result.levelDescription}</p>
+          
           {result.lieScaleInvalid && (
             <div className="mt-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}>
               <strong>⚠ Escala de mentira:</strong> {result.lieScaleRaw}/8. Un puntaje ≥ 5 sugiere tendencia a responder en forma socialmente deseable.
@@ -313,26 +337,30 @@ function CoopersmithReportPageInner() {
         </div>
 
         {/* Gráfico de barras */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: '#e5e5e0' }}>
-          <h2 className="text-sm font-semibold uppercase tracking-widest mb-4" style={{ color: '#9ca3af' }}>Perfil de Subescalas</h2>
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Subescalas</h2>
+          </div>
           <GraficoBarras data={datosGrafico} />
         </div>
 
-        {/* Subescalas con interpretación */}
-        <div className="rounded-2xl border p-6" style={{ background: 'white', borderColor: '#e5e5e0' }}>
-          <h2 className="text-sm font-semibold uppercase tracking-widest mb-5" style={{ color: '#9ca3af' }}>Interpretación de Subescalas</h2>
+        {/* Interpretación de subescalas - con salto de página antes */}
+        <div className="mb-6" style={{ pageBreakBefore: 'avoid', pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Subescalas</h2>
+          </div>
           <div className="space-y-4">
             {result.subscales.map(s => (
-              <div key={s.code}>
+              <div key={s.code} style={{ pageBreakInside: 'avoid' }}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-medium" style={{ color: '#4b5563' }}>{s.label}</span>
+                  <span className="text-sm font-medium" style={{ color: '#1a1a1a' }}>{s.label}</span>
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm font-bold" style={{ color: result.levelColor }}>{s.scaledScore}</span>
+                    <span className="text-sm font-bold" style={{ color: levelColorHex }}>{s.scaledScore}</span>
                     <span className="text-xs" style={{ color: '#9ca3af' }}>/ {s.maxScaled}</span>
                   </div>
                 </div>
                 <div className="h-2 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
-                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.pct * 100}%`, background: result.levelColor }} />
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.pct * 100}%`, background: levelColorHex }} />
                 </div>
                 <p className="text-xs leading-relaxed mt-2" style={{ color: '#6b7280' }}>
                   {getInterpretacionSubescala(s.scaledScore, s.maxScaled, s.label.split(' ')[0])}
@@ -343,18 +371,17 @@ function CoopersmithReportPageInner() {
         </div>
 
         {/* Conclusión general */}
-        <div className="rounded-2xl border p-6" style={{ background: '#fafaf5', borderColor: '#e5e5e0' }}>
-          <h2 className="text-sm font-semibold uppercase tracking-widest mb-4" style={{ color: '#9ca3af' }}>Conclusión y Recomendaciones</h2>
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
+          </div>
           <p className="text-sm leading-relaxed" style={{ color: '#4b5563', textAlign: 'justify' }}>
             {getConclusionGeneral(result, patientName)}
           </p>
         </div>
 
-        <div className="text-center py-4">
-          <p className="text-xs" style={{ color: '#9ca3af' }}>
-            Generado por AQN Praxis · Brinkmann, Segure & Solar (1989) · U. de Concepción
-          </p>
-        </div>
+        {/* Footer con firma e isotipo */}
+        <ReporteFooter showFirma={true} />
       </div>
     </div>
   )
@@ -362,7 +389,7 @@ function CoopersmithReportPageInner() {
 
 function Spinner() {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#f5f5f0' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
       <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#4a4a4a', borderTopColor: 'transparent' }} />
     </div>
   )
@@ -370,7 +397,7 @@ function Spinner() {
 
 function Error({ onBack }: { onBack?: () => void }) {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#f5f5f0' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
       <div className="text-center">
         <p className="text-sm font-medium mb-3" style={{ color: '#4b5563' }}>No se encontraron resultados.</p>
         <button onClick={onBack ?? (() => window.history.back())} className="text-sm" style={{ color: '#4a4a4a' }}>← Volver</button>
@@ -381,7 +408,7 @@ function Error({ onBack }: { onBack?: () => void }) {
 
 export default function CoopersmithReportPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>}>
       <CoopersmithReportPageInner />
     </Suspense>
   )
