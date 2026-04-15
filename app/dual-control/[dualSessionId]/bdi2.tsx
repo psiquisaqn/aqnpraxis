@@ -2,6 +2,9 @@
 // app/dual-control/[dualSessionId]/bdi2.tsx
 // FIX #4: Igual que coopersmith y peca — eliminar el state "completed" y
 // calcular directamente desde Object.keys(responses).length.
+//
+// FIX #7: Layout de opciones en grid 2x2 para reducir espacio vertical
+// y que el botón "Finalizar evaluación" sea visible sin scroll.
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -250,10 +253,11 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
             {responses[currentItem] !== undefined && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Respondido</span>}
           </div>
           <p className="text-gray-800 font-medium mb-4">{currentItemData?.label}</p>
-          <div className="space-y-2">
+          {/* FIX #7: Layout grid 2x2 en lugar de lista vertical */}
+          <div className="grid grid-cols-2 gap-2">
             {BDI_OPTIONS.map((opt: any) => (
               <button key={opt.value} onClick={() => handleResponse(opt.value as BdiResponse)}
-                className={"w-full text-left p-3 rounded-lg border text-sm transition-all " + (responses[currentItem] === opt.value ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100')}
+                className={"w-full text-left p-2 rounded-lg border text-sm transition-all " + (responses[currentItem] === opt.value ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100')}
               >
                 {opt.label}
               </button>
