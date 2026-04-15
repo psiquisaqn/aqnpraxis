@@ -18,38 +18,48 @@ export default function ConfiguracionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadConfig()
+    loadUserAndConfig()
   }, [])
 
-  const loadConfig = async () => {
-    const { data, error } = await supabase
-      .from('config_institucion')
-      .select('*')
-      .single()
-    
-    if (data && !error) {
-      setLogoUrl(data.logo_url)
-      setFirmaUrl(data.firma_url)
-      setInstitucionNombre(data.institucion_nombre || '')
+  const loadUserAndConfig = async () => {
+    // Obtener usuario actual
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setUserId(user.id)
+      
+      // Cargar configuración existente
+      const { data, error } = await supabase
+        .from('config_institucion')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      
+      if (data && !error) {
+        setLogoUrl(data.logo_url)
+        setFirmaUrl(data.firma_url)
+        setInstitucionNombre(data.institucion_nombre || '')
+      }
     }
     setLoading(false)
   }
 
   const uploadImage = async (file: File, tipo: 'logo' | 'firma') => {
-    if (!file) return null
+    if (!file || !userId) return null
     
     const fileExt = file.name.split('.').pop()
-    const fileName = `${tipo}_${Date.now()}.${fileExt}`
-    const filePath = `config/${fileName}`
+    const fileName = `${userId}/${tipo}_${Date.now()}.${fileExt}`
+    const filePath = fileName
 
     const { error: uploadError } = await supabase.storage
       .from('institucion')
-      .upload(filePath, file)
+      .upload(filePath, file, { upsert: true })
 
     if (uploadError) {
       console.error('Error uploading:', uploadError)
+      setMessage('Error al subir la imagen: ' + uploadError.message)
       return null
     }
 
@@ -81,15 +91,45 @@ export default function ConfiguracionPage() {
   }
 
   const saveConfig = async () => {
+    if (!userId) {
+      setMessage('Usuario no autenticado')
+      return
+    }
+    
     setSaving(true)
-    const { error } = await supabase
+    
+    // Verificar si ya existe un registro
+    const { data: existing } = await supabase
       .from('config_institucion')
-      .upsert({
-        logo_url: logoUrl,
-        firma_url: firmaUrl,
-        institucion_nombre: institucionNombre,
-        updated_at: new Date().toISOString()
-      })
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    let error
+    if (existing) {
+      // Actualizar existente
+      const { error: updateError } = await supabase
+        .from('config_institucion')
+        .update({
+          logo_url: logoUrl,
+          firma_url: firmaUrl,
+          institucion_nombre: institucionNombre,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+      error = updateError
+    } else {
+      // Insertar nuevo
+      const { error: insertError } = await supabase
+        .from('config_institucion')
+        .insert({
+          user_id: userId,
+          logo_url: logoUrl,
+          firma_url: firmaUrl,
+          institucion_nombre: institucionNombre
+        })
+      error = insertError
+    }
     
     if (error) {
       setMessage('Error al guardar: ' + error.message)
@@ -108,12 +148,26 @@ export default function ConfiguracionPage() {
     )
   }
 
+  if (!userId) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-700">
+          Debes iniciar sesión para acceder a esta página.
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-6">
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">Configuración de Informes</h1>
       
       {message && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+        <div className={`mb-4 p-3 rounded-lg text-sm ${
+          message.includes('Error') 
+            ? 'bg-red-50 border border-red-200 text-red-700' 
+            : 'bg-green-50 border border-green-200 text-green-700'
+        }`}>
           {message}
         </div>
       )}
@@ -143,6 +197,7 @@ export default function ConfiguracionPage() {
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
           </label>
+          <p className="text-xs text-gray-400 mt-2">Formato recomendado: PNG o JPG. Tamaño máximo: 2MB.</p>
         </div>
       </div>
 
