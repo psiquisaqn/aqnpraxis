@@ -10,6 +10,7 @@ interface ReporteFooterProps {
 
 export function ReporteFooter({ showFirma = true }: ReporteFooterProps) {
   const [firmaUrl, setFirmaUrl] = useState<string | null>(null)
+  const [firmaTexto, setFirmaTexto] = useState<string>('')
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -19,11 +20,12 @@ export function ReporteFooter({ showFirma = true }: ReporteFooterProps) {
       )
       const { data } = await supabase
         .from('config_institucion')
-        .select('firma_url')
+        .select('firma_url, firma_texto')
         .single()
       
       if (data) {
         setFirmaUrl(data.firma_url)
+        setFirmaTexto(data.firma_texto || '')
       }
     }
     loadConfig()
@@ -33,7 +35,7 @@ export function ReporteFooter({ showFirma = true }: ReporteFooterProps) {
     <div className="mt-8 pt-4" style={{ pageBreakInside: 'avoid' }}>
       {/* Espacio para firma */}
       {showFirma && (
-        <div className="text-center mb-6">
+        <div className="text-center mb-4">
           <div className="h-16 flex justify-center items-end">
             {firmaUrl ? (
               <Image src={firmaUrl} alt="Firma" width={150} height={50} className="object-contain" />
@@ -41,6 +43,16 @@ export function ReporteFooter({ showFirma = true }: ReporteFooterProps) {
               <div className="w-40 border-b border-gray-400" />
             )}
           </div>
+          
+          {/* Texto del pie de firma (HTML enriquecido) */}
+          {firmaTexto && (
+            <div 
+              className="text-sm text-gray-600 mt-2"
+              dangerouslySetInnerHTML={{ __html: firmaTexto }}
+              style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
+            />
+          )}
+          
           <p className="text-xs text-gray-500 mt-1">Firma profesional</p>
         </div>
       )}

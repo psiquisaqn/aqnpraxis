@@ -3,6 +3,32 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import Image from 'next/image'
+import dynamic from 'next/dynamic'
+
+// Importar CSS solo en cliente para evitar errores de TypeScript
+if (typeof window !== 'undefined') {
+  require('react-quill/dist/quill.snow.css')
+}
+
+// Importar React Quill dinámicamente para evitar problemas con SSR
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
+
+// Configuración del editor
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'color': [] }, { 'background': [] }],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'align': [] }],
+    ['clean']
+  ],
+}
+
+const quillFormats = [
+  'header', 'bold', 'italic', 'underline', 'strike',
+  'color', 'background', 'list', 'bullet', 'align'
+]
 
 export default function ConfiguracionPage() {
   const [supabase] = useState(() =>
@@ -14,6 +40,7 @@ export default function ConfiguracionPage() {
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [firmaUrl, setFirmaUrl] = useState<string | null>(null)
+  const [firmaTexto, setFirmaTexto] = useState<string>('')
   const [institucionNombre, setInstitucionNombre] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -25,12 +52,10 @@ export default function ConfiguracionPage() {
   }, [])
 
   const loadUserAndConfig = async () => {
-    // Obtener usuario actual
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setUserId(user.id)
       
-      // Cargar configuración existente
       const { data, error } = await supabase
         .from('config_institucion')
         .select('*')
@@ -40,6 +65,7 @@ export default function ConfiguracionPage() {
       if (data && !error) {
         setLogoUrl(data.logo_url)
         setFirmaUrl(data.firma_url)
+        setFirmaTexto(data.firma_texto || '')
         setInstitucionNombre(data.institucion_nombre || '')
       }
     }
@@ -98,7 +124,6 @@ export default function ConfiguracionPage() {
     
     setSaving(true)
     
-    // Verificar si ya existe un registro
     const { data: existing } = await supabase
       .from('config_institucion')
       .select('id')
@@ -107,25 +132,25 @@ export default function ConfiguracionPage() {
 
     let error
     if (existing) {
-      // Actualizar existente
       const { error: updateError } = await supabase
         .from('config_institucion')
         .update({
           logo_url: logoUrl,
           firma_url: firmaUrl,
+          firma_texto: firmaTexto,
           institucion_nombre: institucionNombre,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', userId)
       error = updateError
     } else {
-      // Insertar nuevo
       const { error: insertError } = await supabase
         .from('config_institucion')
         .insert({
           user_id: userId,
           logo_url: logoUrl,
           firma_url: firmaUrl,
+          firma_texto: firmaTexto,
           institucion_nombre: institucionNombre
         })
       error = insertError
@@ -159,7 +184,7 @@ export default function ConfiguracionPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">Configuración de Informes</h1>
       
       {message && (
@@ -172,6 +197,7 @@ export default function ConfiguracionPage() {
         </div>
       )}
 
+      {/* Logo institucional */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <h2 className="text-lg font-medium text-gray-800 mb-4">Logo institucional</h2>
         <div className="mb-4">
@@ -201,8 +227,9 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
+      {/* Firma imagen */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <h2 className="text-lg font-medium text-gray-800 mb-4">Firma profesional</h2>
+        <h2 className="text-lg font-medium text-gray-800 mb-4">Firma (imagen)</h2>
         <div className="mb-4">
           {firmaUrl ? (
             <div className="mb-3">
@@ -230,6 +257,26 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
+      {/* Pie de firma (texto enriquecido) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <h2 className="text-lg font-medium text-gray-800 mb-4">Pie de firma</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Este texto aparecerá debajo de la firma en los informes. Puedes incluir tu nombre, RUT, registro profesional, etc.
+        </p>
+        <div className="mb-4">
+          <ReactQuill
+            theme="snow"
+            value={firmaTexto}
+            onChange={setFirmaTexto}
+            modules={quillModules}
+            formats={quillFormats}
+            placeholder="Ej: Dr. Juan Pérez<br>RUT: 12.345.678-9<br>Registro profesional: 12345"
+            className="h-48 mb-12"
+          />
+        </div>
+      </div>
+
+      {/* Datos institucionales */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <h2 className="text-lg font-medium text-gray-800 mb-4">Datos institucionales</h2>
         <div className="mb-4">
