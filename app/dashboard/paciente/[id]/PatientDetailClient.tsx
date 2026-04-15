@@ -309,8 +309,8 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                   <div className="font-medium text-gray-800">{getTestName(session.test_id)}</div>
                   <div className="text-xs text-gray-400">
                     {new Date(session.created_at).toLocaleDateString()}
-                    {session.status === 'completed' && 'Completada'}
-                    {session.status === 'in_progress' && 'En curso'}
+                    {session.status === 'completed' && ' Completada'}
+                    {session.status === 'in_progress' && ' En curso'}
                   </div>
                 </div>
                 <div className="flex gap-2">
