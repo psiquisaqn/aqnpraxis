@@ -157,7 +157,7 @@ function EmptyState({ search, onNew }: { search: string; onNew: () => void }) {
       ) : (
         <>
           <p className="text-sm font-medium text-gray-700">
-            AÃºn no tienes pacientes registrados
+            Aún no tienes pacientes registrados
           </p>
           <p className="text-xs mt-1 mb-5 text-gray-400">
             Agrega tu primer paciente para comenzar

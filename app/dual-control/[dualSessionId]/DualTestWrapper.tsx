@@ -1,8 +1,6 @@
 'use client'
 // app/dual-control/[dualSessionId]/DualTestWrapper.tsx
-// FIX #1: El panel de navegación era demasiado estrecho (max-h-16) y requería
-// scroll interno para ver todos los ítems. Se aumenta a max-h-28 (~4 filas)
-// y se ajusta el paddingBottom del contenido para compensar.
+// Modificado para reducir altura de navegación y que el botón finalizar sea visible sin scroll
 
 import { ReactNode } from 'react'
 
@@ -49,26 +47,25 @@ export function DualTestWrapper({
     )
   }
 
-  // Altura de la barra de navegación: título(20) + botones hasta 4 filas(4×32=128) + padding(20) = ~168px
-  const NAV_HEIGHT = 170
+  // Altura de la barra de navegación reducida para que el botón finalizar sea visible
+  const NAV_HEIGHT = 140
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Contenido con padding inferior para no quedar tapado */}
-      <div className="p-3" style={{ paddingBottom: NAV_HEIGHT + 8 }}>
+      {/* Contenido con padding inferior reducido */}
+      <div className="p-3" style={{ paddingBottom: NAV_HEIGHT }}>
         {children}
       </div>
 
-      {/* Barra de navegación fija al fondo */}
+      {/* Barra de navegación fija al fondo - más compacta */}
       <div
         className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-20"
-        style={{ padding: '8px 12px 12px' }}
+        style={{ padding: '4px 12px 8px' }}
       >
-        <p className="text-xs text-gray-500 mb-2 text-center font-medium">
+        <p className="text-xs text-gray-500 mb-1 text-center font-medium">
           Navegación rápida — {completed}/{totalItems} respondidos
         </p>
-        {/* max-h-28 = ~4 filas de botones de 28px, sin scroll interno en la mayoría de casos */}
-        <div className="flex flex-wrap justify-center gap-1 overflow-y-auto" style={{ maxHeight: 120 }}>
+        <div className="flex flex-wrap justify-center gap-1 overflow-y-auto" style={{ maxHeight: 90 }}>
           {items.map((item) => {
             const isAnswered = answeredItems ? answeredItems.has(item.num) : false
             const isCurrent = currentItem === item.num
@@ -83,7 +80,7 @@ export function DualTestWrapper({
                     ? 'bg-green-100 text-green-700 border border-green-300'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
-                style={{ width: 28, height: 28 }}
+                style={{ width: 26, height: 26 }}
               >
                 {item.num}
               </button>

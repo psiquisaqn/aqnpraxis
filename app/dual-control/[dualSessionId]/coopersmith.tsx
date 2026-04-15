@@ -9,6 +9,9 @@
 // FIX #5 (Coopersmith): También se agrega patient_id y psychologist_id al
 // insert de informes (eran necesarios y faltaban para que la tabla informes
 // cargue correctamente en la página de Informes).
+//
+// FIX #6 (Coopersmith subescalas): Se agrega el mapeo de respuestas a
+// columnas r01-r58 para que las subescalas se calculen correctamente.
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -127,6 +130,7 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
 
     try {
       console.log('=== INICIANDO FINALIZACIÓN COOPERSMITH ===')
+      console.log('Respuestas totales:', Object.keys(responses).length)
       
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -135,6 +139,8 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
 
       const { scoreCoopersmith } = await import('@/lib/coopersmith/engine')
       const result = scoreCoopersmith(responses)
+      
+      console.log('Resultado scoring:', { totalScaled: result.totalScaled, levelLabel: result.levelLabel })
 
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
@@ -159,11 +165,23 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
 
       const patientId = sessionData?.patient_id
 
-      // Guardar en coopersmith_scores
+      // FIX #6: Mapear respuestas a columnas r01-r58 para las subescalas
+      const respuestasCols: Record<string, string> = {}
+      for (let i = 1; i <= 58; i++) {
+        const key = 'r' + String(i).padStart(2, '0')
+        if (responses[i] !== undefined) {
+          respuestasCols[key] = responses[i] === 'igual' ? 'igual' : 'diferente'
+        }
+      }
+      
+      console.log('Respuestas mapeadas a columnas:', Object.keys(respuestasCols).length)
+
+      // Guardar en coopersmith_scores incluyendo respuestas individuales
       const { error: scoreError } = await supabase
         .from('coopersmith_scores')
         .upsert({
           session_id: sessionId,
+          ...respuestasCols,
           total_scaled: result.totalScaled,
           level_label: result.levelLabel,
           level_color: result.levelColor,
@@ -180,8 +198,9 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
         return
       }
 
-      // FIX #5: Guardar informe CON patient_id y psychologist_id para que
-      // aparezca en la página de Informes
+      console.log('Coopersmith scores guardado correctamente')
+
+      // Guardar informe CON patient_id y psychologist_id
       const recomendaciones = generarRecomendacionesCoopersmith(result.totalScaled, result.levelLabel)
 
       const { data: existingInforme } = await supabase
@@ -208,13 +227,14 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
             updated_at: new Date().toISOString()
           })
           .eq('session_id', sessionId)
+        console.log('Informe actualizado correctamente')
       } else {
         const { error: informeError } = await supabase
           .from('informes')
           .insert({
             session_id: sessionId,
-            patient_id: patientId,           // ← requerido para el join en Informes
-            psychologist_id: user.id,         // ← requerido para RLS
+            patient_id: patientId,
+            psychologist_id: user.id,
             test_id: 'coopersmith',
             titulo: 'Coopersmith SEI - Inventario de Autoestima',
             contenido: JSON.stringify({
@@ -232,7 +252,6 @@ export function CoopersmithControl({ dualSessionId, sessionId, onUpdatePatient, 
 
         if (informeError) {
           console.error('Error insertando informe:', informeError)
-          // No bloquear el flujo por esto, igual redirigir
         } else {
           console.log('Informe Coopersmith guardado correctamente')
         }
