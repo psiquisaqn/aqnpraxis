@@ -225,7 +225,6 @@ export default function Bdi2ReportPage() {
       <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3 flex-wrap no-print" style={{ background: 'white', borderColor: '#e5e5e0' }}>
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>BDI-II</span>
         <div className="flex-1" />
-        {/* Botón Imprimir */}
         <button
           onClick={() => window.print()}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border"

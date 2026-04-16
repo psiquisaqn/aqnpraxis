@@ -2,7 +2,21 @@
 
 import Link from 'next/link'
 import type { Patient } from '@/types'
-import { TEST_LABELS, STATUS_LABELS } from '@/types'
+
+// Definir localmente para evitar problemas de importación
+const TEST_LABELS: Record<string, string> = {
+  coopersmith: 'Coopersmith SEI',
+  bdi2: 'BDI-II',
+  peca: 'PECA',
+  wisc5_cl: 'WISC-V',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  completed: 'Completada',
+  in_progress: 'En progreso',
+  scheduled: 'Agendada',
+  cancelled: 'Cancelada',
+}
 
 interface Props {
   patient: Patient
@@ -97,24 +111,24 @@ export function PatientCard({ patient, onNewSession }: Props) {
         )}
       </div>
 
-      {/* Acciones - 3 botones */}
+      {/* Acciones - 3 botones centrados verticalmente */}
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button
             onClick={() => onNewSession(patient.id)}
-            className="text-xs font-medium py-2 px-1 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center whitespace-nowrap"
+            className="text-xs font-medium py-2 px-1 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center"
           >
             + Nueva evaluación
           </button>
           <Link
             href={`/dashboard/agenda?patient=${patient.id}&new=true`}
-            className="text-xs font-medium py-2 px-1 rounded-lg border border-green-200 text-green-600 bg-white hover:bg-green-50 transition-colors text-center whitespace-nowrap"
+            className="flex items-center justify-center text-xs font-medium py-2 px-1 rounded-lg border border-green-200 text-green-600 bg-white hover:bg-green-50 transition-colors text-center"
           >
             📅 Agendar
           </Link>
           <Link
             href={`/dashboard/paciente/${patient.id}`}
-            className="text-xs font-medium py-2 px-1 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-center whitespace-nowrap"
+            className="flex items-center justify-center text-xs font-medium py-2 px-1 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-center"
           >
             Ver ficha
           </Link>

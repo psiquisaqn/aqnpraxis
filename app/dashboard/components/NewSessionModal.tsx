@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createBrowserClient } from '@supabase/ssr'
 
 const TESTS = [
   { id: 'coopersmith', name: 'Coopersmith SEI', full: 'Inventario de Autoestima de Coopersmith', time: '~15 min', age: '≥ 8 años', color: '#0369a1' },
@@ -23,10 +23,24 @@ export function NewSessionModal({ patientId, onClose }: Props) {
 
   if (!patientId) return null
 
+  const generateRoomCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return code
+  }
+
   const handleStart = () => {
     if (!selected) return
     setError(null)
     startTransition(async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('No autenticado'); return }
 
@@ -48,14 +62,6 @@ export function NewSessionModal({ patientId, onClose }: Props) {
       }
 
       // Generar código de sala
-      const generateRoomCode = () => {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
-        let code = ''
-        for (let i = 0; i < 6; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length))
-        }
-        return code
-      }
       const roomCode = generateRoomCode()
 
       // Crear sesión dual
@@ -91,12 +97,12 @@ export function NewSessionModal({ patientId, onClose }: Props) {
         style={{ background: 'white', maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--stone-100)' }}>
-          <h2 className="text-base font-semibold" style={{ color: 'var(--stone-800)', fontFamily: 'var(--font-serif)' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: '#e5e5e0' }}>
+          <h2 className="text-base font-semibold" style={{ color: '#1a1a1a', fontFamily: 'Georgia, Times New Roman, serif' }}>
             Nueva evaluación
           </h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ color: 'var(--stone-400)', background: 'var(--stone-50)' }}>
+            style={{ color: '#9ca3af', background: '#f5f5f0' }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
@@ -104,7 +110,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
         </div>
 
         <div className="px-6 py-5 overflow-y-auto">
-          <p className="text-sm mb-4" style={{ color: 'var(--stone-500)' }}>
+          <p className="text-sm mb-4" style={{ color: '#6b7280' }}>
             Selecciona el instrumento de evaluación:
           </p>
 
@@ -113,7 +119,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
               <button key={t.id} type="button" onClick={() => setSelected(t.id)}
                 className="w-full text-left rounded-xl p-4 border transition-all duration-150"
                 style={{
-                  borderColor:   selected === t.id ? t.color : 'var(--stone-200)',
+                  borderColor:   selected === t.id ? t.color : '#e5e5e0',
                   background:    selected === t.id ? t.color + '08' : 'white',
                   outline:       selected === t.id ? '2px solid ' + t.color : 'none',
                   outlineOffset: '-1px',
@@ -124,11 +130,11 @@ export function NewSessionModal({ patientId, onClose }: Props) {
                     {t.name.charAt(0)}
                   </div>
                   <div>
-                    <span className="text-sm font-semibold" style={{ color: 'var(--stone-800)' }}>{t.name}</span>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--stone-500)' }}>{t.full}</p>
+                    <span className="text-sm font-semibold" style={{ color: '#1a1a1a' }}>{t.name}</span>
+                    <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>{t.full}</p>
                     <div className="flex gap-3 mt-1.5">
-                      <span className="text-xs" style={{ color: 'var(--stone-400)' }}>{'⏱ ' + t.time}</span>
-                      <span className="text-xs" style={{ color: 'var(--stone-400)' }}>{'· ' + t.age}</span>
+                      <span className="text-xs" style={{ color: '#9ca3af' }}>{'⏱ ' + t.time}</span>
+                      <span className="text-xs" style={{ color: '#9ca3af' }}>{'· ' + t.age}</span>
                     </div>
                   </div>
                 </div>
@@ -146,13 +152,13 @@ export function NewSessionModal({ patientId, onClose }: Props) {
           <div className="flex gap-3 mt-5">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl text-sm border font-medium"
-              style={{ borderColor: 'var(--stone-200)', color: 'var(--stone-600)', background: 'white' }}>
+              style={{ borderColor: '#e5e5e0', color: '#6b7280', background: 'white' }}>
               Cancelar
             </button>
             <button type="button" onClick={handleStart} disabled={!selected || isPending}
               className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
               style={{
-                background: (!selected || isPending) ? 'var(--stone-300)' : 'var(--teal-600)',
+                background: (!selected || isPending) ? '#9ca3af' : '#2563eb',
                 cursor:     (!selected || isPending) ? 'not-allowed' : 'pointer',
               }}>
               {isPending ? 'Iniciando...' : 'Comenzar evaluación'}

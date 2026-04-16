@@ -31,21 +31,10 @@ export default function InformesPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
 
-      // Obtener informes de la tabla informes
+      // Obtener informes de la tabla informes (sin join complejo)
       const { data: informes, error } = await supabase
         .from('informes')
-        .select(`
-          id,
-          session_id,
-          patient_id,
-          test_id,
-          titulo,
-          puntaje_total,
-          nivel,
-          recomendaciones,
-          created_at,
-          profiles:patient_id(full_name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -54,24 +43,40 @@ export default function InformesPage() {
         return
       }
 
-      const testNames: Record<string, string> = {
-        peca: 'PECA - Conducta Adaptativa',
-        bdi2: 'BDI-II - Depresión',
-        coopersmith: 'Coopersmith SEI - Autoestima'
-      }
+      // Para cada informe, obtener el nombre del paciente por separado
+      const formatted: Report[] = []
+      for (const i of informes) {
+        let patientName = 'Paciente'
+        if (i.patient_id) {
+          const { data: patient } = await supabase
+            .from('patients')
+            .select('full_name')
+            .eq('id', i.patient_id)
+            .single()
+          if (patient) {
+            patientName = patient.full_name
+          }
+        }
+        
+        const testNames: Record<string, string> = {
+          peca: 'PECA - Conducta Adaptativa',
+          bdi2: 'BDI-II - Depresión',
+          coopersmith: 'Coopersmith SEI - Autoestima'
+        }
 
-      const formatted: Report[] = informes.map((i: any) => ({
-        id: i.id,
-        session_id: i.session_id,
-        patient_name: i.profiles?.full_name || 'Paciente',
-        patient_id: i.patient_id,
-        test_id: i.test_id,
-        test_name: testNames[i.test_id] || i.test_id,
-        date: i.created_at,
-        score: i.puntaje_total || 0,
-        classification: i.nivel || '',
-        recomendaciones: i.recomendaciones || ''
-      }))
+        formatted.push({
+          id: i.id,
+          session_id: i.session_id,
+          patient_name: patientName,
+          patient_id: i.patient_id || '',
+          test_id: i.test_id,
+          test_name: testNames[i.test_id] || i.test_id,
+          date: i.created_at,
+          score: i.puntaje_total || 0,
+          classification: i.nivel || '',
+          recomendaciones: i.recomendaciones || ''
+        })
+      }
 
       setReports(formatted)
       setFilteredReports(formatted)
