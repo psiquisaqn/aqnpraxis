@@ -4,7 +4,8 @@
 // - Fondo blanco, sin recuadros de colores
 // - Logo y firma configurables
 // - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
-// - Saltos de página controlados
+// - Saltos de página controlados (conclusión en página nueva)
+// - Botón Imprimir visible
 // - Isotipo AQN Praxis al final
 
 import { useEffect, useState, useRef } from 'react'
@@ -224,6 +225,14 @@ export default function Bdi2ReportPage() {
       <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3 flex-wrap no-print" style={{ background: 'white', borderColor: '#e5e5e0' }}>
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>BDI-II</span>
         <div className="flex-1" />
+        {/* Botón Imprimir */}
+        <button
+          onClick={() => window.print()}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg border"
+          style={{ color: '#4b5563', borderColor: '#e5e5e0' }}
+        >
+          Imprimir
+        </button>
         <PdfDownloadButton
           contentRef={contentRef}
           meta={{
@@ -267,7 +276,7 @@ export default function Bdi2ReportPage() {
             <p className="text-5xl font-bold" style={{ color: severityColor }}>{data.total_score}</p>
             <p className="text-lg font-medium mt-1" style={{ color: severityColor }}>{data.severity_label || interpretacion.nivel}</p>
           </div>
-          <p className="text-sm leading-relaxed mb-3" style={{ color: '#4b5563' }}>{interpretacion.descripcion}</p>
+          <p className="text-sm leading-relaxed mb-3 text-justify" style={{ color: '#4b5563' }}>{interpretacion.descripcion}</p>
           <p className="text-sm font-medium" style={{ color: severityColor }}>Recomendación: {interpretacion.recomendacion}</p>
         </div>
 
@@ -279,39 +288,39 @@ export default function Bdi2ReportPage() {
           <GraficoBarras data={datosGrafico} />
         </div>
 
-        {/* Interpretación de dimensiones - con salto de página antes */}
-        <div className="mb-6" style={{ pageBreakBefore: 'avoid', pageBreakInside: 'avoid' }}>
+        {/* Interpretación de dimensiones */}
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Dimensiones</h2>
           </div>
           <div className="space-y-4">
             <div className="pb-3" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="text-md font-semibold mb-2" style={{ color: '#1a1a1a' }}>Dimensión Cognitivo-Afectiva</h3>
-              <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>
+              <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
                 {getInterpretacionDimension("Cognitivo-Afectivo", data.cognitive_affective_score || 0, 42)}
               </p>
             </div>
             <div className="pb-3" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="text-md font-semibold mb-2" style={{ color: '#1a1a1a' }}>Dimensión Somático-Motivacional</h3>
-              <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>
+              <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
                 {getInterpretacionDimension("Somático-Motivacional", data.somatic_motivational_score || 0, 21)}
               </p>
             </div>
             <div className="pb-3" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="text-md font-semibold mb-2" style={{ color: '#1a1a1a' }}>Ideación Suicida</h3>
-              <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>
+              <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
                 {getInterpretacionDimension("Ideación Suicida", data.suicidal_ideation_score || 0, 6)}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Conclusión general */}
-        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+        {/* Conclusión general con salto de página */}
+        <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
           </div>
-          <p className="text-sm leading-relaxed" style={{ color: '#4b5563', textAlign: 'justify' }}>
+          <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563', textAlign: 'justify' }}>
             {getConclusionGeneral(data.total_score, data.severity_label || interpretacion.nivel, patient?.full_name)}
           </p>
         </div>

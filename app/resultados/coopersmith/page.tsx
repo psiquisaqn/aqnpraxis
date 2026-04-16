@@ -4,7 +4,7 @@
 // - Fondo blanco, sin recuadros de colores
 // - Logo y firma configurables
 // - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
-// - Saltos de página controlados
+// - Saltos de página controlados (conclusión en página nueva)
 // - Isotipo AQN Praxis al final
 
 import { useEffect, useState, useRef, Suspense } from 'react'
@@ -269,10 +269,11 @@ function CoopersmithReportPageInner() {
         <button onClick={() => window.print()} className="text-xs font-medium px-3 py-1.5 rounded-lg border" style={{ color: '#4b5563', borderColor: '#e5e5e0' }}>
           Imprimir
         </button>
-        {result && (
-          <PdfDownloadButton contentRef={contentRef}
-            meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }} />
-        )}
+        <PdfDownloadButton
+          contentRef={contentRef}
+          meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }}
+          label="Guardar PDF"
+        />
         <button onClick={() => router.push('/dashboard')}
           className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
           style={{ background: '#2563eb', border: 'none' }}>
@@ -327,7 +328,7 @@ function CoopersmithReportPageInner() {
               </div>
             </div>
           </div>
-          <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>{result.levelDescription}</p>
+          <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>{result.levelDescription}</p>
           
           {result.lieScaleInvalid && (
             <div className="mt-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}>
@@ -344,8 +345,8 @@ function CoopersmithReportPageInner() {
           <GraficoBarras data={datosGrafico} />
         </div>
 
-        {/* Interpretación de subescalas - con salto de página antes */}
-        <div className="mb-6" style={{ pageBreakBefore: 'avoid', pageBreakInside: 'avoid' }}>
+        {/* Interpretación de subescalas */}
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Subescalas</h2>
           </div>
@@ -362,7 +363,7 @@ function CoopersmithReportPageInner() {
                 <div className="h-2 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
                   <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.pct * 100}%`, background: levelColorHex }} />
                 </div>
-                <p className="text-xs leading-relaxed mt-2" style={{ color: '#6b7280' }}>
+                <p className="text-xs leading-relaxed mt-2 text-justify" style={{ color: '#6b7280' }}>
                   {getInterpretacionSubescala(s.scaledScore, s.maxScaled, s.label.split(' ')[0])}
                 </p>
               </div>
@@ -370,12 +371,12 @@ function CoopersmithReportPageInner() {
           </div>
         </div>
 
-        {/* Conclusión general */}
-        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+        {/* Conclusión general con salto de página */}
+        <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
           </div>
-          <p className="text-sm leading-relaxed" style={{ color: '#4b5563', textAlign: 'justify' }}>
+          <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563', textAlign: 'justify' }}>
             {getConclusionGeneral(result, patientName)}
           </p>
         </div>

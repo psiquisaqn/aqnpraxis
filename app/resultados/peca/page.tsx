@@ -5,12 +5,14 @@
 // - Logo y firma configurables
 // - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
 // - Saltos de página controlados
+// - Botón Imprimir y Guardar PDF visibles
+// - Gráfico compacto y legible
 // - Isotipo AQN Praxis al final
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { TestResultsLayout } from '@/components/TestResultsLayout'
+import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scorePeca, type PecaResult } from '@/lib/peca/engine'
 import { ReporteHeader } from '@/components/ReporteHeader'
 import { ReporteFooter } from '@/components/ReporteFooter'
@@ -111,40 +113,55 @@ function getIntensityColor(intensity: string): string {
   }
 }
 
-// Gráfico de barras para dimensiones
+// Gráfico de barras para dimensiones - versión compacta y legible
 function GraficoBarrasDimensiones({ data }: { data: Array<{ label: string; value: number; intensidad: string }> }) {
   const maxVal = 100
+  
+  // Mapeo de etiquetas largas a cortas para mejor visualización
+  const shortLabels: Record<string, string> = {
+    'Comunicación': 'Com.',
+    'Académico func.': 'Acad.',
+    'Vida diaria': 'V. diaria',
+    'Habilidad social': 'H. social',
+    'Autocuidado': 'Auto.',
+    'Uso comunidad': 'Uso com.',
+    'Autodirección': 'Autodir.',
+    'Conducta social': 'C. social',
+    'Ocio/trabajo': 'Ocio'
+  }
   
   return (
     <div className="grafico-barras-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
       <div className="grafico-barras" style={{ 
         display: 'flex', 
-        justifyContent: 'space-around', 
+        justifyContent: 'center', 
         alignItems: 'flex-end', 
-        minHeight: '250px',
+        minHeight: '220px',
         borderBottom: '1px solid #333',
         borderLeft: '1px solid #333',
         paddingLeft: '10px',
         paddingBottom: '10px',
-        flexWrap: 'wrap',
-        gap: '10px'
+        gap: '6px',
+        flexWrap: 'wrap'
       }}>
         {data.map((item, idx) => {
-          const alturaRelativa = (item.value / maxVal) * 180
+          const alturaRelativa = (item.value / maxVal) * 160
           const color = getIntensityColor(item.intensidad)
+          const shortLabel = shortLabels[item.label] || item.label.substring(0, 10)
+          
           return (
-            <div key={idx} style={{ textAlign: 'center', width: '70px' }}>
+            <div key={idx} style={{ textAlign: 'center', width: '55px' }}>
               <div style={{ 
                 backgroundColor: color, 
-                width: '40px', 
+                width: '32px', 
                 margin: '0 auto', 
                 height: `${Math.max(alturaRelativa, 4)}px`,
-                marginBottom: '8px',
+                marginBottom: '6px',
                 transition: 'height 0.3s ease'
               }} title={`${item.value}% - ${item.intensidad}`} />
-              <div style={{ fontSize: '10px', fontWeight: 'bold', fontFamily: 'Georgia, Times New Roman, serif' }}>{item.label}</div>
-              <div style={{ fontSize: '9px', color: color, marginTop: '2px' }}>{item.intensidad}</div>
-              <div style={{ fontSize: '9px', color: '#555' }}>{Math.round(item.value)}%</div>
+              <div style={{ fontSize: '8px', fontWeight: 'bold', fontFamily: 'Georgia, Times New Roman, serif' }}>{shortLabel}</div>
+              <div style={{ fontSize: '7px', color: color, marginTop: '1px' }}>{item.intensidad.substring(0, 4)}</div>
+              <div style={{ fontSize: '8px', color: '#555' }}>{Math.round(item.value)}%</div>
             </div>
           )
         })}
@@ -158,6 +175,7 @@ function PecaResultsPageInner() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
 
+  const contentRef = useRef<HTMLDivElement>(null)
   const [result, setResult] = useState<PecaResult | null>(null)
   const [patientName, setPatientName] = useState('')
   const [patientId, setPatientId] = useState('')
@@ -250,7 +268,7 @@ function PecaResultsPageInner() {
   const nivelColor = result.participationNeeds ? '#A32D2D' : '#166534'
 
   const datosGrafico = result.dimensions.map(dim => ({
-    label: dim.label.substring(0, 12),
+    label: dim.label,
     value: dim.p2 * 100,
     intensidad: dim.intensityLabel
   }))
@@ -270,6 +288,24 @@ function PecaResultsPageInner() {
         >
           Imprimir
         </button>
+        <PdfDownloadButton
+          contentRef={contentRef}
+          meta={{
+            sessionId: sessionId,
+            patientId,
+            testId: 'peca',
+            patientName: patientName,
+            content: {
+              participationLevel: result.participationLevel,
+              answeredItems: result.answeredItems,
+              dimensions: result.dimensions,
+              aamrSets: result.aamrSets,
+              participationText: result.participationText,
+              participationNeeds: result.participationNeeds
+            }
+          }}
+          label="Guardar PDF"
+        />
         <button
           onClick={() => router.push('/dashboard')}
           className="px-4 py-2 rounded-lg text-sm transition-colors"
@@ -280,7 +316,7 @@ function PecaResultsPageInner() {
       </div>
 
       {/* Contenido del informe */}
-      <div className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
+      <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
         
         {/* Header con logo y datos del paciente */}
         <ReporteHeader
@@ -331,7 +367,7 @@ function PecaResultsPageInner() {
               </div>
             </div>
           </div>
-          <p className="text-sm leading-relaxed mb-3" style={{ color: '#4b5563' }}>{interpretacionParticipacion.descripcion}</p>
+          <p className="text-sm leading-relaxed mb-3 text-justify" style={{ color: '#4b5563' }}>{interpretacionParticipacion.descripcion}</p>
           <p className="text-sm font-medium" style={{ color: nivelColor }}>Recomendación: {interpretacionParticipacion.recomendacion}</p>
         </div>
 
@@ -343,8 +379,8 @@ function PecaResultsPageInner() {
           <GraficoBarrasDimensiones data={datosGrafico} />
         </div>
 
-        {/* Interpretación de dimensiones - con salto de página antes */}
-        <div className="mb-6" style={{ pageBreakBefore: 'avoid', pageBreakInside: 'avoid' }}>
+        {/* Interpretación de dimensiones */}
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Dimensiones</h2>
           </div>
@@ -363,7 +399,7 @@ function PecaResultsPageInner() {
                 <div className="h-2 rounded-full overflow-hidden mb-2" style={{ background: '#e5e5e0' }}>
                   <div className="h-full rounded-full transition-all" style={{ width: `${dim.p2 * 100}%`, background: getIntensityColor(dim.intensityLabel) }} />
                 </div>
-                <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>
+                <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
                   {getInterpretacionDimension(dim.code, dim.p2, dim.intensityLabel)}
                 </p>
                 <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
@@ -394,18 +430,18 @@ function PecaResultsPageInner() {
                 <div className="h-2 rounded-full overflow-hidden mb-2" style={{ background: '#e5e5e0' }}>
                   <div className="h-full rounded-full transition-all" style={{ width: `${set.p2 * 100}%`, background: set.needsSupport ? '#F59E0B' : '#10B981' }} />
                 </div>
-                <p className="text-sm leading-relaxed" style={{ color: '#4b5563' }}>{set.descriptionText}</p>
+                <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>{set.descriptionText}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Conclusión general */}
-        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+        {/* Conclusión general con salto de página */}
+        <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
           </div>
-          <p className="text-sm leading-relaxed" style={{ color: '#4b5563', textAlign: 'justify' }}>
+          <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563', textAlign: 'justify' }}>
             {getConclusionGeneral(result, patientName)}
           </p>
         </div>
