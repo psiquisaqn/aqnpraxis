@@ -97,24 +97,14 @@ export function PatientCard({ patient, onNewSession }: Props) {
         )}
       </div>
 
-      {/* Acciones - diseño responsivo con grid para móvil */}
+      {/* Acciones - diseño responsivo (3 columnas en desktop) */}
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <Link
-            href={`/dashboard/paciente/${patient.id}/nueva-sesion`}
-            onClick={(e) => {
-              e.preventDefault()
-              onNewSession(patient.id)
-            }}
-            className="text-xs font-medium py-2 px-1 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center whitespace-nowrap"
-          >
-            + Evaluación simple
-          </Link>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Link
             href={`/dashboard/paciente/${patient.id}/nueva-sesion-dual`}
-            className="text-xs font-medium py-2 px-1 rounded-lg border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 transition-colors text-center whitespace-nowrap"
+            className="text-xs font-medium py-2 px-1 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center whitespace-nowrap"
           >
-            🎮 Evaluación dual
+            + Nueva evaluación
           </Link>
           <Link
             href={`/dashboard/agenda?patient=${patient.id}&new=true`}
