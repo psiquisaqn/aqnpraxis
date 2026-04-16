@@ -1,11 +1,6 @@
 // app/dashboard/page.tsx
-// FIX #7: El DashboardPage server-side ya filtraba por psychologist_id,
-// pero PatientList.tsx hace un fetch a /api/patients que NO filtraba — devolvía
-// TODOS los pacientes. La corrección es doble:
-// 1. DashboardPage pasa el userId al PatientList para que lo use en el fetch
-// 2. La API route /api/patients filtra por psychologist_id del usuario autenticado
 
-import { PatientList } from '@/app/dashboard/components/PatientList'
+import PatientList from '@/app/dashboard/components/PatientList'
 import { supabase as createSupabase } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 

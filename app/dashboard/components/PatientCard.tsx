@@ -97,15 +97,15 @@ export function PatientCard({ patient, onNewSession }: Props) {
         )}
       </div>
 
-      {/* Acciones - diseño responsivo (3 columnas en desktop) */}
+      {/* Acciones - 3 botones */}
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <Link
-            href={`/dashboard/paciente/${patient.id}/nueva-sesion-dual`}
+          <button
+            onClick={() => onNewSession(patient.id)}
             className="text-xs font-medium py-2 px-1 rounded-lg transition-all duration-150 text-white bg-blue-600 hover:bg-blue-700 text-center whitespace-nowrap"
           >
             + Nueva evaluación
-          </Link>
+          </button>
           <Link
             href={`/dashboard/agenda?patient=${patient.id}&new=true`}
             className="text-xs font-medium py-2 px-1 rounded-lg border border-green-200 text-green-600 bg-white hover:bg-green-50 transition-colors text-center whitespace-nowrap"
