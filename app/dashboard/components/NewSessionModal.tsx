@@ -5,10 +5,9 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 
 const TESTS = [
-  { id: 'wisc5_cl',    name: 'WISC-V Chile',  full: 'Escala de Inteligencia de Wechsler para Niños — 5ª Ed.', time: '~65–80 min', age: '6 a 16 años 11 meses', color: 'var(--teal-600)' },
-  { id: 'peca_aqn',        name: 'PECA',           full: 'Prueba de Evaluación Cognitiva para el Aprendizaje',     time: '~30–45 min', age: 'Edad escolar',           color: '#7c3aed' },
-  { id: 'beck_bdi2',   name: 'BDI-II',         full: 'Inventario de Depresión de Beck — 2ª Ed.',               time: '~10 min',    age: '≥ 13 años',              color: '#b45309' },
-  { id: 'coopersmith', name: 'Coopersmith',    full: 'Inventario de Autoestima de Coopersmith',                time: '~15 min',    age: '≥ 8 años',               color: '#0369a1' },
+  { id: 'coopersmith', name: 'Coopersmith SEI', full: 'Inventario de Autoestima de Coopersmith', time: '~15 min', age: '≥ 8 años', color: '#0369a1' },
+  { id: 'bdi2', name: 'BDI-II', full: 'Inventario de Depresión de Beck — 2ª Ed.', time: '~10 min', age: '≥ 13 años', color: '#b45309' },
+  { id: 'peca', name: 'PECA', full: 'Prueba de Evaluación de Conducta Adaptativa', time: '~30-45 min', age: 'Edad escolar', color: '#7c3aed' },
 ]
 
 interface Props {
@@ -28,25 +27,56 @@ export function NewSessionModal({ patientId, onClose }: Props) {
     if (!selected) return
     setError(null)
     startTransition(async () => {
-  const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('No autenticado'); return }
 
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ psychologist_id: user.id, patient_id: patientId, test_id: selected }),
-      })
-      const result = await res.json()
+      // Crear sesión
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .insert({
+          psychologist_id: user.id,
+          patient_id: patientId,
+          test_id: selected,
+          status: 'in_progress'
+        })
+        .select()
+        .single()
 
-      if (result.error) {
-        setError(result.error)
-      } else {
-        onClose()
-        if (selected === 'peca_aqn')             router.push('/peca/' + result.sessionId)
-        else if (selected === 'beck_bdi2')   router.push('/bdi2/' + result.sessionId)
-        else if (selected === 'coopersmith') router.push('/coopersmith/' + result.sessionId)
-        else                                 router.push('/session/' + result.sessionId)
+      if (sessionError) {
+        setError(sessionError.message)
+        return
       }
+
+      // Generar código de sala
+      const generateRoomCode = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
+        let code = ''
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length))
+        }
+        return code
+      }
+      const roomCode = generateRoomCode()
+
+      // Crear sesión dual
+      const { data: dualSession, error: dualError } = await supabase
+        .from('dual_sessions')
+        .insert({
+          session_id: session.id,
+          psychologist_id: user.id,
+          room_code: roomCode,
+          is_active: true
+        })
+        .select()
+        .single()
+
+      if (dualError) {
+        setError(dualError.message)
+        return
+      }
+
+      onClose()
+      router.push(`/dual-control/${dualSession.id}`)
     })
   }
 
@@ -63,7 +93,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--stone-100)' }}>
           <h2 className="text-base font-semibold" style={{ color: 'var(--stone-800)', fontFamily: 'var(--font-serif)' }}>
-            Iniciar evaluación
+            Nueva evaluación
           </h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ color: 'var(--stone-400)', background: 'var(--stone-50)' }}>
@@ -125,7 +155,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
                 background: (!selected || isPending) ? 'var(--stone-300)' : 'var(--teal-600)',
                 cursor:     (!selected || isPending) ? 'not-allowed' : 'pointer',
               }}>
-              {isPending ? 'Iniciando...' : 'Comenzar sesión'}
+              {isPending ? 'Iniciando...' : 'Comenzar evaluación'}
             </button>
           </div>
         </div>
