@@ -8,6 +8,7 @@ const TESTS = [
   { id: 'coopersmith', name: 'Coopersmith SEI', full: 'Inventario de Autoestima de Coopersmith', time: '~15 min', age: '≥ 8 años', color: '#0369a1' },
   { id: 'bdi2', name: 'BDI-II', full: 'Inventario de Depresión de Beck — 2ª Ed.', time: '~10 min', age: '≥ 13 años', color: '#b45309' },
   { id: 'peca', name: 'PECA', full: 'Prueba de Evaluación de Conducta Adaptativa', time: '~30-45 min', age: 'Edad escolar', color: '#7c3aed' },
+  { id: 'wisc5', name: 'WISC-V', full: 'Escala de Inteligencia de Wechsler para Niños — 5ª Ed.', time: '~65-80 min', age: '6 a 16 años 11 meses', color: '#0d9488' },
 ]
 
 interface Props {
