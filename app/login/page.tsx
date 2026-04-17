@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -40,6 +41,8 @@ export default function LoginPage() {
               className="h-20 w-auto"
             />
           </div>
+          <h2 className="text-xl font-semibold text-gray-800 mt-2">Acceso psicólogos</h2>
+          <p className="text-sm text-gray-500 mt-1">Ingresa con tu cuenta profesional</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
@@ -99,6 +102,29 @@ export default function LoginPage() {
             </p>
           </div>
         </form>
+
+        {/* Divider */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="px-2 bg-white text-gray-400">o</span>
+          </div>
+        </div>
+
+        {/* Botón Sala de Pacientes */}
+        <Link
+          href="/sala"
+          className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="1.5" stroke="white" strokeWidth="1.2"/>
+            <path d="M2.5 13.5c0-2.5 2.5-5 5.5-5s5.5 2.5 5.5 5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M8 8a2 2 0 100-4 2 2 0 000 4z" stroke="white" strokeWidth="1.2"/>
+          </svg>
+          Sala de Pacientes
+        </Link>
       </div>
     </div>
   )
