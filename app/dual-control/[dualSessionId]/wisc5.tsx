@@ -11,20 +11,15 @@ import { DualTestWrapper } from './DualTestWrapper'
 
 // Configuración de ítems para Construcción con Cubos (CC)
 const CC_ITEMS_CONFIG = [
-  // ítem 1
   { num: 1, timeLimit: 30, twoAttempts: true, maxScore: 2, scores: { first: 2, second: 1, fail: 0 } },
-  // ítem 2
   { num: 2, timeLimit: 45, twoAttempts: true, maxScore: 2, scores: { first: 2, second: 1, fail: 0 } },
-  // ítem 3
   { num: 3, timeLimit: 45, twoAttempts: true, maxScore: 2, scores: { first: 2, second: 1, fail: 0 } },
-  // ítems 4-9 (sin segundos intentos)
   { num: 4, timeLimit: 45, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
   { num: 5, timeLimit: 45, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
   { num: 6, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
   { num: 7, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
   { num: 8, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
   { num: 9, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
-  // ítems 10-13 (con puntaje por tiempo)
   { num: 10, timeLimit: 120, twoAttempts: false, maxScore: 7, scoresByTime: [
     { maxTime: 30, score: 7 },
     { maxTime: 60, score: 6 },
@@ -53,18 +48,6 @@ const CC_ITEMS_CONFIG = [
     { maxTime: 120, score: 4 },
     { maxTime: Infinity, score: 0 }
   ]}
-]
-
-// Subpruebas complementarias (para sustitución)
-const SUPPLEMENTAL_SUBTESTS = [
-  { code: 'RV', name: 'Rompecabezas Visuales', belongsTo: 'IVE' },
-  { code: 'RI', name: 'Retención de Imágenes', belongsTo: 'IMT' },
-  { code: 'BS', name: 'Búsqueda de Símbolos', belongsTo: 'IVP' },
-  { code: 'IN', name: 'Información', belongsTo: null },
-  { code: 'SLN', name: 'Span Letras y Números', belongsTo: null },
-  { code: 'CAN', name: 'Cancelación', belongsTo: null },
-  { code: 'COM', name: 'Comprensión', belongsTo: null },
-  { code: 'ARI', name: 'Aritmética', belongsTo: null }
 ]
 
 // ============================================================
@@ -137,10 +120,14 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isAct
 interface CcInterfaceProps {
   onComplete: (scores: Record<number, number>, rawTotal: number) => void
   onUpdatePatient: (content: any) => void
+  startItem?: number
 }
 
-function CcInterface({ onComplete, onUpdatePatient }: CcInterfaceProps) {
-  const [currentItemIndex, setCurrentItemIndex] = useState(0)
+function CcInterface({ onComplete, onUpdatePatient, startItem = 1 }: CcInterfaceProps) {
+  // Encontrar el índice inicial basado en el ítem de inicio
+  const initialIndex = CC_ITEMS_CONFIG.findIndex(item => item.num === startItem)
+  
+  const [currentItemIndex, setCurrentItemIndex] = useState(initialIndex >= 0 ? initialIndex : 0)
   const [scores, setScores] = useState<Record<number, number>>({})
   const [attempts, setAttempts] = useState<Record<number, number>>({})
   const [showRetryButton, setShowRetryButton] = useState(false)
@@ -235,7 +222,6 @@ function CcInterface({ onComplete, onUpdatePatient }: CcInterfaceProps) {
 
   if (!currentItem || isCompleted) return null
 
-  // Obtener puntaje según tiempo (para mostrar en botones)
   const getScoreLabel = (score: number): string => {
     switch (score) {
       case 7: return '7 (≤30s)'
@@ -257,7 +243,7 @@ function CcInterface({ onComplete, onUpdatePatient }: CcInterfaceProps) {
           </span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(currentItemIndex / CC_ITEMS_CONFIG.length) * 100}%` }} />
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${((currentItemIndex + 1) / CC_ITEMS_CONFIG.length) * 100}%` }} />
         </div>
       </div>
 
@@ -269,6 +255,7 @@ function CcInterface({ onComplete, onUpdatePatient }: CcInterfaceProps) {
           alt={`Modelo invertido ${currentItem.num}`}
           className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg"
           onError={(e) => {
+            console.error(`Error cargando imagen: /wisc5/cc/cubosinv${String(currentItem.num).padStart(3, '0')}.png`)
             e.currentTarget.src = '/placeholder-image.png'
           }}
         />
@@ -411,7 +398,6 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const [activeSubtest, setActiveSubtest] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const firstItemSent = useRef(false)
 
   // Calcular edad y grupo etario
   const calculateAge = (birthDate: Date, evalDate: Date): { years: number; months: number; totalMonths: number } => {
@@ -458,6 +444,12 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     ]
     const group = groups.find(g => totalMonths >= g.min && totalMonths <= g.max)
     return group?.label || '6:0-6:5'
+  }
+
+  // Determinar ítem de inicio según edad
+  const getStartingItem = (years: number): number => {
+    if (years <= 7) return 1
+    return 3 // 8 años o más
   }
 
   // Actualizar grupo etario cuando cambia la fecha de nacimiento
@@ -537,18 +529,8 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     updateScaledScores()
   }, [rawScores, ageInfo?.group])
 
-  // Actualizar puntajes compuestos
-  useEffect(() => {
-    const updateIndexScores = async () => {
-      // Por ahora solo CC está implementado
-      // Los demás índices se agregarán cuando se implementen las subpruebas
-    }
-    updateIndexScores()
-  }, [scaledScores])
-
   const handleCcComplete = (itemScores: Record<number, number>, rawTotal: number) => {
     setRawScores({ ...rawScores, CC: rawTotal })
-    // Calcular puntaje escalado para CC
     if (ageInfo?.group) {
       fetchScaledScore('CC', rawTotal, ageInfo.group).then(scaled => {
         if (scaled) {
@@ -586,18 +568,11 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
         age_group: ageInfo?.group
       }
 
-      // Guardar puntajes brutos y escalados
       for (const [code, raw] of Object.entries(rawScores)) {
         scoreData[`${code.toLowerCase()}_raw`] = raw
         if (scaledScores[code]) {
           scoreData[`${code.toLowerCase()}_scaled`] = scaledScores[code]
         }
-      }
-
-      // Guardar índices compuestos
-      for (const [indexCode, idxData] of Object.entries(indexScores)) {
-        scoreData[indexCode.toLowerCase()] = idxData.score
-        scoreData[`${indexCode.toLowerCase()}_classification`] = idxData.classification
       }
 
       const { error: saveError } = await supabase
@@ -606,7 +581,6 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
       if (saveError) throw saveError
 
-      // Guardar informe
       await supabase
         .from('informes')
         .upsert({
@@ -640,7 +614,6 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   }
 
   const allSubtestsCompleted = () => {
-    // Por ahora solo CC
     return rawScores.CC !== undefined
   }
 
@@ -699,19 +672,20 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       onStart={() => {}}
     >
       <div className="space-y-4">
-        {/* Información del paciente */}
         <div className="bg-gray-50 rounded-lg p-3">
           <p className="text-sm text-gray-600">
             Edad: {ageInfo?.years} años, {ageInfo?.months} meses | Grupo: {ageInfo?.group}
           </p>
         </div>
 
-        {/* Subprueba activa: Construcción con Cubos */}
-        {activeSubtest === 'CC' && (
-          <CcInterface onComplete={handleCcComplete} onUpdatePatient={onUpdatePatient} />
+        {activeSubtest === 'CC' && ageInfo && (
+          <CcInterface 
+            onComplete={handleCcComplete} 
+            onUpdatePatient={onUpdatePatient}
+            startItem={getStartingItem(ageInfo.years)}
+          />
         )}
 
-        {/* Resumen de subpruebas completadas */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">Subpruebas completadas</h3>
           <div className="flex flex-wrap gap-2">

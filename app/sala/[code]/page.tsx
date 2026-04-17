@@ -25,12 +25,16 @@ export default function SalaDisplayPage() {
   // Buscar sesión dual por código
   useEffect(() => {
     const findSession = async () => {
+      console.log('Buscando sala con código:', code)
+      
       const { data, error } = await supabase
         .from('dual_sessions')
         .select('id, session_id, screen2_device_id')
-        .eq('room_code', code)
+        .eq('room_code', code.toUpperCase())
         .eq('is_active', true)
-        .single()
+        .maybeSingle()  // ← Cambiado de .single() a .maybeSingle()
+
+      console.log('Resultado:', { data, error })
 
       if (error || !data) {
         setError('Código inválido o sesión no encontrada')
@@ -40,7 +44,9 @@ export default function SalaDisplayPage() {
       }
     }
 
-    findSession()
+    if (code) {
+      findSession()
+    }
   }, [code, supabase])
 
   // Escuchar comandos del psicólogo
@@ -198,9 +204,6 @@ export default function SalaDisplayPage() {
           </div>
         )
 
-      // ============================================================
-      // WISC-V - Construcción con Cubos (CC)
-      // ============================================================
       case 'wisc5_cc':
         const stimulusNum = currentDisplay.stimulusNum || 1
         const imagePath = `/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.jpg`
@@ -263,7 +266,6 @@ export default function SalaDisplayPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
-      {/* Botón flotante "Volver al panel principal" */}
       <div className="fixed top-4 right-4 z-50">
         <Link
           href="/dashboard"
