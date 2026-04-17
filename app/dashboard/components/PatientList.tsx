@@ -2,19 +2,39 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { Patient } from '@/types'
 import { PatientCard } from './PatientCard'
 import { NewPatientModal } from './NewPatientModal'
 import { NewSessionModal } from './NewSessionModal'
 import { calcAge } from '@/lib/utils'
 import Link from 'next/link'
 
+// Definir tipos localmente para coincidir con PatientCard
+interface LocalSession {
+  id: string
+  test_id: string
+  status: string
+  completed_at?: string | null
+}
+
+interface LocalPatient {
+  id: string
+  full_name: string
+  rut?: string
+  birth_date?: string
+  gender?: string
+  school?: string
+  age_years: number
+  age_months: number
+  session_count: number
+  latest_session: LocalSession | null
+}
+
 interface Props {
-  patients: Patient[]
+  patients: LocalPatient[]
 }
 
 export default function PatientList({ patients: initialPatients }: Props) {
-  const [patients, setPatients] = useState<Patient[]>(initialPatients)
+  const [patients, setPatients] = useState<LocalPatient[]>(initialPatients as LocalPatient[])
   const [search, setSearch] = useState('')
   const [newPatientOpen, setNewPatientOpen] = useState(false)
   const [sessionPatientId, setSessionPatientId] = useState<string | null>(null)

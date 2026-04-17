@@ -1,36 +1,61 @@
 'use client'
 
 import Link from 'next/link'
-import type { Patient } from '@/types'
 
-// Definir localmente para evitar problemas de importación
+// Definir tipos localmente para evitar conflictos
+interface LocalSession {
+  id: string
+  test_id: string
+  status: string
+  completed_at?: string | null
+}
+
+interface LocalPatient {
+  id: string
+  full_name: string
+  rut?: string
+  birth_date?: string
+  gender?: string
+  school?: string
+  age_years: number
+  age_months: number
+  session_count: number
+  latest_session: LocalSession | null
+}
+
+interface Props {
+  patient: LocalPatient
+  onNewSession: (patientId: string) => void
+}
+
+// Definiciones locales
 const TEST_LABELS: Record<string, string> = {
   coopersmith: 'Coopersmith SEI',
   bdi2: 'BDI-II',
   peca: 'PECA',
+  wisc5: 'WISC-V',
   wisc5_cl: 'WISC-V',
 }
 
 const STATUS_LABELS: Record<string, string> = {
   completed: 'Completada',
-  in_progress: 'En progreso',
+  in_progress: 'En curso',
   scheduled: 'Agendada',
   cancelled: 'Cancelada',
+  completed_brief: 'Finalizado (breve)',
+  completed_extended: 'Finalizado (extendido)',
 }
 
-interface Props {
-  patient: Patient
-  onNewSession: (patientId: string) => void
-}
-
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   completed:   { bg: '#EFF6FF',  text: '#3B82F6' },
   in_progress: { bg: '#FEF3C7',  text: '#D97706' },
   scheduled:   { bg: '#EFF6FF',  text: '#3B82F6' },
   cancelled:   { bg: '#FEE2E2',  text: '#DC2626' },
+  completed_brief: { bg: '#D1FAE5', text: '#059669' },
+  completed_extended: { bg: '#D1FAE5', text: '#059669' },
 }
 
-const GENDER_ICON = {
+const GENDER_ICON: Record<string, string> = {
   M:  '♂',
   F:  '♀',
   NB: '⚧',
@@ -40,6 +65,7 @@ const GENDER_ICON = {
 export function PatientCard({ patient, onNewSession }: Props) {
   const s = patient.latest_session
   const statusColor = s ? STATUS_COLORS[s.status] : null
+  const statusLabel = s ? (STATUS_LABELS[s.status] || s.status) : null
 
   return (
     <div className="group bg-white rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 overflow-hidden">
@@ -60,7 +86,7 @@ export function PatientCard({ patient, onNewSession }: Props) {
                 </span>
                 {patient.gender && (
                   <span className="text-xs text-gray-400">
-                    · {GENDER_ICON[patient.gender as keyof typeof GENDER_ICON]}
+                    · {GENDER_ICON[patient.gender]}
                   </span>
                 )}
                 {patient.school && (
@@ -86,12 +112,12 @@ export function PatientCard({ patient, onNewSession }: Props) {
               <span className="text-xs font-semibold text-gray-700">
                 {TEST_LABELS[s.test_id] ?? s.test_id}
               </span>
-              {statusColor && (
+              {statusColor && statusLabel && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full font-medium"
                   style={{ background: statusColor.bg, color: statusColor.text }}
                 >
-                  {STATUS_LABELS[s.status]}
+                  {statusLabel}
                 </span>
               )}
             </div>
@@ -103,6 +129,14 @@ export function PatientCard({ patient, onNewSession }: Props) {
                 Continuar →
               </Link>
             )}
+            {(s.status === 'completed_brief' || s.status === 'completed_extended') && (
+              <Link
+                href={`/resultados/wisc5?session=${s.id}&type=${s.status === 'completed_brief' ? 'brief' : 'extended'}`}
+                className="text-xs font-medium text-green-600 hover:text-green-700 transition-colors"
+              >
+                Ver informe →
+              </Link>
+            )}
           </div>
         ) : (
           <p className="mt-3 text-xs text-gray-400">
@@ -111,7 +145,7 @@ export function PatientCard({ patient, onNewSession }: Props) {
         )}
       </div>
 
-      {/* Acciones - 3 botones centrados verticalmente */}
+      {/* Acciones - 3 botones */}
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button

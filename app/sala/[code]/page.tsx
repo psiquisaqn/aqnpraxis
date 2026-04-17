@@ -26,20 +26,23 @@ export default function SalaDisplayPage() {
   useEffect(() => {
     const findSession = async () => {
       console.log('Buscando sala con código:', code)
+      console.log('Código en mayúsculas:', code.toUpperCase())
       
       const { data, error } = await supabase
         .from('dual_sessions')
         .select('id, session_id, screen2_device_id')
         .eq('room_code', code.toUpperCase())
         .eq('is_active', true)
-        .maybeSingle()  // ← Cambiado de .single() a .maybeSingle()
+        .maybeSingle()
 
-      console.log('Resultado:', { data, error })
+      console.log('Resultado búsqueda:', { data, error })
 
       if (error || !data) {
+        console.log('Error o no se encontró sala:', error?.message)
         setError('Código inválido o sesión no encontrada')
         setWaiting(false)
       } else {
+        console.log('Sala encontrada, ID:', data.id)
         setDualSessionId(data.id)
       }
     }
@@ -51,17 +54,19 @@ export default function SalaDisplayPage() {
 
   // Escuchar comandos del psicólogo
   const { sendMessage, connected } = useRealtime(dualSessionId || '', (payload) => {
+    console.log('Mensaje recibido en display:', payload)
     if (payload.type === 'update_display') {
       setCurrentDisplay(payload.content)
       setWaiting(false)
     }
   })
 
-  // Cuando el canal esta conectado, avisar al control
+  // Cuando el canal está conectado, avisar al control
   const displayReadySent = useRef(false)
   useEffect(() => {
     if (!connected || !dualSessionId || displayReadySent.current) return
     displayReadySent.current = true
+    console.log('Display listo, enviando señal al control')
     sendMessage({ type: 'display_ready', message: 'Display listo' })
   }, [connected, dualSessionId, sendMessage])
 
@@ -204,9 +209,12 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V - Construcción con Cubos (CC)
+      // ============================================================
       case 'wisc5_cc':
         const stimulusNum = currentDisplay.stimulusNum || 1
-        const imagePath = `/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.jpg`
+        const imagePath = `/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.png`
         const isTwoAttempts = currentDisplay.twoAttempts || false
         const currentAttempt = currentDisplay.currentAttempt || 1
         const totalItems = currentDisplay.totalItems || 13
@@ -229,6 +237,7 @@ export default function SalaDisplayPage() {
                 alt={`Modelo ${stimulusNum}`}
                 className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-md"
                 onError={(e) => {
+                  console.error(`Error cargando imagen: ${imagePath}`)
                   e.currentTarget.src = '/placeholder-image.png'
                 }}
               />
@@ -266,6 +275,7 @@ export default function SalaDisplayPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+      {/* Botón flotante "Volver al panel principal" */}
       <div className="fixed top-4 right-4 z-50">
         <Link
           href="/dashboard"
