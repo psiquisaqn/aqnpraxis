@@ -198,6 +198,55 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V - Construcción con Cubos (CC)
+      // ============================================================
+      case 'wisc5_cc':
+        const stimulusNum = currentDisplay.stimulusNum || 1
+        const imagePath = `/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.jpg`
+        const isTwoAttempts = currentDisplay.twoAttempts || false
+        const currentAttempt = currentDisplay.currentAttempt || 1
+        const totalItems = currentDisplay.totalItems || 13
+        
+        return (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Construcción con Cubos</span>
+                <span>Ítem {stimulusNum}/{totalItems}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(stimulusNum / totalItems) * 100}%` }} />
+              </div>
+            </div>
+            
+            <div className="mb-8">
+              <img 
+                src={imagePath} 
+                alt={`Modelo ${stimulusNum}`}
+                className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-md"
+                onError={(e) => {
+                  e.currentTarget.src = '/placeholder-image.png'
+                }}
+              />
+            </div>
+            
+            <div className="text-gray-600 text-sm mb-4">
+              {currentDisplay.instructions || 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.'}
+            </div>
+            
+            {isTwoAttempts && (
+              <div className="text-xs text-gray-400">
+                Intento {currentAttempt} de 2
+              </div>
+            )}
+            
+            {currentDisplay.selected !== undefined && (
+              <p className="text-xs text-green-600 mt-4">✓ Respuesta registrada</p>
+            )}
+          </div>
+        )
+
       default:
         return (
           <div className="text-center">
