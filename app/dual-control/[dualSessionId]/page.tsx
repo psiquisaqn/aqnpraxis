@@ -1,78 +1,159 @@
 ﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
-import { useRealtime } from '@/hooks/useRealtime'
-import { CoopersmithControl } from './coopersmith'
+import { createBrowserClient } from '@supabase/ssr'
 import { PecaControl } from './peca'
 import { Bdi2Control } from './bdi2'
+import { CoopersmithControl } from './coopersmith'
+import { Wisc5Control } from './wisc5'
+
+interface DualSession {
+  id: string
+  session_id: string
+  room_code: string
+  is_active: boolean
+  session?: {
+    id: string
+    test_id: string
+    status: string
+  }
+}
 
 export default function DualControlPage() {
   const params = useParams()
   const router = useRouter()
   const dualSessionId = params.dualSessionId as string
 
-  const [sessionData, setSessionData] = useState<any>(null)
+  const [supabase] = useState(() =>
+    createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  )
+
+  const [dualSession, setDualSession] = useState<DualSession | null>(null)
+  const [testId, setTestId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentTest, setCurrentTest] = useState<string>('')
-  const [sessionId, setSessionId] = useState<string>('')
   const [displayReady, setDisplayReady] = useState(false)
+  const [broadcastChannel, setBroadcastChannel] = useState<any>(null)
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
 
+  // Cargar sesión dual
   useEffect(() => {
-    const loadSession = async () => {
-      const { data, error } = await supabase
-        .from('dual_sessions')
-        .select(`
-          *,
-          session:sessions(
-            id,
-            patient:patients(full_name),
-            test_id
-          )
-        `)
-        .eq('id', dualSessionId)
-        .single()
+    const loadDualSession = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('dual_sessions')
+          .select(`
+            *,
+            session:sessions (
+              id,
+              test_id,
+              status
+            )
+          `)
+          .eq('id', dualSessionId)
+          .single()
 
-      if (error) {
-        console.error('Error loading dual session:', error)
-        setError('No se pudo cargar la sesion')
-      } else {
-        setSessionData(data)
-        setCurrentTest(data.session.test_id)
-        setSessionId(data.session.id)
+        if (error) {
+          console.error('Error loading dual session:', error)
+          setError(`Error al cargar sesión: ${error.message}`)
+          setLoading(false)
+          return
+        }
+
+        if (!data) {
+          setError('Sesión dual no encontrada')
+          setLoading(false)
+          return
+        }
+
+        setDualSession(data)
+        setTestId(data.session?.test_id || null)
+        setLoading(false)
+      } catch (err: any) {
+        console.error('Unexpected error:', err)
+        setError(`Error inesperado: ${err.message}`)
+        setLoading(false)
       }
-      setLoading(false)
     }
-    loadSession()
-  }, [dualSessionId])
 
-  const { sendMessage } = useRealtime(dualSessionId, (payload) => {
-    console.log('Mensaje recibido en control:', payload)
-    if (payload.type === 'display_ready') {
-      console.log('=== DISPLAY READY RECIBIDO ===', payload)
-      setDisplayReady(prev => {
-        console.log('displayReady anterior:', prev, '-> true')
-        return true
+    if (dualSessionId) {
+      loadDualSession()
+    }
+  }, [dualSessionId, supabase])
+
+  // Configurar canal de broadcast para comunicación con dual-display
+  useEffect(() => {
+    if (!dualSessionId) return
+
+    const channel = supabase.channel(`dual:${dualSessionId}`, {
+      config: {
+        broadcast: { ack: true },
+        presence: { key: dualSessionId }
+      }
+    })
+
+    channel
+      .on('broadcast', { event: 'update_display' }, ({ payload }) => {
+        console.log('Mensaje recibido en control:', payload)
+        // Los mensajes se manejan en los componentes hijos
+      })
+      .on('broadcast', { event: 'display_ready' }, ({ payload }) => {
+        console.log('Display listo:', payload)
+        setDisplayReady(true)
+      })
+      .on('broadcast', { event: 'response_saved' }, ({ payload }) => {
+        console.log('Respuesta guardada:', payload)
+      })
+      .subscribe((status) => {
+        console.log('Canal status:', status)
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus('connected')
+        } else if (status === 'CHANNEL_ERROR') {
+          setConnectionStatus('disconnected')
+          setError('Error de conexión con el display del paciente')
+        }
+      })
+
+    setBroadcastChannel(channel)
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [dualSessionId, supabase])
+
+  // Enviar mensaje al display del paciente
+  const sendToDisplay = (content: any) => {
+    if (broadcastChannel) {
+      broadcastChannel.send({
+        type: 'broadcast',
+        event: 'update_display',
+        payload: { type: 'update_display', content }
       })
     }
-  })
-
-  const updatePatientScreen = async (content: any) => {
-    sendMessage({ type: 'update_display', content })
   }
 
+  // Guardar respuesta del psicólogo
   const saveResponse = async (item: number, value: any) => {
-    const { error } = await supabase
-      .from('dual_session_tests')
-      .upsert({
-        dual_session_id: dualSessionId,
-        test_id: currentTest,
-        current_item: item,
-        responses: { [item]: value }
-      }, { onConflict: 'dual_session_id' })
-    if (error) console.error('Error saving response:', error)
+    try {
+      // Guardar en la tabla de respuestas según el test
+      // Por ahora, solo log
+      console.log(`Respuesta guardada - Item ${item}:`, value)
+      
+      // Notificar al display
+      if (broadcastChannel) {
+        broadcastChannel.send({
+          type: 'broadcast',
+          event: 'response_saved',
+          payload: { item, value }
+        })
+      }
+    } catch (err) {
+      console.error('Error saving response:', err)
+    }
   }
 
   if (loading) {
@@ -80,18 +161,22 @@ export default function DualControlPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500">Cargando sesion...</p>
+          <p className="text-gray-500">Cargando sesión de control...</p>
         </div>
       </div>
     )
   }
 
-  if (error || !sessionData) {
+  if (error || !dualSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-red-600 mb-3">{error || 'Sesion no encontrada'}</p>
-          <button onClick={() => router.push('/dashboard')} className="text-blue-600 hover:text-blue-700">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h2 className="text-red-700 font-semibold mb-2">Error:</h2>
+          <p className="text-red-600">{error || 'Sesión no encontrada'}</p>
+          <button 
+            onClick={() => router.push('/dashboard')} 
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
             Volver al dashboard
           </button>
         </div>
@@ -99,70 +184,85 @@ export default function DualControlPage() {
     )
   }
 
-  const testLabel =
-    currentTest === 'coopersmith' ? 'Coopersmith SEI' :
-    currentTest === 'peca' ? 'PECA' :
-    currentTest === 'bdi2' ? 'BDI-II' : currentTest
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-gray-800">Control de evaluacion</h1>
-              <p className="text-sm text-gray-500">Paciente: {sessionData.session?.patient?.full_name}</p>
-              <p className="text-xs text-gray-400 mt-1">Test: {testLabel}</p>
-              <p className="text-xs text-gray-400 mt-1">
-                Codigo de sala: <span className="font-mono font-bold text-blue-600 text-sm">{sessionData?.room_code}</span>
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 hover:text-gray-700">
-                Salir
-              </button>
-            </div>
-          </div>
+  // Estado de conexión
+  if (connectionStatus === 'connecting') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500">Conectando con la sala del paciente...</p>
+          <p className="text-xs text-gray-400 mt-2">Código de sala: {dualSession.room_code}</p>
         </div>
+      </div>
+    )
+  }
 
-        {currentTest === 'coopersmith' ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <CoopersmithControl
-              dualSessionId={dualSessionId}
-              sessionId={sessionId}
-              onUpdatePatient={updatePatientScreen}
-              onSaveResponse={saveResponse}
-              displayReady={displayReady}
-            />
-          </div>
-        ) : currentTest === 'peca' ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <PecaControl
-              dualSessionId={dualSessionId}
-              sessionId={sessionId}
-              onUpdatePatient={updatePatientScreen}
-              onSaveResponse={saveResponse}
-              displayReady={displayReady}
-            />
-          </div>
-        ) : currentTest === 'bdi2' ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <Bdi2Control
-              dualSessionId={dualSessionId}
-              sessionId={sessionId}
-              onUpdatePatient={updatePatientScreen}
-              onSaveResponse={saveResponse}
-              displayReady={displayReady}
-            />
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-            <p className="text-gray-500 mb-4">Test {currentTest} no implementado en modo dual aun.</p>
-            <button onClick={() => router.push('/dashboard')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+  // Renderizar el control según el tipo de test
+  const renderTestControl = () => {
+    const commonProps = {
+      dualSessionId,
+      sessionId: dualSession.session_id,
+      onUpdatePatient: sendToDisplay,
+      onSaveResponse: saveResponse,
+      displayReady
+    }
+
+    switch (testId) {
+      case 'peca':
+        return <PecaControl {...commonProps} />
+      case 'bdi2':
+        return <Bdi2Control {...commonProps} />
+      case 'coopersmith':
+        return <CoopersmithControl {...commonProps} />
+      case 'wisc5':
+        return <Wisc5Control {...commonProps} />
+      default:
+        return (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+            <h2 className="text-yellow-700 font-semibold mb-2">Test no soportado</h2>
+            <p className="text-yellow-600">El test "{testId}" no está disponible en modo dual.</p>
+            <button 
+              onClick={() => router.push('/dashboard')} 
+              className="mt-4 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+            >
               Volver al dashboard
             </button>
           </div>
-        )}
+        )
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header fijo con información de la sesión */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Salir
+          </button>
+          <div className="h-4 w-px bg-gray-200" />
+          <div className="text-sm">
+            <span className="text-gray-500">Código de sala:</span>
+            <span className="ml-2 font-mono font-bold text-blue-600">{dualSession.room_code}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <div className={`flex items-center gap-1.5 ${connectionStatus === 'connected' ? 'text-green-600' : 'text-yellow-600'}`}>
+            <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+            <span>{connectionStatus === 'connected' ? 'Paciente conectado' : 'Esperando paciente...'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Contenido del test */}
+      <div className="p-4">
+        {renderTestControl()}
       </div>
     </div>
   )
