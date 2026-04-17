@@ -27,17 +27,9 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-12">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/isotipoaqnpraxis.png" 
-              alt="AQN Praxis" 
-              className="h-12 w-auto"
-            />
-            <span className="text-xl font-semibold text-gray-800">AQN Praxis</span>
-          </div>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Header - solo botones */}
+        <div className="flex justify-end items-center mb-8">
           <div className="flex gap-3">
             {session ? (
               <Link
@@ -65,14 +57,18 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Hero */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-            Plataforma de <span className="text-blue-600">Evaluación Psicológica</span>
-          </h1>
-          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-            Gestión de pacientes, aplicaciones de tests y generación de informes profesionales
-          </p>
+        {/* Hero - Isotipo centrado como título principal */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <img 
+              src="/isotipoaqnpraxis.png" 
+              alt="AQN Praxis" 
+              className="h-32 w-auto md:h-40"
+            />
+          </div>
+          <h2 className="text-sm md:text-base font-medium text-gray-500 tracking-wide">
+            Plataforma de Evaluación Psicológica
+          </h2>
         </div>
 
         {/* Botones de acceso rápido */}
