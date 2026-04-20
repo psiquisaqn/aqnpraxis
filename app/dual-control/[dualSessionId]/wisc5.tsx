@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { DualTestWrapper } from './DualTestWrapper'
@@ -147,7 +147,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isAct
 }
 
 // ============================================================
-// INTERFAZ PARA CONSTRUCCIÓN CON CUBOS (CC)
+// INTERFAZ PARA CONSTRUCCIÓN CON CUBOS (CC) - CON REACT.MEMO
 // ============================================================
 
 interface CcInterfaceProps {
@@ -156,7 +156,7 @@ interface CcInterfaceProps {
   patientAge: number
 }
 
-function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfaceProps) {
+const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfaceProps) {
   const [currentItemNum, setCurrentItemNum] = useState<number | null>(() => getStartingItem(patientAge))
   const [scores, setScores] = useState<Record<number, number>>({})
   const [attempts, setAttempts] = useState<Record<number, number>>({})
@@ -170,7 +170,8 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
   const [timeEnded, setTimeEnded] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
   
-  const lastSentItemRef = useRef<number | null>(null)
+  // Usar un Set para rastrear ítems ya enviados
+  const sentItemsRef = useRef<Set<number>>(new Set())
 
   const currentItem = CC_ITEMS_CONFIG.find(i => i.num === currentItemNum)
   const isTwoAttempts = currentItem?.twoAttempts || false
@@ -179,11 +180,11 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
   const bonusPoints = getBonusPoints(patientAge)
   const hasBonus = bonusPoints > 0
 
-  // Enviar estímulo al display solo cuando el ítem cambia
+  // Enviar estímulo al display solo una vez por ítem
   useEffect(() => {
     if (currentItem && !isCompleted && timerStarted) {
-      if (lastSentItemRef.current !== currentItem.num) {
-        lastSentItemRef.current = currentItem.num
+      if (!sentItemsRef.current.has(currentItem.num)) {
+        sentItemsRef.current.add(currentItem.num)
         console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
         onUpdatePatient({
           type: 'wisc5_cc',
@@ -220,9 +221,6 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
     console.log('📝 Registrando puntaje - Ítem:', currentItemNum, 'Puntaje:', score, 'Tiempo:', timeSeconds)
     const newScores = { ...scores, [currentItemNum!]: score }
     setScores(newScores)
-    
-    // Resetear el ref para el próximo ítem
-    lastSentItemRef.current = null
     
     if (checkSuspension(newScores)) {
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
@@ -340,7 +338,6 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
         {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo por fallo...</p>}
       </div>
 
-      {/* Vista del examinador (modelo invertido) */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <p className="text-sm font-medium text-gray-700 mb-2">Vista del examinador (modelo invertido)</p>
         <img 
@@ -352,7 +349,6 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
         <p className="text-xs text-gray-400 mt-2 text-center">Verifica que la construcción del paciente coincida con este modelo</p>
       </div>
 
-      {/* Cronómetro */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <Stopwatch
           key={stopwatchKey}
@@ -417,7 +413,7 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
       </div>
     </div>
   )
-}
+})
 
 // ============================================================
 // PANEL DE SUBPRUEBAS
