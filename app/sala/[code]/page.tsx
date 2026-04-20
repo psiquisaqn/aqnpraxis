@@ -71,8 +71,9 @@ export default function SalaDisplayPage() {
 
   // Escuchar comandos del psicólogo
   const { sendMessage, connected } = useRealtime(dualSessionId || '', (payload) => {
-    console.log('Mensaje recibido en display:', payload)
+    console.log('📨 Mensaje recibido en display:', payload)
     if (payload.type === 'update_display') {
+      console.log('🖥️ Actualizando display con:', payload.content)
       setCurrentDisplay(payload.content)
       setWaiting(false)
     }
@@ -83,9 +84,17 @@ export default function SalaDisplayPage() {
   useEffect(() => {
     if (!connected || !dualSessionId || displayReadySent.current) return
     displayReadySent.current = true
-    console.log('Display listo, enviando señal al control')
+    console.log('📡 Display listo, enviando señal al control')
+    console.log('   dualSessionId:', dualSessionId)
     sendMessage({ type: 'display_ready', message: 'Display listo' })
   }, [connected, dualSessionId, sendMessage])
+
+  // Verificar conexión WebSocket
+  useEffect(() => {
+    if (dualSessionId) {
+      console.log('🔌 Conectando al canal:', dualSessionId)
+    }
+  }, [dualSessionId])
 
   if (error) {
     return (
@@ -234,6 +243,8 @@ export default function SalaDisplayPage() {
         const currentAttempt = currentDisplay.currentAttempt || 1
         const totalItems = currentDisplay.totalItems || 13
         
+        console.log('🎨 Renderizando CC - Ítem:', stimulusNum, 'Imagen:', imagePath)
+        
         return (
           <div className="text-center">
             <div className="mb-6">
@@ -252,9 +263,10 @@ export default function SalaDisplayPage() {
                 alt={`Modelo ${stimulusNum}`}
                 className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-md"
                 onError={(e) => {
-                  console.error(`Error cargando imagen: ${imagePath}`)
+                  console.error(`❌ Error cargando imagen: ${imagePath}`)
                   e.currentTarget.src = '/placeholder-image.png'
                 }}
+                onLoad={() => console.log(`✅ Imagen cargada: ${imagePath}`)}
               />
             </div>
             
@@ -326,7 +338,7 @@ export default function SalaDisplayPage() {
             <div className="text-4xl mb-4">⚠️</div>
             <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
             <p className="text-gray-400 text-sm">
-              La evaluación no ha comenzado. Contacta al especialista.
+              La evaluación no ha comenzado. Contacta al psicólogo.
             </p>
           </div>
         )}

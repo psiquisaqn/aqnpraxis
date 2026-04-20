@@ -112,7 +112,12 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isAct
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [isRunning, isActive, seconds, timeLimit, onTimeUpdate, onTimeEnd])
 
-  const startTimer = () => { setIsRunning(true); onStart?.() }
+  const startTimer = () => { 
+    console.log('⏱️ Cronómetro iniciado manualmente')
+    setIsRunning(true)
+    onStart?.()
+  }
+  
   const formatTime = (totalSeconds: number): string => {
     const mins = Math.floor(totalSeconds / 60)
     const secs = totalSeconds % 60
@@ -172,8 +177,12 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
   const bonusPoints = getBonusPoints(patientAge)
   const hasBonus = bonusPoints > 0
 
+  // Enviar estímulo al display cuando cambia el ítem o se inicia el timer
   useEffect(() => {
     if (currentItem && !isCompleted && timerStarted) {
+      console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
+      console.log('   timerStarted:', timerStarted)
+      console.log('   isCompleted:', isCompleted)
       onUpdatePatient({
         type: 'wisc5_cc',
         stimulusNum: currentItem.num,
@@ -205,6 +214,7 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
   }, [elapsedTime, isTimeBased, currentItem, isPaused, isCompleted, timerStarted, timeEnded])
 
   const handleScore = (score: number, timeSeconds?: number) => {
+    console.log('📝 Registrando puntaje - Ítem:', currentItemNum, 'Puntaje:', score, 'Tiempo:', timeSeconds)
     const newScores = { ...scores, [currentItemNum!]: score }
     setScores(newScores)
     if (checkSuspension(newScores)) {
@@ -218,6 +228,7 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
     if (score === 0 && patientAge >= 8) {
       nextItem = getNextItemOnFailure(currentItemNum!, newScores)
       if (nextItem) {
+        console.log('⬅️ Retrocediendo al ítem:', nextItem, 'por fallo')
         setIsGoingBack(true)
         setCurrentItemNum(nextItem)
         setTimerStarted(false)
@@ -238,9 +249,11 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
     
     if (nextItem > 13) {
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
+      console.log('✅ Subprueba completada. Total:', total)
       setIsCompleted(true)
       onComplete(newScores, total)
     } else {
+      console.log('➡️ Avanzando al ítem:', nextItem)
       setCurrentItemNum(nextItem)
       setTimerStarted(false)
       setTimeEnded(false)
@@ -254,6 +267,7 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
   }
 
   const handleRetry = () => {
+    console.log('🔄 Segundo intento para el ítem:', currentItemNum)
     setAttempts({ ...attempts, [currentItemNum!]: 2 })
     setShowRetryButton(false)
     setTimerStarted(true)
@@ -264,8 +278,16 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
     setAvailableScores([])
   }
 
-  const handleTimeEnd = () => setTimeEnded(true)
-  const handleStartTimer = () => { setTimerStarted(true); setTimeEnded(false) }
+  const handleTimeEnd = () => {
+    console.log('⏰ Tiempo finalizado para el ítem:', currentItemNum)
+    setTimeEnded(true)
+  }
+
+  const handleStartTimer = () => {
+    console.log('▶️ Iniciando timer para el ítem:', currentItemNum)
+    setTimerStarted(true)
+    setTimeEnded(false)
+  }
 
   if (!currentItem) return null
 
@@ -641,11 +663,15 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
   const handleCcComplete = (itemScores: Record<number, number>, rawTotal: number) => {
     const effectiveCode = substitutionUsed ? 'RV' : 'CC'
+    console.log('✅ Subprueba CC completada. Puntaje bruto:', rawTotal)
     setRawScores({ ...rawScores, [effectiveCode]: rawTotal })
     setSubtestStatus(prev => ({ ...prev, [effectiveCode]: 'completed' }))
     if (ageInfo?.group) {
       fetchScaledScore(effectiveCode, rawTotal, ageInfo.group).then(scaled => {
-        if (scaled) setScaledScores({ ...scaledScores, [effectiveCode]: scaled })
+        if (scaled) {
+          console.log('📊 Puntaje escalado para', effectiveCode, ':', scaled)
+          setScaledScores({ ...scaledScores, [effectiveCode]: scaled })
+        }
       })
     }
     saveState('in_progress')
@@ -654,7 +680,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   }
 
   const handleSelectSubtest = (code: string) => {
-    // Por ahora solo CC tiene interfaz
+    console.log('🔘 Subprueba seleccionada:', code)
     if (code === 'CC' || (code === 'RV' && substitutionUsed)) {
       setActiveSubtest('CC')
       setShowSubtestPanel(false)
@@ -664,6 +690,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   }
 
   const handleToggleSubstitution = (useRV: boolean) => {
+    console.log('🔄 Sustitución CC → RV:', useRV)
     setSubstitutionUsed(useRV)
     if (useRV && subtestStatus['CC'] === 'completed') {
       if (rawScores.CC) setRawScores({ ...rawScores, RV: rawScores.CC, CC: undefined })
@@ -691,18 +718,21 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
   const generateBriefReport = async () => {
     if (!arePrimarySubtestsCompleted()) return
+    console.log('📄 Generando informe breve')
     await saveState('completed_brief', 'brief')
     router.push(`/resultados/wisc5?session=${sessionId}&type=brief`)
   }
 
   const generateExtendedReport = async () => {
     if (!areAllSubtestsCompleted()) return
+    console.log('📄 Generando informe extendido')
     await saveState('completed_extended', 'extended')
     router.push(`/resultados/wisc5?session=${sessionId}&type=extended`)
   }
 
   const handleStartTest = () => {
     if (!birthDate) { setError('Por favor, ingresa la fecha de nacimiento del paciente'); return }
+    console.log('🎯 Iniciando evaluación WISC-V')
     setShowQuestionZero(false)
     setError(null)
     setShowSubtestPanel(true)
