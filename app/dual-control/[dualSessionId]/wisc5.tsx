@@ -147,7 +147,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isAct
 }
 
 // ============================================================
-// INTERFAZ PARA CONSTRUCCIÓN CON CUBOS (CC) - CON REACT.MEMO
+// INTERFAZ PARA CONSTRUCCIÓN CON CUBOS (CC) - CON REFERENCIAS ESTABLES
 // ============================================================
 
 interface CcInterfaceProps {
@@ -170,8 +170,16 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   const [timeEnded, setTimeEnded] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
   
-  // Usar un Set para rastrear ítems ya enviados
+  // Referencias estables
   const sentItemsRef = useRef<Set<number>>(new Set())
+  const onCompleteRef = useRef(onComplete)
+  const onUpdatePatientRef = useRef(onUpdatePatient)
+
+  // Actualizar referencias cuando cambian las props
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+    onUpdatePatientRef.current = onUpdatePatient
+  }, [onComplete, onUpdatePatient])
 
   const currentItem = CC_ITEMS_CONFIG.find(i => i.num === currentItemNum)
   const isTwoAttempts = currentItem?.twoAttempts || false
@@ -180,13 +188,13 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   const bonusPoints = getBonusPoints(patientAge)
   const hasBonus = bonusPoints > 0
 
-  // Enviar estímulo al display solo una vez por ítem
+  // Enviar estímulo al display usando referencias estables
   useEffect(() => {
     if (currentItem && !isCompleted && timerStarted) {
       if (!sentItemsRef.current.has(currentItem.num)) {
         sentItemsRef.current.add(currentItem.num)
         console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
-        onUpdatePatient({
+        onUpdatePatientRef.current({
           type: 'wisc5_cc',
           stimulusNum: currentItem.num,
           instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
@@ -196,7 +204,7 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
         })
       }
     }
-  }, [currentItemNum, currentItem, isCompleted, timerStarted, onUpdatePatient, isTwoAttempts, currentAttempt])
+  }, [currentItemNum, currentItem, isCompleted, timerStarted, isTwoAttempts, currentAttempt])
 
   const checkSuspension = (newScores: Record<number, number>): boolean => {
     const items = Object.keys(newScores).map(Number).sort((a, b) => a - b)
@@ -225,7 +233,7 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
     if (checkSuspension(newScores)) {
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
       setIsCompleted(true)
-      onComplete(newScores, total)
+      onCompleteRef.current(newScores, total)
       return
     }
     
@@ -256,7 +264,7 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
       console.log('✅ Subprueba completada. Total:', total)
       setIsCompleted(true)
-      onComplete(newScores, total)
+      onCompleteRef.current(newScores, total)
     } else {
       console.log('➡️ Avanzando al ítem:', nextItem)
       setCurrentItemNum(nextItem)
