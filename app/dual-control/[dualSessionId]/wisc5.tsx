@@ -77,16 +77,17 @@ const getNextItemOnFailure = (failedItem: number, currentScores: Record<number, 
 }
 
 // ============================================================
-// COMPONENTE DE CRONÓMETRO - VERSIÓN SIMPLIFICADA
+// COMPONENTE DE CRONÓMETRO
 // ============================================================
 
 interface StopwatchProps {
   timeLimit: number
   onTimeUpdate: (seconds: number) => void
   onTimeEnd: () => void
+  onStart?: () => void
 }
 
-function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd }: StopwatchProps) {
+function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchProps) {
   const [seconds, setSeconds] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -118,6 +119,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd }: StopwatchProps) {
     console.log('⏱️ Cronómetro iniciado manualmente')
     setSeconds(0)
     setIsRunning(true)
+    onStart?.()
   }
 
   const formatTime = (totalSeconds: number): string => {
@@ -277,6 +279,21 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
     setTimeEnded(true)
   }
 
+  const sendStimulus = () => {
+    if (!sentItemsRef.current.has(currentItem.num)) {
+      sentItemsRef.current.add(currentItem.num)
+      console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
+      onUpdatePatientRef.current({
+        type: 'wisc5_cc',
+        stimulusNum: currentItem.num,
+        instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
+        twoAttempts: isTwoAttempts,
+        currentAttempt: currentAttempt,
+        totalItems: CC_ITEMS_CONFIG.length
+      })
+    }
+  }
+
   if (!currentItem) return null
 
   if (isCompleted) {
@@ -340,21 +357,9 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
           timeLimit={currentItem.timeLimit}
           onTimeUpdate={(seconds) => {
             setElapsedTime(seconds)
-            // Enviar estímulo al display cuando se inicia el tiempo
-            if (!sentItemsRef.current.has(currentItem.num)) {
-              sentItemsRef.current.add(currentItem.num)
-              console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
-              onUpdatePatientRef.current({
-                type: 'wisc5_cc',
-                stimulusNum: currentItem.num,
-                instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
-                twoAttempts: isTwoAttempts,
-                currentAttempt: currentAttempt,
-                totalItems: CC_ITEMS_CONFIG.length
-              })
-            }
           }}
           onTimeEnd={handleTimeEnd}
+          onStart={sendStimulus}
         />
       </div>
 
