@@ -1,8 +1,9 @@
 ﻿'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { useRealtime } from '@/hooks/useRealtime'
 import { PecaControl } from './peca'
 import { Bdi2Control } from './bdi2'
 import { CoopersmithControl } from './coopersmith'
@@ -37,13 +38,21 @@ export default function DualControlPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [displayReady, setDisplayReady] = useState(false)
-  const [broadcastChannel, setBroadcastChannel] = useState<any>(null)
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
+
+  // Usar el hook useRealtime para la comunicación
+  const { sendMessage, connected } = useRealtime(dualSessionId || '', (payload) => {
+    console.log('📨 Mensaje recibido en control:', payload)
+    if (payload.type === 'display_ready') {
+      console.log('✅ Display listo!')
+      setDisplayReady(true)
+    }
+  })
 
   // Cargar sesión dual
   useEffect(() => {
     const loadDualSession = async () => {
       try {
+        console.log('📋 Cargando sesión dual:', dualSessionId)
         const { data, error } = await supabase
           .from('dual_sessions')
           .select(`
@@ -70,6 +79,7 @@ export default function DualControlPage() {
           return
         }
 
+        console.log('✅ Sesión dual cargada:', data)
         setDualSession(data)
         setTestId(data.session?.test_id || null)
         setLoading(false)
@@ -85,72 +95,17 @@ export default function DualControlPage() {
     }
   }, [dualSessionId, supabase])
 
-  // Configurar canal de broadcast para comunicación con dual-display
-  useEffect(() => {
-    if (!dualSessionId) return
-
-    const channel = supabase.channel(`dual:${dualSessionId}`, {
-      config: {
-        broadcast: { ack: true },
-        presence: { key: dualSessionId }
-      }
-    })
-
-    channel
-      .on('broadcast', { event: 'update_display' }, ({ payload }) => {
-        console.log('Mensaje recibido en control:', payload)
-        // Los mensajes se manejan en los componentes hijos
-      })
-      .on('broadcast', { event: 'display_ready' }, ({ payload }) => {
-        console.log('Display listo:', payload)
-        setDisplayReady(true)
-      })
-      .on('broadcast', { event: 'response_saved' }, ({ payload }) => {
-        console.log('Respuesta guardada:', payload)
-      })
-      .subscribe((status) => {
-        console.log('Canal status:', status)
-        if (status === 'SUBSCRIBED') {
-          setConnectionStatus('connected')
-        } else if (status === 'CHANNEL_ERROR') {
-          setConnectionStatus('disconnected')
-          setError('Error de conexión con el display del paciente')
-        }
-      })
-
-    setBroadcastChannel(channel)
-
-    return () => {
-      channel.unsubscribe()
-    }
-  }, [dualSessionId, supabase])
-
   // Enviar mensaje al display del paciente
   const sendToDisplay = (content: any) => {
-    if (broadcastChannel) {
-      broadcastChannel.send({
-        type: 'broadcast',
-        event: 'update_display',
-        payload: { type: 'update_display', content }
-      })
-    }
+    console.log('📤 Enviando mensaje al display:', content)
+    sendMessage({ type: 'update_display', content })
   }
 
   // Guardar respuesta del psicólogo
   const saveResponse = async (item: number, value: any) => {
     try {
-      // Guardar en la tabla de respuestas según el test
-      // Por ahora, solo log
-      console.log(`Respuesta guardada - Item ${item}:`, value)
-      
-      // Notificar al display
-      if (broadcastChannel) {
-        broadcastChannel.send({
-          type: 'broadcast',
-          event: 'response_saved',
-          payload: { item, value }
-        })
-      }
+      console.log(`💾 Respuesta guardada - Item ${item}:`, value)
+      sendMessage({ type: 'response_saved', item, value })
     } catch (err) {
       console.error('Error saving response:', err)
     }
@@ -179,19 +134,6 @@ export default function DualControlPage() {
           >
             Volver al dashboard
           </button>
-        </div>
-      </div>
-    )
-  }
-
-  // Estado de conexión
-  if (connectionStatus === 'connecting') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500">Conectando con la sala del paciente...</p>
-          <p className="text-xs text-gray-400 mt-2">Código de sala: {dualSession.room_code}</p>
         </div>
       </div>
     )
@@ -253,10 +195,13 @@ export default function DualControlPage() {
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <div className={`flex items-center gap-1.5 ${connectionStatus === 'connected' ? 'text-green-600' : 'text-yellow-600'}`}>
-            <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-            <span>{connectionStatus === 'connected' ? 'Paciente conectado' : 'Esperando paciente...'}</span>
+          <div className={`flex items-center gap-1.5 ${connected ? 'text-green-600' : 'text-yellow-600'}`}>
+            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+            <span>{connected ? 'Paciente conectado' : 'Esperando paciente...'}</span>
           </div>
+          {displayReady && (
+            <span className="text-green-600 text-xs">✓ Display listo</span>
+          )}
         </div>
       </div>
 
