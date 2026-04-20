@@ -25,25 +25,42 @@ export default function SalaDisplayPage() {
   // Buscar sesión dual por código
   useEffect(() => {
     const findSession = async () => {
-      console.log('Buscando sala con código:', code)
-      console.log('Código en mayúsculas:', code.toUpperCase())
+      const cleanCode = code.trim().toUpperCase()
+      console.log('=== BÚSQUEDA DE SALA ===')
+      console.log('Código original:', code)
+      console.log('Código limpio:', cleanCode)
+      console.log('Longitud del código:', cleanCode.length)
       
-      const { data, error } = await supabase
-        .from('dual_sessions')
-        .select('id, session_id, screen2_device_id')
-        .eq('room_code', code.toUpperCase())
-        .eq('is_active', true)
-        .maybeSingle()
+      try {
+        const { data, error, status } = await supabase
+          .from('dual_sessions')
+          .select('*')
+          .eq('room_code', cleanCode)
+          .eq('is_active', true)
+          .maybeSingle()
 
-      console.log('Resultado búsqueda:', { data, error })
+        console.log('Status HTTP:', status)
+        console.log('Data:', data)
+        console.log('Error:', error)
 
-      if (error || !data) {
-        console.log('Error o no se encontró sala:', error?.message)
-        setError('Código inválido o sesión no encontrada')
+        if (error) {
+          console.error('Error en consulta:', error)
+          setError(`Error: ${error.message}`)
+          setWaiting(false)
+        } else if (!data) {
+          console.log('No se encontró sala con código:', cleanCode)
+          setError(`No se encontró sala con código "${cleanCode}"`)
+          setWaiting(false)
+        } else {
+          console.log('✅ Sala encontrada! ID:', data.id)
+          console.log('Room code de la BD:', data.room_code)
+          console.log('is_active:', data.is_active)
+          setDualSessionId(data.id)
+        }
+      } catch (err) {
+        console.error('Error inesperado:', err)
+        setError('Error al conectar con el servidor')
         setWaiting(false)
-      } else {
-        console.log('Sala encontrada, ID:', data.id)
-        setDualSessionId(data.id)
       }
     }
 
@@ -76,9 +93,7 @@ export default function SalaDisplayPage() {
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
           <div className="text-4xl mb-3">⚠️</div>
           <h2 className="text-xl font-medium text-gray-700 mb-2">Código inválido</h2>
-          <p className="text-gray-400 text-sm mb-4">
-            No se encontró una evaluación activa con este código.
-          </p>
+          <p className="text-gray-400 text-sm mb-4">{error}</p>
           <Link
             href="/sala"
             className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
@@ -311,7 +326,7 @@ export default function SalaDisplayPage() {
             <div className="text-4xl mb-4">⚠️</div>
             <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
             <p className="text-gray-400 text-sm">
-              La evaluación no ha comenzado. Contacta al psicólogo.
+              La evaluación no ha comenzado. Contacta al especialista.
             </p>
           </div>
         )}
