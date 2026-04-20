@@ -77,50 +77,55 @@ const getNextItemOnFailure = (failedItem: number, currentScores: Record<number, 
 }
 
 // ============================================================
-// COMPONENTE DE CRONÓMETRO
+// COMPONENTE DE CRONÓMETRO - VERSIÓN SIMPLIFICADA
 // ============================================================
 
 interface StopwatchProps {
   timeLimit: number
-  onTimeUpdate?: (seconds: number) => void
-  onTimeEnd?: () => void
-  onStart?: () => void
+  onTimeUpdate: (seconds: number) => void
+  onTimeEnd: () => void
 }
 
-function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchProps) {
+function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd }: StopwatchProps) {
   const [seconds, setSeconds] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    if (isRunning && seconds < timeLimit) {
+    if (isRunning) {
       intervalRef.current = setInterval(() => {
         setSeconds(prev => {
           const newSeconds = prev + 1
-          onTimeUpdate?.(newSeconds)
+          onTimeUpdate(newSeconds)
           if (newSeconds >= timeLimit) {
             setIsRunning(false)
-            onTimeEnd?.()
+            onTimeEnd()
             return timeLimit
           }
           return newSeconds
         })
       }, 1000)
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [isRunning, seconds, timeLimit, onTimeUpdate, onTimeEnd])
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [isRunning, timeLimit, onTimeUpdate, onTimeEnd])
 
-  const startTimer = () => { 
+  const startTimer = () => {
     console.log('⏱️ Cronómetro iniciado manualmente')
+    setSeconds(0)
     setIsRunning(true)
-    onStart?.()
   }
-  
+
   const formatTime = (totalSeconds: number): string => {
     const mins = Math.floor(totalSeconds / 60)
     const secs = totalSeconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
+
   const getProgressPercent = (): number => Math.min((seconds / timeLimit) * 100, 100)
 
   if (!isRunning && seconds === 0) {
@@ -160,11 +165,10 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   const [attempts, setAttempts] = useState<Record<number, number>>({})
   const [showRetryButton, setShowRetryButton] = useState(false)
   const [elapsedTime, setElapsedTime] = useState(0)
-  const [stopwatchKey, setStopwatchKey] = useState(0)
+  const [cronometroKey, setCronometroKey] = useState(0)
   const [availableScores, setAvailableScores] = useState<number[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
-  const [timerStarted, setTimerStarted] = useState(false)
   const [timeEnded, setTimeEnded] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
   
@@ -186,24 +190,6 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   const bonusPoints = getBonusPoints(patientAge)
   const hasBonus = bonusPoints > 0
 
-  // Enviar estímulo al display cuando se inicia el timer
-  useEffect(() => {
-    if (currentItem && !isCompleted && timerStarted) {
-      if (!sentItemsRef.current.has(currentItem.num)) {
-        sentItemsRef.current.add(currentItem.num)
-        console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
-        onUpdatePatientRef.current({
-          type: 'wisc5_cc',
-          stimulusNum: currentItem.num,
-          instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
-          twoAttempts: isTwoAttempts,
-          currentAttempt: currentAttempt,
-          totalItems: CC_ITEMS_CONFIG.length
-        })
-      }
-    }
-  }, [currentItemNum, currentItem, isCompleted, timerStarted, isTwoAttempts, currentAttempt])
-
   const checkSuspension = (newScores: Record<number, number>): boolean => {
     const items = Object.keys(newScores).map(Number).sort((a, b) => a - b)
     if (items.length >= 2) {
@@ -214,14 +200,14 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   }
 
   useEffect(() => {
-    if (isTimeBased && currentItem?.scoresByTime && !isPaused && !isCompleted && timerStarted && !timeEnded) {
+    if (isTimeBased && currentItem?.scoresByTime && !isPaused && !isCompleted && !timeEnded) {
       const available: number[] = []
       for (const tier of currentItem.scoresByTime) {
         if (elapsedTime <= tier.maxTime) available.push(tier.score)
       }
       setAvailableScores(available)
     }
-  }, [elapsedTime, isTimeBased, currentItem, isPaused, isCompleted, timerStarted, timeEnded])
+  }, [elapsedTime, isTimeBased, currentItem, isPaused, isCompleted, timeEnded])
 
   const handleScore = (score: number, timeSeconds?: number) => {
     console.log('📝 Registrando puntaje - Ítem:', currentItemNum, 'Puntaje:', score, 'Tiempo:', timeSeconds)
@@ -242,10 +228,9 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
         console.log('⬅️ Retrocediendo al ítem:', nextItem, 'por fallo')
         setIsGoingBack(true)
         setCurrentItemNum(nextItem)
-        setTimerStarted(false)
         setTimeEnded(false)
         setElapsedTime(0)
-        setStopwatchKey(prev => prev + 1)
+        setCronometroKey(prev => prev + 1)
         setShowRetryButton(false)
         setIsPaused(false)
         setAvailableScores([])
@@ -266,10 +251,9 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
     } else {
       console.log('➡️ Avanzando al ítem:', nextItem)
       setCurrentItemNum(nextItem)
-      setTimerStarted(false)
       setTimeEnded(false)
       setElapsedTime(0)
-      setStopwatchKey(prev => prev + 1)
+      setCronometroKey(prev => prev + 1)
       setShowRetryButton(false)
       setIsPaused(false)
       setAvailableScores([])
@@ -281,10 +265,9 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
     console.log('🔄 Segundo intento para el ítem:', currentItemNum)
     setAttempts({ ...attempts, [currentItemNum!]: 2 })
     setShowRetryButton(false)
-    setTimerStarted(true)
     setTimeEnded(false)
     setElapsedTime(0)
-    setStopwatchKey(prev => prev + 1)
+    setCronometroKey(prev => prev + 1)
     setIsPaused(false)
     setAvailableScores([])
   }
@@ -292,12 +275,6 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   const handleTimeEnd = () => {
     console.log('⏰ Tiempo finalizado para el ítem:', currentItemNum)
     setTimeEnded(true)
-  }
-
-  const handleStartTimer = () => {
-    console.log('▶️ Iniciando timer para el ítem:', currentItemNum)
-    setTimerStarted(true)
-    setTimeEnded(false)
   }
 
   if (!currentItem) return null
@@ -358,22 +335,27 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
 
       {/* Cronómetro */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        {!timerStarted ? (
-          <Stopwatch
-            key={stopwatchKey}
-            timeLimit={currentItem.timeLimit}
-            onTimeUpdate={setElapsedTime}
-            onTimeEnd={handleTimeEnd}
-            onStart={handleStartTimer}
-          />
-        ) : (
-          <Stopwatch
-            key={stopwatchKey}
-            timeLimit={currentItem.timeLimit}
-            onTimeUpdate={setElapsedTime}
-            onTimeEnd={handleTimeEnd}
-          />
-        )}
+        <Stopwatch
+          key={cronometroKey}
+          timeLimit={currentItem.timeLimit}
+          onTimeUpdate={(seconds) => {
+            setElapsedTime(seconds)
+            // Enviar estímulo al display cuando se inicia el tiempo
+            if (!sentItemsRef.current.has(currentItem.num)) {
+              sentItemsRef.current.add(currentItem.num)
+              console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
+              onUpdatePatientRef.current({
+                type: 'wisc5_cc',
+                stimulusNum: currentItem.num,
+                instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
+                twoAttempts: isTwoAttempts,
+                currentAttempt: currentAttempt,
+                totalItems: CC_ITEMS_CONFIG.length
+              })
+            }
+          }}
+          onTimeEnd={handleTimeEnd}
+        />
       </div>
 
       {timeEnded && (
