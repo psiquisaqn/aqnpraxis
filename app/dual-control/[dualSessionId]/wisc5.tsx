@@ -77,7 +77,7 @@ const getNextItemOnFailure = (failedItem: number, currentScores: Record<number, 
 }
 
 // ============================================================
-// COMPONENTE DE CRONÓMETRO
+// COMPONENTE DE CRONÓMETRO - CON LOGS
 // ============================================================
 
 interface StopwatchProps {
@@ -94,11 +94,14 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchPro
 
   useEffect(() => {
     if (isRunning) {
+      console.log('⏱️ Cronómetro iniciando intervalo')
       intervalRef.current = setInterval(() => {
         setSeconds(prev => {
           const newSeconds = prev + 1
+          console.log('⏱️ Tiempo actual:', newSeconds)
           onTimeUpdate(newSeconds)
           if (newSeconds >= timeLimit) {
+            console.log('⏱️ Tiempo límite alcanzado')
             setIsRunning(false)
             onTimeEnd()
             return timeLimit
@@ -107,6 +110,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchPro
         })
       }, 1000)
     } else if (intervalRef.current) {
+      console.log('⏱️ Limpiando intervalo')
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
@@ -116,7 +120,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchPro
   }, [isRunning, timeLimit, onTimeUpdate, onTimeEnd])
 
   const startTimer = () => {
-    console.log('⏱️ Cronómetro iniciado manualmente')
+    console.log('⏱️ Cronómetro iniciado manualmente - startTimer()')
     setSeconds(0)
     setIsRunning(true)
     onStart?.()
@@ -356,6 +360,7 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
           key={cronometroKey}
           timeLimit={currentItem.timeLimit}
           onTimeUpdate={(seconds) => {
+            console.log('📡 onTimeUpdate recibido:', seconds)
             setElapsedTime(seconds)
           }}
           onTimeEnd={handleTimeEnd}
