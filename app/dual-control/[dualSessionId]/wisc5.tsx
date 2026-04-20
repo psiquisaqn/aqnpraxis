@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { DualTestWrapper } from './DualTestWrapper'
@@ -77,7 +77,7 @@ const getNextItemOnFailure = (failedItem: number, currentScores: Record<number, 
 }
 
 // ============================================================
-// COMPONENTE DE CRONÓMETRO - CON LOGS
+// COMPONENTE DE CRONÓMETRO
 // ============================================================
 
 interface StopwatchProps {
@@ -110,7 +110,6 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchPro
         })
       }, 1000)
     } else if (intervalRef.current) {
-      console.log('⏱️ Limpiando intervalo')
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
@@ -196,6 +195,32 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   const bonusPoints = getBonusPoints(patientAge)
   const hasBonus = bonusPoints > 0
 
+  // Callbacks estables con useCallback
+  const handleTimeUpdate = useCallback((seconds: number) => {
+    console.log('📡 onTimeUpdate recibido:', seconds)
+    setElapsedTime(seconds)
+  }, [])
+
+  const handleTimeEnd = useCallback(() => {
+    console.log('⏰ Tiempo finalizado para el ítem:', currentItemNum)
+    setTimeEnded(true)
+  }, [currentItemNum])
+
+  const sendStimulus = useCallback(() => {
+    if (currentItem && !sentItemsRef.current.has(currentItem.num)) {
+      sentItemsRef.current.add(currentItem.num)
+      console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
+      onUpdatePatientRef.current({
+        type: 'wisc5_cc',
+        stimulusNum: currentItem.num,
+        instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
+        twoAttempts: isTwoAttempts,
+        currentAttempt: currentAttempt,
+        totalItems: CC_ITEMS_CONFIG.length
+      })
+    }
+  }, [currentItem, isTwoAttempts, currentAttempt])
+
   const checkSuspension = (newScores: Record<number, number>): boolean => {
     const items = Object.keys(newScores).map(Number).sort((a, b) => a - b)
     if (items.length >= 2) {
@@ -278,26 +303,6 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
     setAvailableScores([])
   }
 
-  const handleTimeEnd = () => {
-    console.log('⏰ Tiempo finalizado para el ítem:', currentItemNum)
-    setTimeEnded(true)
-  }
-
-  const sendStimulus = () => {
-    if (!sentItemsRef.current.has(currentItem.num)) {
-      sentItemsRef.current.add(currentItem.num)
-      console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
-      onUpdatePatientRef.current({
-        type: 'wisc5_cc',
-        stimulusNum: currentItem.num,
-        instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
-        twoAttempts: isTwoAttempts,
-        currentAttempt: currentAttempt,
-        totalItems: CC_ITEMS_CONFIG.length
-      })
-    }
-  }
-
   if (!currentItem) return null
 
   if (isCompleted) {
@@ -359,10 +364,7 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
         <Stopwatch
           key={cronometroKey}
           timeLimit={currentItem.timeLimit}
-          onTimeUpdate={(seconds) => {
-            console.log('📡 onTimeUpdate recibido:', seconds)
-            setElapsedTime(seconds)
-          }}
+          onTimeUpdate={handleTimeUpdate}
           onTimeEnd={handleTimeEnd}
           onStart={sendStimulus}
         />
