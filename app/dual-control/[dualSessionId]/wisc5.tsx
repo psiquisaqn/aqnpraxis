@@ -84,18 +84,16 @@ interface StopwatchProps {
   timeLimit: number
   onTimeUpdate?: (seconds: number) => void
   onTimeEnd?: () => void
-  autoStart?: boolean
-  isActive?: boolean
   onStart?: () => void
 }
 
-function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isActive = true, onStart }: StopwatchProps) {
+function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchProps) {
   const [seconds, setSeconds] = useState(0)
-  const [isRunning, setIsRunning] = useState(autoStart && isActive)
+  const [isRunning, setIsRunning] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    if (isRunning && isActive && seconds < timeLimit) {
+    if (isRunning && seconds < timeLimit) {
       intervalRef.current = setInterval(() => {
         setSeconds(prev => {
           const newSeconds = prev + 1
@@ -110,7 +108,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isAct
       }, 1000)
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [isRunning, isActive, seconds, timeLimit, onTimeUpdate, onTimeEnd])
+  }, [isRunning, seconds, timeLimit, onTimeUpdate, onTimeEnd])
 
   const startTimer = () => { 
     console.log('⏱️ Cronómetro iniciado manualmente')
@@ -125,7 +123,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isAct
   }
   const getProgressPercent = (): number => Math.min((seconds / timeLimit) * 100, 100)
 
-  if (!isRunning && !autoStart && seconds === 0) {
+  if (!isRunning && seconds === 0) {
     return (
       <div className="text-center">
         <div className="text-3xl font-mono font-bold mb-2">{formatTime(0)}</div>
@@ -147,7 +145,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, autoStart = true, isAct
 }
 
 // ============================================================
-// INTERFAZ PARA CONSTRUCCIÓN CON CUBOS (CC) - CON REFERENCIAS ESTABLES
+// INTERFAZ PARA CONSTRUCCIÓN CON CUBOS (CC)
 // ============================================================
 
 interface CcInterfaceProps {
@@ -188,7 +186,7 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
   const bonusPoints = getBonusPoints(patientAge)
   const hasBonus = bonusPoints > 0
 
-  // Enviar estímulo al display usando referencias estables
+  // Enviar estímulo al display cuando se inicia el timer
   useEffect(() => {
     if (currentItem && !isCompleted && timerStarted) {
       if (!sentItemsRef.current.has(currentItem.num)) {
@@ -346,6 +344,7 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
         {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo por fallo...</p>}
       </div>
 
+      {/* Vista del examinador (modelo invertido) */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <p className="text-sm font-medium text-gray-700 mb-2">Vista del examinador (modelo invertido)</p>
         <img 
@@ -357,16 +356,24 @@ const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatien
         <p className="text-xs text-gray-400 mt-2 text-center">Verifica que la construcción del paciente coincida con este modelo</p>
       </div>
 
+      {/* Cronómetro */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <Stopwatch
-          key={stopwatchKey}
-          timeLimit={currentItem.timeLimit}
-          onTimeUpdate={setElapsedTime}
-          onTimeEnd={handleTimeEnd}
-          autoStart={false}
-          isActive={!showRetryButton && !isPaused && !scores[currentItem.num] && timerStarted && !timeEnded}
-          onStart={handleStartTimer}
-        />
+        {!timerStarted ? (
+          <Stopwatch
+            key={stopwatchKey}
+            timeLimit={currentItem.timeLimit}
+            onTimeUpdate={setElapsedTime}
+            onTimeEnd={handleTimeEnd}
+            onStart={handleStartTimer}
+          />
+        ) : (
+          <Stopwatch
+            key={stopwatchKey}
+            timeLimit={currentItem.timeLimit}
+            onTimeUpdate={setElapsedTime}
+            onTimeEnd={handleTimeEnd}
+          />
+        )}
       </div>
 
       {timeEnded && (
