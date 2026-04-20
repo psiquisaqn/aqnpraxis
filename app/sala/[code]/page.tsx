@@ -21,6 +21,10 @@ export default function SalaDisplayPage() {
   const [waiting, setWaiting] = useState(true)
   const [dualSessionId, setDualSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  
+  // Para evitar mensajes duplicados
+  const lastMessageRef = useRef<string | null>(null)
+  const displayReadySent = useRef(false)
 
   // Buscar sesión dual por código
   useEffect(() => {
@@ -29,32 +33,21 @@ export default function SalaDisplayPage() {
       console.log('=== BÚSQUEDA DE SALA ===')
       console.log('Código original:', code)
       console.log('Código limpio:', cleanCode)
-      console.log('Longitud del código:', cleanCode.length)
       
       try {
-        const { data, error, status } = await supabase
+        const { data, error } = await supabase
           .from('dual_sessions')
           .select('*')
           .eq('room_code', cleanCode)
           .eq('is_active', true)
           .maybeSingle()
 
-        console.log('Status HTTP:', status)
-        console.log('Data:', data)
-        console.log('Error:', error)
-
-        if (error) {
-          console.error('Error en consulta:', error)
-          setError(`Error: ${error.message}`)
-          setWaiting(false)
-        } else if (!data) {
-          console.log('No se encontró sala con código:', cleanCode)
-          setError(`No se encontró sala con código "${cleanCode}"`)
+        if (error || !data) {
+          console.log('No se encontró sala')
+          setError('Código inválido o sesión no encontrada')
           setWaiting(false)
         } else {
           console.log('✅ Sala encontrada! ID:', data.id)
-          console.log('Room code de la BD:', data.room_code)
-          console.log('is_active:', data.is_active)
           setDualSessionId(data.id)
         }
       } catch (err) {
@@ -69,9 +62,18 @@ export default function SalaDisplayPage() {
     }
   }, [code, supabase])
 
-  // Escuchar comandos del psicólogo
+  // Escuchar comandos del psicólogo - con prevención de duplicados
   const { sendMessage, connected } = useRealtime(dualSessionId || '', (payload) => {
     console.log('📨 Mensaje recibido en display:', payload)
+    
+    // Evitar procesar el mismo mensaje repetidamente
+    const messageKey = JSON.stringify(payload)
+    if (lastMessageRef.current === messageKey) {
+      console.log('⚠️ Mensaje duplicado ignorado')
+      return
+    }
+    lastMessageRef.current = messageKey
+    
     if (payload.type === 'update_display') {
       console.log('🖥️ Actualizando display con:', payload.content)
       setCurrentDisplay(payload.content)
@@ -79,22 +81,13 @@ export default function SalaDisplayPage() {
     }
   })
 
-  // Cuando el canal está conectado, avisar al control
-  const displayReadySent = useRef(false)
+  // Enviar display_ready solo una vez
   useEffect(() => {
     if (!connected || !dualSessionId || displayReadySent.current) return
     displayReadySent.current = true
-    console.log('📡 Display listo, enviando señal al control')
-    console.log('   dualSessionId:', dualSessionId)
+    console.log('📡 Enviando display_ready (única vez)')
     sendMessage({ type: 'display_ready', message: 'Display listo' })
   }, [connected, dualSessionId, sendMessage])
-
-  // Verificar conexión WebSocket
-  useEffect(() => {
-    if (dualSessionId) {
-      console.log('🔌 Conectando al canal:', dualSessionId)
-    }
-  }, [dualSessionId])
 
   if (error) {
     return (
@@ -103,10 +96,7 @@ export default function SalaDisplayPage() {
           <div className="text-4xl mb-3">⚠️</div>
           <h2 className="text-xl font-medium text-gray-700 mb-2">Código inválido</h2>
           <p className="text-gray-400 text-sm mb-4">{error}</p>
-          <Link
-            href="/sala"
-            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
-          >
+          <Link href="/sala" className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">
             Volver al inicio
           </Link>
         </div>
@@ -129,121 +119,12 @@ export default function SalaDisplayPage() {
     if (!currentDisplay) return null
 
     switch (currentDisplay.type) {
-      case 'coopersmith':
-        const progress = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 58)) * 100
-        return (
-          <div className="text-center">
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 mb-1">
-                <span>Progreso</span>
-                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 58}</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
-              </div>
-            </div>
-            <div className="text-sm text-gray-400 mb-4">
-              Ítem {currentDisplay.item} de {currentDisplay.totalItems || 58}
-            </div>
-            <div className="text-2xl font-medium text-gray-800 mb-6 leading-relaxed">
-              {currentDisplay.text}
-            </div>
-            <div className="flex gap-4 justify-center">
-              {currentDisplay.options?.map((opt: string, idx: number) => (
-                <div
-                  key={idx}
-                  className={`px-6 py-3 rounded-xl text-sm font-medium ${
-                    currentDisplay.selected === (idx === 0 ? 'igual' : 'diferente')
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                      : 'bg-gray-100 text-gray-500'
-                  }`}
-                >
-                  {opt}
-                </div>
-              ))}
-            </div>
-            {currentDisplay.selected && (
-              <p className="text-xs text-green-600 mt-6 flex items-center justify-center gap-1">
-                ✓ Respuesta registrada
-              </p>
-            )}
-          </div>
-        )
-
-      case 'bdi2':
-        const progressBdi = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 21)) * 100
-        return (
-          <div className="text-center">
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 mb-1">
-                <span>Progreso</span>
-                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 21}</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressBdi + '%' }} />
-              </div>
-            </div>
-            <div className="text-sm text-gray-400 mb-4">Item {currentDisplay.item} de {currentDisplay.totalItems || 21}</div>
-            <div className="text-xl font-medium text-gray-800 mb-6 leading-relaxed">{currentDisplay.label}</div>
-            <div className="space-y-3 max-w-md mx-auto">
-              {currentDisplay.options?.map((opt: any) => (
-                <div key={opt.value}
-                  className={"p-3 rounded-xl border text-sm " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}
-                >
-                  {opt.label}
-                </div>
-              ))}
-            </div>
-            {currentDisplay.selected !== undefined && <p className="text-xs text-green-600 mt-4">Respuesta registrada</p>}
-          </div>
-        )
-
-      case 'peca':
-        const progressPeca = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 45)) * 100
-        return (
-          <div className="text-center">
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 mb-1">
-                <span>Progreso</span>
-                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 45}</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressPeca + '%' }} />
-              </div>
-            </div>
-            <div className="text-sm text-gray-400 mb-6">Item {currentDisplay.item} de {currentDisplay.totalItems || 45}</div>
-            <div className="flex justify-between gap-6 mb-8">
-              <span className="flex-1 text-left text-lg font-medium text-gray-800">{currentDisplay.leftPhrase}</span>
-              <span className="text-gray-400 text-lg">vs</span>
-              <span className="flex-1 text-right text-lg font-medium text-gray-800">{currentDisplay.rightPhrase}</span>
-            </div>
-            <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto">
-              {currentDisplay.options?.map((opt: any) => (
-                <div key={opt.value}
-                  className={"p-3 rounded-xl border text-sm font-medium " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}
-                >
-                  {opt.value}
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-xs text-gray-400 mt-2 max-w-sm mx-auto px-2">
-              <span>Izquierda</span><span>Derecha</span>
-            </div>
-            {currentDisplay.selected && <p className="text-xs text-green-600 mt-4">Respuesta registrada</p>}
-          </div>
-        )
-
-      // ============================================================
-      // WISC-V - Construcción con Cubos (CC)
-      // ============================================================
       case 'wisc5_cc':
         const stimulusNum = currentDisplay.stimulusNum || 1
         const imagePath = `/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.png`
         const isTwoAttempts = currentDisplay.twoAttempts || false
         const currentAttempt = currentDisplay.currentAttempt || 1
         const totalItems = currentDisplay.totalItems || 13
-        
-        console.log('🎨 Renderizando CC - Ítem:', stimulusNum, 'Imagen:', imagePath)
         
         return (
           <div className="text-center">
@@ -263,10 +144,9 @@ export default function SalaDisplayPage() {
                 alt={`Modelo ${stimulusNum}`}
                 className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-md"
                 onError={(e) => {
-                  console.error(`❌ Error cargando imagen: ${imagePath}`)
+                  console.error(`Error cargando imagen: ${imagePath}`)
                   e.currentTarget.src = '/placeholder-image.png'
                 }}
-                onLoad={() => console.log(`✅ Imagen cargada: ${imagePath}`)}
               />
             </div>
             
@@ -275,9 +155,7 @@ export default function SalaDisplayPage() {
             </div>
             
             {isTwoAttempts && (
-              <div className="text-xs text-gray-400">
-                Intento {currentAttempt} de 2
-              </div>
+              <div className="text-xs text-gray-400">Intento {currentAttempt} de 2</div>
             )}
             
             {currentDisplay.selected !== undefined && (
@@ -302,12 +180,8 @@ export default function SalaDisplayPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
-      {/* Botón flotante "Volver al panel principal" */}
       <div className="fixed top-4 right-4 z-50">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-        >
+        <Link href="/dashboard" className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-md text-sm text-gray-700 hover:bg-gray-50 transition-colors">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M12 8H4M8 12L4 8L8 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -323,10 +197,8 @@ export default function SalaDisplayPage() {
         {waiting && !currentDisplay ? (
           <div className="text-center">
             <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl font-medium text-gray-700 mb-2">Esperando al psicólogo</h2>
-            <p className="text-gray-400 text-sm">
-              La evaluación comenzará en breve. Por favor, espera las instrucciones.
-            </p>
+            <h2 className="text-xl font-medium text-gray-700 mb-2">Aquí se verán los estímulos de la evaluación</h2>
+            <p className="text-gray-400 text-sm">La evaluación comenzará en breve. Por favor, espera las instrucciones.</p>
             <div className="mt-6 flex justify-center">
               <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
@@ -337,9 +209,7 @@ export default function SalaDisplayPage() {
           <div className="text-center">
             <div className="text-4xl mb-4">⚠️</div>
             <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
-            <p className="text-gray-400 text-sm">
-              La evaluación no ha comenzado. Contacta al psicólogo.
-            </p>
+            <p className="text-gray-400 text-sm">La evaluación no ha comenzado. Contacta al especialista.</p>
           </div>
         )}
       </div>
