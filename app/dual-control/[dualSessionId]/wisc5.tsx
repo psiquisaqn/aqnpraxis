@@ -169,6 +169,8 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
   const [timerStarted, setTimerStarted] = useState(false)
   const [timeEnded, setTimeEnded] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
+  
+  const lastSentItemRef = useRef<number | null>(null)
 
   const currentItem = CC_ITEMS_CONFIG.find(i => i.num === currentItemNum)
   const isTwoAttempts = currentItem?.twoAttempts || false
@@ -177,20 +179,21 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
   const bonusPoints = getBonusPoints(patientAge)
   const hasBonus = bonusPoints > 0
 
-  // Enviar estímulo al display cuando cambia el ítem o se inicia el timer
+  // Enviar estímulo al display solo cuando el ítem cambia
   useEffect(() => {
     if (currentItem && !isCompleted && timerStarted) {
-      console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
-      console.log('   timerStarted:', timerStarted)
-      console.log('   isCompleted:', isCompleted)
-      onUpdatePatient({
-        type: 'wisc5_cc',
-        stimulusNum: currentItem.num,
-        instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
-        twoAttempts: isTwoAttempts,
-        currentAttempt: currentAttempt,
-        totalItems: CC_ITEMS_CONFIG.length
-      })
+      if (lastSentItemRef.current !== currentItem.num) {
+        lastSentItemRef.current = currentItem.num
+        console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
+        onUpdatePatient({
+          type: 'wisc5_cc',
+          stimulusNum: currentItem.num,
+          instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
+          twoAttempts: isTwoAttempts,
+          currentAttempt: currentAttempt,
+          totalItems: CC_ITEMS_CONFIG.length
+        })
+      }
     }
   }, [currentItemNum, currentItem, isCompleted, timerStarted, onUpdatePatient, isTwoAttempts, currentAttempt])
 
@@ -217,6 +220,10 @@ function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfacePro
     console.log('📝 Registrando puntaje - Ítem:', currentItemNum, 'Puntaje:', score, 'Tiempo:', timeSeconds)
     const newScores = { ...scores, [currentItemNum!]: score }
     setScores(newScores)
+    
+    // Resetear el ref para el próximo ítem
+    lastSentItemRef.current = null
+    
     if (checkSuspension(newScores)) {
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
       setIsCompleted(true)
