@@ -57,55 +57,87 @@ interface SuggestionResult {
   suggestedScore: 0 | 1 | 2
   confidence: 'low' | 'medium' | 'high'
   reason?: string
+  disclaimer?: string
 }
 
 function suggestScore(response: string, word1: string, word2: string, isPractice: boolean): SuggestionResult {
+  const disclaimer = "⚠️ Esta sugerencia es automática. Consulte el manual del WISC-V y aplique su criterio profesional para la asignación definitiva del puntaje."
+
   if (isPractice) {
-    return { suggestedScore: 0, confidence: 'low', reason: 'Ítem de práctica - registrar manualmente' }
+    return { 
+      suggestedScore: 0, 
+      confidence: 'low', 
+      reason: 'Ítem de práctica - registrar manualmente',
+      disclaimer 
+    }
   }
 
   const normalizedResponse = normalizeText(response)
   if (!normalizedResponse) {
-    return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta vacía' }
+    return { 
+      suggestedScore: 0, 
+      confidence: 'low', 
+      reason: 'Respuesta vacía',
+      disclaimer 
+    }
   }
 
+  // Palabras clave para puntaje 2 (respuesta certera) - COMPLETO hasta ítem 23
   const highKeywords: Record<string, string[]> = {
-    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio', 'vegetal'],
-    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación', 'entretenimiento'],
-    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria', 'atuendo'],
-    'Agua-Leche': ['bebida', 'líquido', 'bebible', 'hidratante', 'bebestible'],
-    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador'],
-    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares'],
-    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo'],
-    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época', 'periodo'],
-    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia'],
-    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto'],
-    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo'],
-    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro'],
-    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro'],
-    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo'],
-    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico'],
-    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación'],
-    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo'],
-    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve'],
-    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar'],
-    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción'],
-    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición'],
-    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto'],
-    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida']
+    // Ítems 1-10
+    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio', 'vegetal', 'fruta tropical', 'alimento vegetal'],
+    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación', 'entretenimiento', 'objeto de juego'],
+    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria', 'atuendo', 'vestuario'],
+    'Agua-Leche': ['bebida', 'líquido', 'liquido', 'bebible', 'hidratante', 'bebestible', 'bebida liquida', 'lacteo', 'lácteo'],
+    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador', 'artrópodo', 'insecto volador'],
+    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares', 'parentela', 'miembro de la familia'],
+    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo', 'transportador', 'medio de desplazamiento'],
+    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época', 'periodo', 'estación del año'],
+    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia', 'disciplina deportiva', 'deporte olímpico'],
+    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto', 'sensación', 'estado emocional'],
+    // Ítems 11-15
+    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo', 'sabor básico', 'sensación gustativa'],
+    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro', 'articulación del cuerpo', 'parte del cuerpo'],
+    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro', 'cría animal', 'animal pequeño'],
+    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo', 'instrumento de medida', 'medidor'],
+    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico', 'manifestación artística', 'obra de arte'],
+    // Ítems 16-20
+    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación', 'estado del agua', 'cambio de estado'],
+    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo', 'ilusión', 'emoción positiva'],
+    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve', 'elemento natural', 'formación natural'],
+    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar', 'ubicación', 'posición en serie'],
+    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción', 'fenómeno físico', 'onda electromagnética'],
+    // Ítems 21-23
+    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición', 'atributo físico', 'propiedad física'],
+    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto', 'valor universal', 'concepto abstracto'],
+    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida', 'concepto abstracto', 'dimensión fundamental']
   }
 
+  // Palabras clave para puntaje 1 (respuesta parcial) - COMPLETO hasta ítem 23
   const mediumKeywords: Record<string, string[]> = {
-    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde'],
-    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido'],
-    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar'],
-    'Agua-Leche': ['blanco', 'beber', 'tomar', 'líquido', 'hidratar'],
-    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan'],
-    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares'],
-    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar'],
-    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura'],
-    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio'],
-    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción']
+    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde', 'fruta tropical'],
+    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido', 'pequeño'],
+    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar', 'vestimenta casual'],
+    'Agua-Leche': ['blanco', 'beber', 'tomar', 'hidratar', 'agua', 'leche', 'bebida blanca'],
+    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan', 'insecto volador'],
+    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares', 'miembro de la familia'],
+    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar', 'medio de transporte'],
+    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura', 'clima extremo'],
+    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio', 'deporte olímpico'],
+    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción', 'estado emocional'],
+    'Ácido-Salado': ['ácido', 'sal', 'sabor fuerte', 'condimento', 'gusto intenso'],
+    'Codo-Rodilla': ['hueso', 'brazo', 'pierna', 'extremidad', 'parte del cuerpo'],
+    'Ternero-Potrillo': ['vaca', 'caballo', 'animal', 'bebé animal', 'cría'],
+    'Reloj-Termómetro': ['tiempo', 'temperatura', 'medición', 'aparato', 'instrumento'],
+    'Escultura-Poema': ['belleza', 'creatividad', 'expresión artística', 'obra', 'arte'],
+    'Hielo-Vapor': ['frío', 'calor', 'agua', 'cambio', 'transformación', 'evaporación'],
+    'Esperanza-Deseo': ['futuro', 'anhelar', 'querer', 'ilusionarse', 'aspirar'],
+    'Montaña-Lago': ['alto', 'profundo', 'agua', 'tierra', 'paisaje', 'naturaleza'],
+    'Primero-Último': ['inicio', 'final', 'comienzo', 'termino', 'posición'],
+    'Luz-Sonido': ['ver', 'oír', 'sentido', 'percepción', 'estímulo'],
+    'Estatura-Peso': ['alto', 'bajo', 'gordo', 'flaco', 'físico', 'corporal'],
+    'Libertad-Justicia': ['igualdad', 'derecho', 'ética', 'moral', 'principio'],
+    'Tiempo-Espacio': ['duración', 'distancia', 'medida', 'extensión', 'dimensión']
   }
 
   const key = `${word1}-${word2}`
@@ -113,22 +145,42 @@ function suggestScore(response: string, word1: string, word2: string, isPractice
   const keywords = highKeywords[key] || []
   for (const kw of keywords) {
     if (normalizedResponse.includes(kw)) {
-      return { suggestedScore: 2, confidence: 'high', reason: `Palabra clave "${kw}" detectada` }
+      return { 
+        suggestedScore: 2, 
+        confidence: 'high', 
+        reason: `Palabra clave "${kw}" detectada`,
+        disclaimer 
+      }
     }
   }
 
   const mediumKw = mediumKeywords[key] || []
   for (const kw of mediumKw) {
     if (normalizedResponse.includes(kw)) {
-      return { suggestedScore: 1, confidence: 'medium', reason: `Palabra clave "${kw}" detectada` }
+      return { 
+        suggestedScore: 1, 
+        confidence: 'medium', 
+        reason: `Palabra clave "${kw}" detectada`,
+        disclaimer 
+      }
     }
   }
 
   if (normalizedResponse.split(' ').length >= 3) {
-    return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada, pero sin palabras clave' }
+    return { 
+      suggestedScore: 1, 
+      confidence: 'low', 
+      reason: 'Respuesta elaborada, pero sin palabras clave',
+      disclaimer 
+    }
   }
 
-  return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta insuficiente' }
+  return { 
+    suggestedScore: 0, 
+    confidence: 'low', 
+    reason: 'Respuesta insuficiente',
+    disclaimer 
+  }
 }
 
 // ============================================================
@@ -225,13 +277,11 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
-  // Marcar ítems no administrados como correctos
   const markSkippedItemsAsCorrect = (newScores: Record<string | number, number>, failedItem: number, successItem: number): Record<string | number, number> => {
     const updatedScores = { ...newScores }
-    // Marcar todos los ítems entre el fallo y el éxito (excluyendo los ya respondidos)
     for (let i = failedItem - 1; i >= successItem; i--) {
       if (updatedScores[i] === undefined && i >= 1 && !isNaN(i)) {
-        updatedScores[i] = 2 // Puntaje máximo para AN
+        updatedScores[i] = 2
         console.log(`✓ Ítem ${i} no administrado - se asigna puntaje 2 automáticamente`)
       }
     }
@@ -252,33 +302,30 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     if (backtrackMode) {
       if (currentScore === 2) {
         const prevItem = numericItem - 1
-        if (prevItem >= 1 && !scores[prevItem]) {
+        if (prevItem >= 1 && updatedScores[prevItem] === 2) {
+          setBacktrackMode(false)
+          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem || firstStartItem, numericItem)
+          const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
+          const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
+          return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
+        }
+        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
-        // Se completó el retroceso con dos éxitos consecutivos
-        setBacktrackMode(false)
-        // Marcar ítems no administrados como correctos
-        updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem || firstStartItem, numericItem)
-        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
-        const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
-        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       } else {
         const prevItem = numericItem - 1
-        if (prevItem >= 1 && !scores[prevItem]) {
+        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
-        setBacktrackMode(false)
-        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
-        const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
-        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       }
+      setBacktrackMode(false)
     }
 
     if (numericItem === firstStartItem && currentScore !== 2) {
       setBacktrackMode(true)
       setFailedStartItem(numericItem)
       const prevItem = numericItem - 1
-      if (prevItem >= 1 && !scores[prevItem]) {
+      if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
         return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
@@ -287,7 +334,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       setBacktrackMode(true)
       setFailedStartItem(firstStartItem)
       const prevItem = firstStartItem - 1
-      if (prevItem >= 1 && !scores[prevItem]) {
+      if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
         return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
@@ -411,6 +458,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
                   </span>
                 </p>
                 {suggestion.reason && <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>}
+                <p className="text-xs text-orange-600 mt-2">{suggestion.disclaimer}</p>
               </div>
               <button onClick={applySuggestion} className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Aplicar</button>
             </div>

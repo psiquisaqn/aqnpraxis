@@ -163,31 +163,30 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     if (backtrackMode) {
       if (currentScore === 1) {
         const prevItem = numericItem - 1
-        if (prevItem >= 1 && !scores[prevItem]) {
+        if (prevItem >= 1 && updatedScores[prevItem] === 1) {
+          setBacktrackMode(false)
+          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem || firstStartItem, numericItem)
+          const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
+          const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
+          return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
+        }
+        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
-        setBacktrackMode(false)
-        updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem || firstStartItem, numericItem)
-        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
-        const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
-        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       } else {
         const prevItem = numericItem - 1
-        if (prevItem >= 1 && !scores[prevItem]) {
+        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
-        setBacktrackMode(false)
-        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
-        const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
-        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       }
+      setBacktrackMode(false)
     }
 
     if (numericItem === firstStartItem && currentScore === 0) {
       setBacktrackMode(true)
       setFailedStartItem(numericItem)
       const prevItem = numericItem - 1
-      if (prevItem >= 1 && !scores[prevItem]) {
+      if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
         return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
@@ -196,7 +195,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       setBacktrackMode(true)
       setFailedStartItem(firstStartItem)
       const prevItem = firstStartItem - 1
-      if (prevItem >= 1 && !scores[prevItem]) {
+      if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
         return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
