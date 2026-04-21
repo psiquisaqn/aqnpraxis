@@ -60,28 +60,39 @@ interface MRInterfaceProps {
 }
 
 export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdatePatient, patientAge }: MRInterfaceProps) {
-  // Determinar el ítem de inicio REAL después de las prácticas
-  const getRealStartItem = (): number => {
-    if (patientAge <= 8) return 1
-    if (patientAge <= 11) return 5
-    return 9
+  const getStartItems = (): { first: number; second: number } => {
+    if (patientAge <= 8) return { first: 1, second: 2 }
+    if (patientAge <= 11) return { first: 5, second: 6 }
+    return { first: 9, second: 10 }
   }
 
-  // Verificar si dos ítems consecutivos tienen puntaje 1
-  const hasTwoConsecutiveSuccesses = (scores: Record<string | number, number>, startItem: number): boolean => {
-    return scores[startItem] === 1 && scores[startItem + 1] === 1
+  const checkBonusEligibility = (scores: Record<string | number, number>): boolean => {
+    const { first, second } = getStartItems()
+    return scores[first] === 1 && scores[second] === 1
   }
 
-  // Obtener el siguiente ítem después de un retroceso
-  const getNextAfterBacktrack = (currentItemNum: number, scores: Record<string | number, number>): number => {
-    const realStart = getRealStartItem()
-    for (let i = realStart + 1; i <= 32; i++) {
-      if (!scores[i]) return i
+  const getBonusPoints = (): number => {
+    if (patientAge >= 9 && patientAge <= 11) return 4
+    if (patientAge >= 12) return 8
+    return 0
+  }
+
+  const getJumpItemAfterBacktrack = (failedItem: number): number => {
+    if (patientAge <= 8) {
+      if (failedItem === 1) return 3
+      if (failedItem === 2) return 4
+      return failedItem + 1
     }
-    return 33
+    if (patientAge <= 11) {
+      if (failedItem === 5) return 7
+      if (failedItem === 6) return 8
+      return failedItem + 1
+    }
+    if (failedItem === 9) return 11
+    if (failedItem === 10) return 12
+    return failedItem + 1
   }
 
-  // Siempre empezar desde PA (índice 0)
   const [currentIndex, setCurrentIndex] = useState<number>(0)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [scores, setScores] = useState<Record<string | number, number>>({})
@@ -90,12 +101,12 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   const [bonusApplied, setBonusApplied] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
   const [backtrackMode, setBacktrackMode] = useState(false)
+  const [failedStartItem, setFailedStartItem] = useState<number | null>(null)
 
   const currentItem = MR_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
-  const isBonusEligible = (patientAge >= 9 && patientAge <= 11) || (patientAge >= 12)
+  const { first: firstStartItem, second: secondStartItem } = getStartItems()
 
-  // Referencias estables
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
 
@@ -104,7 +115,6 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     onUpdatePatientRef.current = onUpdatePatient
   }, [onComplete, onUpdatePatient])
 
-  // Enviar estímulo al display
   useEffect(() => {
     if (currentItem && !isCompleted) {
       const imageName = isPractice 
@@ -120,80 +130,63 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     }
   }, [currentItem, isCompleted])
 
-  // Verificar bonus
   useEffect(() => {
-    if (!bonusApplied) {
-      if (patientAge >= 9 && patientAge <= 11 && scores[5] === 1 && scores[6] === 1) {
-        setBonusApplied(true)
-        console.log('🎉 Bonus de +4 puntos aplicado por ítems 5 y 6')
-      } else if (patientAge >= 12 && scores[9] === 1 && scores[10] === 1) {
-        setBonusApplied(true)
-        console.log('🎉 Bonus de +8 puntos aplicado por ítems 9 y 10')
-      }
+    if (!bonusApplied && checkBonusEligibility(scores)) {
+      setBonusApplied(true)
+      console.log(`🎉 Bonus de +${getBonusPoints()} puntos aplicado por acertar ${firstStartItem} y ${secondStartItem}`)
     }
-  }, [scores, patientAge, bonusApplied])
+  }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
-  // Determinar siguiente ítem según reglas de retroceso
   const getNextItemIndex = (currentItemNum: number | string, currentScore: number): number => {
     const currentIdx = MR_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    // Prácticas: PA -> PB -> ítem real de inicio
     if (currentItemNum === 'PA') return MR_ITEMS.findIndex(i => i.num === 'PB')
     if (currentItemNum === 'PB') {
-      const realStartItem = getRealStartItem()
-      return MR_ITEMS.findIndex(i => i.num === realStartItem)
+      return MR_ITEMS.findIndex(i => i.num === firstStartItem)
     }
 
     const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
-    const realStart = getRealStartItem()
     
-    // Si estamos en modo retroceso
     if (backtrackMode) {
-      // Si el puntaje actual es 1 (éxito)
       if (currentScore === 1) {
-        // Verificar si ya tenemos dos éxitos consecutivos
-        if (hasTwoConsecutiveSuccesses(scores, numericItem)) {
-          // Salir del modo retroceso y saltar al siguiente ítem después del inicio
-          setBacktrackMode(false)
-          const nextAfterStart = getNextAfterBacktrack(numericItem, { ...scores, [numericItem]: currentScore })
-          const nextIndex = MR_ITEMS.findIndex(i => i.num === nextAfterStart)
-          return nextIndex >= 0 ? nextIndex : currentIdx + 1
-        }
-        // Continuar retrocediendo
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
           return MR_ITEMS.findIndex(i => i.num === prevItem)
         }
+        setBacktrackMode(false)
+        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
+        const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
+        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
       } else {
-        // Puntaje 0 - continuar retrocediendo
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
           return MR_ITEMS.findIndex(i => i.num === prevItem)
         }
+        setBacktrackMode(false)
+        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
+        const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
+        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
       }
-      // Si no hay más ítems hacia atrás, salir del modo retroceso
-      setBacktrackMode(false)
     }
 
-    // Si es el ítem de inicio y el puntaje es 0, iniciar retroceso
-    if (numericItem === realStart && currentScore === 0) {
+    if (numericItem === firstStartItem && currentScore === 0) {
       setBacktrackMode(true)
+      setFailedStartItem(numericItem)
       const prevItem = numericItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
         return MR_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
-    // Si es el segundo ítem (realStart + 1) y el primero fue éxito pero este falló
-    if (numericItem === realStart + 1 && scores[realStart] === 1 && currentScore === 0) {
+    if (numericItem === secondStartItem && scores[firstStartItem] === 1 && currentScore === 0) {
       setBacktrackMode(true)
-      const prevItem = realStart - 1
+      setFailedStartItem(firstStartItem)
+      const prevItem = firstStartItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
         return MR_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
-    // Avanzar al siguiente ítem no respondido
     let nextIdx = currentIdx + 1
     while (nextIdx < MR_ITEMS.length && scores[MR_ITEMS[nextIdx].num]) {
       nextIdx++
@@ -211,14 +204,12 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     setScores(newScores)
     setSelectedAnswer(null)
 
-    // Solo contar para suspensión si no es práctica
     if (!isPractice) {
       if (effectiveScore === 0) {
         const newConsecutiveZeros = consecutiveZeros + 1
         setConsecutiveZeros(newConsecutiveZeros)
-        
         if (newConsecutiveZeros >= 3) {
-          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? (patientAge >= 12 ? 8 : 4) : 0)
+          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
           setIsCompleted(true)
           onCompleteRef.current(newScores, total)
           return
@@ -228,11 +219,10 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       }
     }
 
-    // Determinar siguiente ítem
     const nextIndex = getNextItemIndex(currentItem.num, score)
     
     if (nextIndex >= MR_ITEMS.length) {
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? (patientAge >= 12 ? 8 : 4) : 0)
+      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
       setIsCompleted(true)
       onCompleteRef.current(newScores, total)
     } else {
@@ -244,13 +234,13 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   if (!currentItem) return null
 
   if (isCompleted) {
-    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? (patientAge >= 12 ? 8 : 4) : 0)
+    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
         <p className="text-sm text-green-600 mt-1">
           Puntaje total: {totalScore} / {MR_ITEMS.filter(i => !i.isPractice).length}
-          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{patientAge >= 12 ? 8 : 4} puntos por bonus)</span>}
+          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{getBonusPoints()} puntos por bonus)</span>}
         </p>
       </div>
     )
@@ -258,7 +248,6 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
 
   return (
     <div className="space-y-4">
-      {/* Progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Matrices de Razonamiento</span>
@@ -273,19 +262,17 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
         </div>
         {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo para verificar nivel basal...</p>}
         {backtrackMode && <p className="text-xs text-orange-600 mt-1">Modo retroceso activo</p>}
-        {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{patientAge >= 12 ? 8 : 4} puntos aplicado</p>}
+        {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{getBonusPoints()} puntos aplicado</p>}
       </div>
 
-      {/* No mostramos la imagen aquí porque va en el display del paciente */}
       <div className="bg-blue-50 rounded-lg p-3 text-center">
         <p className="text-sm text-blue-700">
           La imagen se muestra en la pantalla del paciente.
           <br />
-          Selecciona la respuesta que el paciente indique.
+          <strong>Respuesta correcta: {currentItem.correctAnswer}</strong>
         </p>
       </div>
 
-      {/* Botones de respuesta 1-5 */}
       {!scores[currentItem.num] && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-600 mb-3">
@@ -310,7 +297,6 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
         </div>
       )}
 
-      {/* Mensaje de ítem ya respondido */}
       {scores[currentItem.num] !== undefined && (
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">
@@ -320,15 +306,12 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
         </div>
       )}
 
-      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
           Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / {MR_ITEMS.filter(i => !i.isPractice).length}
-          {!bonusApplied && patientAge >= 9 && patientAge <= 11 && scores[5] === 1 && scores[6] !== 1 && (
-            <span className="ml-2 text-xs text-blue-600">(Falta ítem 6 para bonus de +4)</span>
-          )}
-          {!bonusApplied && patientAge >= 12 && scores[9] === 1 && scores[10] !== 1 && (
-            <span className="ml-2 text-xs text-blue-600">(Falta ítem 10 para bonus de +8)</span>
+          {!bonusApplied && ((patientAge >= 9 && patientAge <= 11 && scores[firstStartItem] === 1 && scores[secondStartItem] !== 1) ||
+            (patientAge >= 12 && scores[firstStartItem] === 1 && scores[secondStartItem] !== 1)) && (
+            <span className="ml-2 text-xs text-blue-600">(Falta ítem {secondStartItem} para bonus de +{getBonusPoints()})</span>
           )}
         </p>
       </div>

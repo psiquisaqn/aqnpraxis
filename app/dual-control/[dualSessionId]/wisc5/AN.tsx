@@ -45,7 +45,6 @@ const AN_ITEMS: ANItem[] = [
 // FUNCIÓN DE SUGERENCIA DE PUNTUAJE - MEJORADA
 // ============================================================
 
-// Normalizar texto (quitar tildes, minúsculas)
 const normalizeText = (text: string): string => {
   return text
     .toLowerCase()
@@ -61,7 +60,6 @@ interface SuggestionResult {
 }
 
 function suggestScore(response: string, word1: string, word2: string, isPractice: boolean): SuggestionResult {
-  // No sugerir puntaje en ítems de práctica
   if (isPractice) {
     return { suggestedScore: 0, confidence: 'low', reason: 'Ítem de práctica - registrar manualmente' }
   }
@@ -71,50 +69,47 @@ function suggestScore(response: string, word1: string, word2: string, isPractice
     return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta vacía' }
   }
 
-  // Palabras clave para puntaje 2 (respuesta certera) - ampliado con sinónimos
   const highKeywords: Record<string, string[]> = {
-    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio', 'vegetal', 'alimento vegetal'],
-    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación', 'entretenimiento', 'diversión'],
-    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria', 'atuendo', 'vestuario'],
-    'Agua-Leche': ['bebida', 'líquido', 'bebible', 'hidratante', 'bebestible', 'líquido bebible'],
-    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador', 'artrópodo'],
-    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares', 'parentela'],
-    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo', 'transportador'],
-    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época', 'periodo', 'estación del año'],
-    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia', 'disciplina deportiva'],
-    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto', 'sensación'],
-    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo', 'sabor básico'],
-    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro', 'articulación del cuerpo'],
-    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro', 'cría animal'],
-    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo', 'instrumento de medida'],
-    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico', 'manifestación artística'],
-    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación', 'estado del agua'],
-    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo', 'ilusión'],
-    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve', 'elemento natural'],
-    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar', 'ubicación'],
-    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción', 'fenómeno físico'],
-    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición', 'atributo físico'],
-    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto', 'valor universal'],
-    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida', 'concepto abstracto']
+    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio', 'vegetal'],
+    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación', 'entretenimiento'],
+    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria', 'atuendo'],
+    'Agua-Leche': ['bebida', 'líquido', 'bebible', 'hidratante', 'bebestible'],
+    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador'],
+    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares'],
+    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo'],
+    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época', 'periodo'],
+    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia'],
+    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto'],
+    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo'],
+    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro'],
+    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro'],
+    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo'],
+    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico'],
+    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación'],
+    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo'],
+    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve'],
+    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar'],
+    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción'],
+    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición'],
+    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto'],
+    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida']
   }
 
-  // Palabras clave para puntaje 1 (respuesta parcial) - ampliado
   const mediumKeywords: Record<string, string[]> = {
-    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde', 'fruta tropical'],
-    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido', 'pequeño'],
-    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar', 'vestimenta casual'],
-    'Agua-Leche': ['blanco', 'beber', 'tomar', 'líquido', 'hidratar', 'bebida común'],
-    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan', 'insecto volador'],
-    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares', 'miembro de la familia'],
-    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar', 'medio de transporte'],
-    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura', 'clima extremo'],
-    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio', 'deporte olímpico'],
-    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción', 'estado emocional']
+    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde'],
+    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido'],
+    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar'],
+    'Agua-Leche': ['blanco', 'beber', 'tomar', 'líquido', 'hidratar'],
+    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan'],
+    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares'],
+    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar'],
+    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura'],
+    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio'],
+    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción']
   }
 
   const key = `${word1}-${word2}`
   
-  // Buscar en palabras clave de alto puntaje
   const keywords = highKeywords[key] || []
   for (const kw of keywords) {
     if (normalizedResponse.includes(kw)) {
@@ -122,7 +117,6 @@ function suggestScore(response: string, word1: string, word2: string, isPractice
     }
   }
 
-  // Buscar en palabras clave de puntaje medio
   const mediumKw = mediumKeywords[key] || []
   for (const kw of mediumKw) {
     if (normalizedResponse.includes(kw)) {
@@ -130,7 +124,6 @@ function suggestScore(response: string, word1: string, word2: string, isPractice
     }
   }
 
-  // Si la respuesta tiene más de 3 palabras, puede ser un intento válido
   if (normalizedResponse.split(' ').length >= 3) {
     return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada, pero sin palabras clave' }
   }
@@ -149,26 +142,39 @@ interface ANInterfaceProps {
 }
 
 export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdatePatient, patientAge }: ANInterfaceProps) {
-  // Determinar el ítem de inicio REAL después de las prácticas
-  const getRealStartItem = (): number => {
-    if (patientAge <= 7) return 1
-    if (patientAge <= 11) return 5
-    return 8
+  // Determinar los ítems de inicio según edad
+  const getStartItems = (): { first: number; second: number } => {
+    if (patientAge <= 7) return { first: 1, second: 2 }
+    if (patientAge <= 11) return { first: 5, second: 6 }
+    return { first: 8, second: 9 }
   }
 
-  // Verificar si dos ítems consecutivos tienen puntaje 2
-  const hasTwoConsecutiveSuccesses = (scores: Record<string | number, number>, startItem: number): boolean => {
-    return scores[startItem] === 2 && scores[startItem + 1] === 2
+  // Verificar si se aplica bonus (ambos primeros ítems con puntaje 2)
+  const checkBonusEligibility = (scores: Record<string | number, number>): boolean => {
+    const { first, second } = getStartItems()
+    return scores[first] === 2 && scores[second] === 2
   }
 
-  // Obtener el siguiente ítem después de un retroceso
-  const getNextAfterBacktrack = (currentItemNum: number, scores: Record<string | number, number>): number => {
-    // Buscar el primer ítem no respondido después del punto de inicio
-    const realStart = getRealStartItem()
-    for (let i = realStart + 1; i <= 23; i++) {
-      if (!scores[i]) return i
+  const getBonusPoints = (): number => {
+    if (patientAge >= 8 && patientAge <= 11) return 8
+    return 0
+  }
+
+  // Obtener el ítem al que saltar después del retroceso
+  const getJumpItemAfterBacktrack = (failedItem: number): number => {
+    if (patientAge <= 7) {
+      if (failedItem === 1) return 3
+      if (failedItem === 2) return 4
+      return failedItem + 1
     }
-    return 24
+    if (patientAge <= 11) {
+      if (failedItem === 5) return 7
+      if (failedItem === 6) return 8
+      return failedItem + 1
+    }
+    if (failedItem === 8) return 11
+    if (failedItem === 9) return 12
+    return failedItem + 1
   }
 
   // Siempre empezar desde PA (índice 0)
@@ -181,12 +187,12 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   const [bonusApplied, setBonusApplied] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
   const [backtrackMode, setBacktrackMode] = useState(false)
+  const [failedStartItem, setFailedStartItem] = useState<number | null>(null)
 
   const currentItem = AN_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
-  const isBonusEligible = patientAge >= 8 && patientAge <= 11 && !bonusApplied
+  const { first: firstStartItem, second: secondStartItem } = getStartItems()
 
-  // Referencias estables
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
 
@@ -195,7 +201,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     onUpdatePatientRef.current = onUpdatePatient
   }, [onComplete, onUpdatePatient])
 
-  // Enviar estímulo al display
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
@@ -208,7 +213,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     }
   }, [currentItem, isCompleted])
 
-  // Sugerir puntaje cuando cambia la respuesta
   useEffect(() => {
     if (currentItem && response.trim().length > 0 && !scores[currentItem.num]) {
       const suggestionResult = suggestScore(response, currentItem.words[0], currentItem.words[1], isPractice)
@@ -218,75 +222,63 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     }
   }, [response, currentItem, isPractice])
 
-  // Verificar si se deben aplicar bonus (ítems 5 y 6 con puntaje 2)
   useEffect(() => {
-    if (isBonusEligible && scores[5] === 2 && scores[6] === 2 && !bonusApplied) {
+    if (!bonusApplied && checkBonusEligibility(scores)) {
       setBonusApplied(true)
-      console.log('🎉 Bonus de +8 puntos aplicado por ítems 5 y 6')
+      console.log(`🎉 Bonus de +${getBonusPoints()} puntos aplicado por acertar ${firstStartItem} y ${secondStartItem}`)
     }
-  }, [scores, isBonusEligible, bonusApplied])
+  }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
-  // Determinar siguiente ítem según reglas de retroceso
   const getNextItemIndex = (currentItemNum: number | string, currentScore: number): number => {
     const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    // Prácticas: PA -> PB -> ítem real de inicio
     if (currentItemNum === 'PA') return AN_ITEMS.findIndex(i => i.num === 'PB')
     if (currentItemNum === 'PB') {
-      const realStartItem = getRealStartItem()
-      return AN_ITEMS.findIndex(i => i.num === realStartItem)
+      return AN_ITEMS.findIndex(i => i.num === firstStartItem)
     }
 
     const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
-    const realStart = getRealStartItem()
     
-    // Si estamos en modo retroceso
     if (backtrackMode) {
-      // Si el puntaje actual es 2 (éxito)
       if (currentScore === 2) {
-        // Verificar si ya tenemos dos éxitos consecutivos
-        if (hasTwoConsecutiveSuccesses(scores, numericItem)) {
-          // Salir del modo retroceso y saltar al siguiente ítem después del inicio
-          setBacktrackMode(false)
-          const nextAfterStart = getNextAfterBacktrack(realStart, { ...scores, [numericItem]: currentScore })
-          const nextIndex = AN_ITEMS.findIndex(i => i.num === nextAfterStart)
-          return nextIndex >= 0 ? nextIndex : currentIdx + 1
-        }
-        // Continuar retrocediendo
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
           return AN_ITEMS.findIndex(i => i.num === prevItem)
         }
+        setBacktrackMode(false)
+        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
+        const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
+        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
       } else {
-        // Puntaje 0 o 1 - continuar retrocediendo
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
           return AN_ITEMS.findIndex(i => i.num === prevItem)
         }
+        setBacktrackMode(false)
+        const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
+        const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
+        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
       }
-      // Si no hay más ítems hacia atrás, salir del modo retroceso
-      setBacktrackMode(false)
     }
 
-    // Si es el ítem de inicio y el puntaje no es máximo (0 o 1), iniciar retroceso
-    if (numericItem === realStart && currentScore !== 2) {
+    if (numericItem === firstStartItem && currentScore !== 2) {
       setBacktrackMode(true)
+      setFailedStartItem(numericItem)
       const prevItem = numericItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
         return AN_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
-    // Si es el segundo ítem (realStart + 1) y el primero fue éxito pero este falló
-    if (numericItem === realStart + 1 && scores[realStart] === 2 && currentScore !== 2) {
+    if (numericItem === secondStartItem && scores[firstStartItem] === 2 && currentScore !== 2) {
       setBacktrackMode(true)
-      const prevItem = realStart - 1
+      setFailedStartItem(firstStartItem)
+      const prevItem = firstStartItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
         return AN_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
-    // Avanzar al siguiente ítem no respondido
     let nextIdx = currentIdx + 1
     while (nextIdx < AN_ITEMS.length && scores[AN_ITEMS[nextIdx].num]) {
       nextIdx++
@@ -297,21 +289,18 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   const handleScore = (score: number) => {
     if (scores[currentItem.num]) return
 
-    // Los ítems de práctica no suman puntos
     const effectiveScore = isPractice ? 0 : score
     const newScores = { ...scores, [currentItem.num]: effectiveScore }
     setScores(newScores)
     setResponse('')
     setSuggestion(null)
 
-    // Solo contar para suspensión si no es práctica
     if (!isPractice) {
       if (effectiveScore === 0) {
         const newConsecutiveZeros = consecutiveZeros + 1
         setConsecutiveZeros(newConsecutiveZeros)
-        
         if (newConsecutiveZeros >= 3) {
-          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? 8 : 0)
+          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
           setIsCompleted(true)
           onCompleteRef.current(newScores, total)
           return
@@ -321,11 +310,10 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       }
     }
 
-    // Determinar siguiente ítem
     const nextIndex = getNextItemIndex(currentItem.num, score)
     
     if (nextIndex >= AN_ITEMS.length) {
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? 8 : 0)
+      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
       setIsCompleted(true)
       onCompleteRef.current(newScores, total)
     } else {
@@ -343,13 +331,13 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   if (!currentItem) return null
 
   if (isCompleted) {
-    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? 8 : 0)
+    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
         <p className="text-sm text-green-600 mt-1">
           Puntaje total: {totalScore} / 46
-          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +8 puntos por bonus)</span>}
+          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{getBonusPoints()} puntos por bonus)</span>}
         </p>
       </div>
     )
@@ -357,7 +345,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
 
   return (
     <div className="space-y-4">
-      {/* Progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Analogías</span>
@@ -372,10 +359,9 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
         </div>
         {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo para verificar nivel basal...</p>}
         {backtrackMode && <p className="text-xs text-orange-600 mt-1">Modo retroceso activo</p>}
-        {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +8 puntos aplicado</p>}
+        {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{getBonusPoints()} puntos aplicado</p>}
       </div>
 
-      {/* Palabras a relacionar */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
         <div className="flex justify-center items-center gap-8">
           <span className="text-2xl md:text-3xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
@@ -386,16 +372,11 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
             {currentItem.words[1]}
           </span>
         </div>
-        {isPractice && (
-          <p className="text-xs text-gray-400 mt-3">Ítem de práctica (no suma puntos)</p>
-        )}
+        {isPractice && <p className="text-xs text-gray-400 mt-3">Ítem de práctica (no suma puntos)</p>}
       </div>
 
-      {/* Campo de respuesta */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Respuesta del paciente
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Respuesta del paciente</label>
         <textarea
           value={response}
           onChange={(e) => setResponse(e.target.value)}
@@ -404,7 +385,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
         />
         
-        {/* Sugerencia de puntaje */}
         {suggestion && !scores[currentItem.num] && !isPractice && (
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex justify-between items-center">
@@ -415,22 +395,14 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
                     ({suggestion.confidence === 'high' ? 'Alta confianza' : suggestion.confidence === 'medium' ? 'Confianza media' : 'Baja confianza'})
                   </span>
                 </p>
-                {suggestion.reason && (
-                  <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>
-                )}
+                {suggestion.reason && <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>}
               </div>
-              <button
-                onClick={applySuggestion}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-              >
-                Aplicar
-              </button>
+              <button onClick={applySuggestion} className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Aplicar</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Botones de puntaje */}
       {!scores[currentItem.num] && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-600 mb-3">
@@ -438,29 +410,13 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
             {isPractice && <span className="ml-2 text-xs text-gray-400">(no suma puntos)</span>}
           </p>
           <div className="grid grid-cols-3 gap-3">
-            <button
-              onClick={() => handleScore(0)}
-              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
-            >
-              0 - No logrado
-            </button>
-            <button
-              onClick={() => handleScore(1)}
-              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
-            >
-              1 - Respuesta parcial
-            </button>
-            <button
-              onClick={() => handleScore(2)}
-              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
-            >
-              2 - Respuesta correcta
-            </button>
+            <button onClick={() => handleScore(0)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">0 - No logrado</button>
+            <button onClick={() => handleScore(1)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">1 - Respuesta parcial</button>
+            <button onClick={() => handleScore(2)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">2 - Respuesta correcta</button>
           </div>
         </div>
       )}
 
-      {/* Mensaje de ítem ya respondido */}
       {scores[currentItem.num] !== undefined && (
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">
@@ -470,14 +426,12 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
         </div>
       )}
 
-      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
           Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 46
-          {isBonusEligible && !bonusApplied && scores[5] === 2 && scores[6] !== 2 && (
-            <span className="ml-2 text-xs text-blue-600">(Falta ítem 6 para bonus de +8)</span>
+          {!bonusApplied && patientAge >= 8 && patientAge <= 11 && scores[firstStartItem] === 2 && scores[secondStartItem] !== 2 && (
+            <span className="ml-2 text-xs text-blue-600">(Falta ítem {secondStartItem} para bonus de +8)</span>
           )}
-          {bonusApplied && <span className="ml-2 text-xs text-green-600">(+8 puntos de bonus aplicados)</span>}
         </p>
       </div>
     </div>
