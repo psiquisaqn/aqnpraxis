@@ -62,28 +62,23 @@ interface MRInterfaceProps {
 export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdatePatient, patientAge }: MRInterfaceProps) {
   // Determinar el ítem de inicio REAL después de las prácticas
   const getRealStartItem = (): number => {
-    if (patientAge <= 8) return 1      // 6-8 años: empezar en ítem 1
-    if (patientAge <= 11) return 5     // 9-11 años: empezar en ítem 5
-    return 9                            // 12-16 años: empezar en ítem 9
+    if (patientAge <= 8) return 1
+    if (patientAge <= 11) return 5
+    return 9
   }
 
-  // Verificar si aplica bonus
-  const isBonusEligible = (): boolean => {
-    if (patientAge >= 9 && patientAge <= 11) {
-      // Bonus para 9-11 años: ítems 5 y 6
-      return scores[5] === 1 && scores[6] === 1
-    }
-    if (patientAge >= 12) {
-      // Bonus para 12+ años: ítems 9 y 10
-      return scores[9] === 1 && scores[10] === 1
-    }
-    return false
+  // Verificar si dos ítems consecutivos tienen puntaje 1
+  const hasTwoConsecutiveSuccesses = (scores: Record<string | number, number>, startItem: number): boolean => {
+    return scores[startItem] === 1 && scores[startItem + 1] === 1
   }
 
-  const getBonusPoints = (): number => {
-    if (patientAge >= 9 && patientAge <= 11) return 4
-    if (patientAge >= 12) return 8
-    return 0
+  // Obtener el siguiente ítem después de un retroceso
+  const getNextAfterBacktrack = (currentItemNum: number, scores: Record<string | number, number>): number => {
+    const realStart = getRealStartItem()
+    for (let i = realStart + 1; i <= 32; i++) {
+      if (!scores[i]) return i
+    }
+    return 33
   }
 
   // Siempre empezar desde PA (índice 0)
@@ -94,9 +89,11 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   const [isCompleted, setIsCompleted] = useState(false)
   const [bonusApplied, setBonusApplied] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
+  const [backtrackMode, setBacktrackMode] = useState(false)
 
   const currentItem = MR_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
+  const isBonusEligible = (patientAge >= 9 && patientAge <= 11) || (patientAge >= 12)
 
   // Referencias estables
   const onCompleteRef = useRef(onComplete)
@@ -125,64 +122,74 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
 
   // Verificar bonus
   useEffect(() => {
-    if (!bonusApplied && isBonusEligible()) {
-      setBonusApplied(true)
-      console.log(`🎉 Bonus de +${getBonusPoints()} puntos aplicado`)
+    if (!bonusApplied) {
+      if (patientAge >= 9 && patientAge <= 11 && scores[5] === 1 && scores[6] === 1) {
+        setBonusApplied(true)
+        console.log('🎉 Bonus de +4 puntos aplicado por ítems 5 y 6')
+      } else if (patientAge >= 12 && scores[9] === 1 && scores[10] === 1) {
+        setBonusApplied(true)
+        console.log('🎉 Bonus de +8 puntos aplicado por ítems 9 y 10')
+      }
     }
-  }, [scores, bonusApplied])
+  }, [scores, patientAge, bonusApplied])
 
   // Determinar siguiente ítem según reglas de retroceso
   const getNextItemIndex = (currentItemNum: number | string, currentScore: number): number => {
     const currentIdx = MR_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    // Si es práctica PA, pasar a PB
+    // Prácticas: PA -> PB -> ítem real de inicio
     if (currentItemNum === 'PA') return MR_ITEMS.findIndex(i => i.num === 'PB')
-    
-    // Si es práctica PB, pasar al ítem real de inicio según edad
     if (currentItemNum === 'PB') {
       const realStartItem = getRealStartItem()
       return MR_ITEMS.findIndex(i => i.num === realStartItem)
     }
 
     const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
+    const realStart = getRealStartItem()
     
-    // Reglas para 9-11 años
-    if (patientAge >= 9 && patientAge <= 11) {
-      // Si falla el ítem 5 (puntaje 0), retrocede al 4
-      if (numericItem === 5 && currentScore === 0) {
-        return MR_ITEMS.findIndex(i => i.num === 4)
+    // Si estamos en modo retroceso
+    if (backtrackMode) {
+      // Si el puntaje actual es 1 (éxito)
+      if (currentScore === 1) {
+        // Verificar si ya tenemos dos éxitos consecutivos
+        if (hasTwoConsecutiveSuccesses(scores, numericItem)) {
+          // Salir del modo retroceso y saltar al siguiente ítem después del inicio
+          setBacktrackMode(false)
+          const nextAfterStart = getNextAfterBacktrack(numericItem, { ...scores, [numericItem]: currentScore })
+          const nextIndex = MR_ITEMS.findIndex(i => i.num === nextAfterStart)
+          return nextIndex >= 0 ? nextIndex : currentIdx + 1
+        }
+        // Continuar retrocediendo
+        const prevItem = numericItem - 1
+        if (prevItem >= 1 && !scores[prevItem]) {
+          return MR_ITEMS.findIndex(i => i.num === prevItem)
+        }
+      } else {
+        // Puntaje 0 - continuar retrocediendo
+        const prevItem = numericItem - 1
+        if (prevItem >= 1 && !scores[prevItem]) {
+          return MR_ITEMS.findIndex(i => i.num === prevItem)
+        }
       }
-      // Si acierta el ítem 5 (puntaje 1) y no ha respondido el 4, ir al 4 (para verificar base)
-      if (numericItem === 5 && currentScore === 1 && !scores[4]) {
-        return MR_ITEMS.findIndex(i => i.num === 4)
-      }
-      // Si viene del 4 con acierto (1) y ya respondió 5, ir al 6
-      if (numericItem === 4 && currentScore === 1 && scores[5] === 1 && !scores[6]) {
-        return MR_ITEMS.findIndex(i => i.num === 6)
-      }
-      // Si falla el 6 (puntaje 0) habiendo acertado 5, retrocede al 4
-      if (numericItem === 6 && currentScore === 0 && scores[5] === 1 && !scores[4]) {
-        return MR_ITEMS.findIndex(i => i.num === 4)
+      // Si no hay más ítems hacia atrás, salir del modo retroceso
+      setBacktrackMode(false)
+    }
+
+    // Si es el ítem de inicio y el puntaje es 0, iniciar retroceso
+    if (numericItem === realStart && currentScore === 0) {
+      setBacktrackMode(true)
+      const prevItem = numericItem - 1
+      if (prevItem >= 1 && !scores[prevItem]) {
+        return MR_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
-    // Reglas para 12-16 años
-    if (patientAge >= 12) {
-      // Si falla el ítem 9 (puntaje 0), retrocede al 8
-      if (numericItem === 9 && currentScore === 0) {
-        return MR_ITEMS.findIndex(i => i.num === 8)
-      }
-      // Si acierta el ítem 9 (puntaje 1) y no ha respondido el 8, ir al 8
-      if (numericItem === 9 && currentScore === 1 && !scores[8]) {
-        return MR_ITEMS.findIndex(i => i.num === 8)
-      }
-      // Si viene del 8 con acierto (1) y ya respondió 9, ir al 10
-      if (numericItem === 8 && currentScore === 1 && scores[9] === 1 && !scores[10]) {
-        return MR_ITEMS.findIndex(i => i.num === 10)
-      }
-      // Si falla el 10 (puntaje 0) habiendo acertado 9, retrocede al 8
-      if (numericItem === 10 && currentScore === 0 && scores[9] === 1 && !scores[8]) {
-        return MR_ITEMS.findIndex(i => i.num === 8)
+    // Si es el segundo ítem (realStart + 1) y el primero fue éxito pero este falló
+    if (numericItem === realStart + 1 && scores[realStart] === 1 && currentScore === 0) {
+      setBacktrackMode(true)
+      const prevItem = realStart - 1
+      if (prevItem >= 1 && !scores[prevItem]) {
+        return MR_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
@@ -199,31 +206,33 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
 
     const isCorrect = selected === currentItem.correctAnswer
     const score = isCorrect ? 1 : 0
-    const newScores = { ...scores, [currentItem.num]: score }
+    const effectiveScore = isPractice ? 0 : score
+    const newScores = { ...scores, [currentItem.num]: effectiveScore }
     setScores(newScores)
     setSelectedAnswer(null)
 
-    // Actualizar contador de ceros consecutivos
-    if (score === 0) {
-      const newConsecutiveZeros = consecutiveZeros + 1
-      setConsecutiveZeros(newConsecutiveZeros)
-      
-      // Suspensión después de 3 ceros consecutivos
-      if (newConsecutiveZeros >= 3) {
-        const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
-        setIsCompleted(true)
-        onCompleteRef.current(newScores, total)
-        return
+    // Solo contar para suspensión si no es práctica
+    if (!isPractice) {
+      if (effectiveScore === 0) {
+        const newConsecutiveZeros = consecutiveZeros + 1
+        setConsecutiveZeros(newConsecutiveZeros)
+        
+        if (newConsecutiveZeros >= 3) {
+          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? (patientAge >= 12 ? 8 : 4) : 0)
+          setIsCompleted(true)
+          onCompleteRef.current(newScores, total)
+          return
+        }
+      } else {
+        setConsecutiveZeros(0)
       }
-    } else {
-      setConsecutiveZeros(0)
     }
 
     // Determinar siguiente ítem
     const nextIndex = getNextItemIndex(currentItem.num, score)
     
     if (nextIndex >= MR_ITEMS.length) {
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
+      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? (patientAge >= 12 ? 8 : 4) : 0)
       setIsCompleted(true)
       onCompleteRef.current(newScores, total)
     } else {
@@ -235,13 +244,13 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   if (!currentItem) return null
 
   if (isCompleted) {
-    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
+    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? (patientAge >= 12 ? 8 : 4) : 0)
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
         <p className="text-sm text-green-600 mt-1">
           Puntaje total: {totalScore} / {MR_ITEMS.filter(i => !i.isPractice).length}
-          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{getBonusPoints()} puntos por bonus)</span>}
+          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{patientAge >= 12 ? 8 : 4} puntos por bonus)</span>}
         </p>
       </div>
     )
@@ -262,8 +271,9 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
             width: `${(Object.keys(scores).filter(k => !isNaN(Number(k))).length / MR_ITEMS.filter(i => !i.isPractice).length) * 100}%` 
           }} />
         </div>
-        {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo por reglas de aplicación...</p>}
-        {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{getBonusPoints()} puntos aplicado</p>}
+        {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo para verificar nivel basal...</p>}
+        {backtrackMode && <p className="text-xs text-orange-600 mt-1">Modo retroceso activo</p>}
+        {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{patientAge >= 12 ? 8 : 4} puntos aplicado</p>}
       </div>
 
       {/* No mostramos la imagen aquí porque va en el display del paciente */}
@@ -278,7 +288,10 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       {/* Botones de respuesta 1-5 */}
       {!scores[currentItem.num] && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-3">Respuesta del paciente:</p>
+          <p className="text-sm text-gray-600 mb-3">
+            Respuesta del paciente:
+            {isPractice && <span className="ml-2 text-xs text-gray-400">(no suma puntos)</span>}
+          </p>
           <div className="grid grid-cols-5 gap-3">
             {[1, 2, 3, 4, 5].map(num => (
               <button
@@ -302,6 +315,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">
             ✓ Ítem respondido - {scores[currentItem.num] === 1 ? 'Correcto' : 'Incorrecto'}
+            {isPractice && <span className="ml-2 text-xs">(no suma al total)</span>}
           </p>
         </div>
       )}

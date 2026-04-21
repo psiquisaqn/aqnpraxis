@@ -42,8 +42,17 @@ const AN_ITEMS: ANItem[] = [
 ]
 
 // ============================================================
-// FUNCIÓN DE SUGERENCIA DE PUNTUAJE (NLP SIMPLE)
+// FUNCIÓN DE SUGERENCIA DE PUNTUAJE - MEJORADA
 // ============================================================
+
+// Normalizar texto (quitar tildes, minúsculas)
+const normalizeText = (text: string): string => {
+  return text
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
 
 interface SuggestionResult {
   suggestedScore: 0 | 1 | 2
@@ -51,72 +60,79 @@ interface SuggestionResult {
   reason?: string
 }
 
-function suggestScore(response: string, word1: string, word2: string): SuggestionResult {
-  const lowerResponse = response.toLowerCase().trim()
-  if (!lowerResponse) {
+function suggestScore(response: string, word1: string, word2: string, isPractice: boolean): SuggestionResult {
+  // No sugerir puntaje en ítems de práctica
+  if (isPractice) {
+    return { suggestedScore: 0, confidence: 'low', reason: 'Ítem de práctica - registrar manualmente' }
+  }
+
+  const normalizedResponse = normalizeText(response)
+  if (!normalizedResponse) {
     return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta vacía' }
   }
 
-  // Palabras clave para puntaje 2 (respuesta certera)
+  // Palabras clave para puntaje 2 (respuesta certera) - ampliado con sinónimos
   const highKeywords: Record<string, string[]> = {
-    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio'],
-    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación'],
-    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria'],
-    'Agua-Leche': ['bebida', 'líquido', 'bebible', 'hidratante'],
-    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador'],
-    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares'],
-    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo'],
-    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época'],
-    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia'],
-    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto'],
-    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo'],
-    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro'],
-    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro'],
-    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo'],
-    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico'],
-    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación'],
-    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo'],
-    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve'],
-    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar'],
-    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción'],
-    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición'],
-    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto'],
-    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida']
+    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio', 'vegetal', 'alimento vegetal'],
+    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación', 'entretenimiento', 'diversión'],
+    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria', 'atuendo', 'vestuario'],
+    'Agua-Leche': ['bebida', 'líquido', 'bebible', 'hidratante', 'bebestible', 'líquido bebible'],
+    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador', 'artrópodo'],
+    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares', 'parentela'],
+    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo', 'transportador'],
+    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época', 'periodo', 'estación del año'],
+    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia', 'disciplina deportiva'],
+    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto', 'sensación'],
+    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo', 'sabor básico'],
+    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro', 'articulación del cuerpo'],
+    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro', 'cría animal'],
+    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo', 'instrumento de medida'],
+    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico', 'manifestación artística'],
+    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación', 'estado del agua'],
+    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo', 'ilusión'],
+    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve', 'elemento natural'],
+    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar', 'ubicación'],
+    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción', 'fenómeno físico'],
+    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición', 'atributo físico'],
+    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto', 'valor universal'],
+    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida', 'concepto abstracto']
+  }
+
+  // Palabras clave para puntaje 1 (respuesta parcial) - ampliado
+  const mediumKeywords: Record<string, string[]> = {
+    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde', 'fruta tropical'],
+    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido', 'pequeño'],
+    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar', 'vestimenta casual'],
+    'Agua-Leche': ['blanco', 'beber', 'tomar', 'líquido', 'hidratar', 'bebida común'],
+    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan', 'insecto volador'],
+    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares', 'miembro de la familia'],
+    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar', 'medio de transporte'],
+    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura', 'clima extremo'],
+    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio', 'deporte olímpico'],
+    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción', 'estado emocional']
   }
 
   const key = `${word1}-${word2}`
-  const keywords = highKeywords[key] || []
   
+  // Buscar en palabras clave de alto puntaje
+  const keywords = highKeywords[key] || []
   for (const kw of keywords) {
-    if (lowerResponse.includes(kw)) {
+    if (normalizedResponse.includes(kw)) {
       return { suggestedScore: 2, confidence: 'high', reason: `Palabra clave "${kw}" detectada` }
     }
   }
 
-  // Palabras clave para puntaje 1 (respuesta parcial)
-  const mediumKeywords: Record<string, string[]> = {
-    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde'],
-    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido'],
-    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar'],
-    'Agua-Leche': ['blanco', 'beber', 'tomar', 'líquido', 'hidratar'],
-    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan'],
-    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares'],
-    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar'],
-    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura'],
-    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio'],
-    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción']
-  }
-
+  // Buscar en palabras clave de puntaje medio
   const mediumKw = mediumKeywords[key] || []
   for (const kw of mediumKw) {
-    if (lowerResponse.includes(kw)) {
+    if (normalizedResponse.includes(kw)) {
       return { suggestedScore: 1, confidence: 'medium', reason: `Palabra clave "${kw}" detectada` }
     }
   }
 
-  // Si la respuesta tiene más de 4 palabras, puede ser un intento válido
-  if (lowerResponse.split(' ').length >= 4) {
-    return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada' }
+  // Si la respuesta tiene más de 3 palabras, puede ser un intento válido
+  if (normalizedResponse.split(' ').length >= 3) {
+    return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada, pero sin palabras clave' }
   }
 
   return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta insuficiente' }
@@ -140,6 +156,21 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     return 8
   }
 
+  // Verificar si dos ítems consecutivos tienen puntaje 2
+  const hasTwoConsecutiveSuccesses = (scores: Record<string | number, number>, startItem: number): boolean => {
+    return scores[startItem] === 2 && scores[startItem + 1] === 2
+  }
+
+  // Obtener el siguiente ítem después de un retroceso
+  const getNextAfterBacktrack = (currentItemNum: number, scores: Record<string | number, number>): number => {
+    // Buscar el primer ítem no respondido después del punto de inicio
+    const realStart = getRealStartItem()
+    for (let i = realStart + 1; i <= 23; i++) {
+      if (!scores[i]) return i
+    }
+    return 24
+  }
+
   // Siempre empezar desde PA (índice 0)
   const [currentIndex, setCurrentIndex] = useState<number>(0)
   const [response, setResponse] = useState('')
@@ -149,6 +180,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   const [isCompleted, setIsCompleted] = useState(false)
   const [bonusApplied, setBonusApplied] = useState(false)
   const [isGoingBack, setIsGoingBack] = useState(false)
+  const [backtrackMode, setBacktrackMode] = useState(false)
 
   const currentItem = AN_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
@@ -179,12 +211,12 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   // Sugerir puntaje cuando cambia la respuesta
   useEffect(() => {
     if (currentItem && response.trim().length > 0 && !scores[currentItem.num]) {
-      const suggestionResult = suggestScore(response, currentItem.words[0], currentItem.words[1])
+      const suggestionResult = suggestScore(response, currentItem.words[0], currentItem.words[1], isPractice)
       setSuggestion(suggestionResult)
     } else {
       setSuggestion(null)
     }
-  }, [response, currentItem])
+  }, [response, currentItem, isPractice])
 
   // Verificar si se deben aplicar bonus (ítems 5 y 6 con puntaje 2)
   useEffect(() => {
@@ -198,52 +230,59 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   const getNextItemIndex = (currentItemNum: number | string, currentScore: number): number => {
     const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    // Si es práctica PA, pasar a PB
+    // Prácticas: PA -> PB -> ítem real de inicio
     if (currentItemNum === 'PA') return AN_ITEMS.findIndex(i => i.num === 'PB')
-    
-    // Si es práctica PB, pasar al ítem real de inicio según edad
     if (currentItemNum === 'PB') {
       const realStartItem = getRealStartItem()
       return AN_ITEMS.findIndex(i => i.num === realStartItem)
     }
 
-    // Reglas para 8-11 años
-    if (patientAge >= 8 && patientAge <= 11) {
-      // Si falla el ítem 5 (puntaje 0 o 1), retrocede al 4
-      if (currentItemNum === 5 && (currentScore === 0 || currentScore === 1)) {
-        return AN_ITEMS.findIndex(i => i.num === 4)
+    const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
+    const realStart = getRealStartItem()
+    
+    // Si estamos en modo retroceso
+    if (backtrackMode) {
+      // Si el puntaje actual es 2 (éxito)
+      if (currentScore === 2) {
+        // Verificar si ya tenemos dos éxitos consecutivos
+        if (hasTwoConsecutiveSuccesses(scores, numericItem)) {
+          // Salir del modo retroceso y saltar al siguiente ítem después del inicio
+          setBacktrackMode(false)
+          const nextAfterStart = getNextAfterBacktrack(realStart, { ...scores, [numericItem]: currentScore })
+          const nextIndex = AN_ITEMS.findIndex(i => i.num === nextAfterStart)
+          return nextIndex >= 0 ? nextIndex : currentIdx + 1
+        }
+        // Continuar retrocediendo
+        const prevItem = numericItem - 1
+        if (prevItem >= 1 && !scores[prevItem]) {
+          return AN_ITEMS.findIndex(i => i.num === prevItem)
+        }
+      } else {
+        // Puntaje 0 o 1 - continuar retrocediendo
+        const prevItem = numericItem - 1
+        if (prevItem >= 1 && !scores[prevItem]) {
+          return AN_ITEMS.findIndex(i => i.num === prevItem)
+        }
       }
-      // Si acierta el ítem 5 (puntaje 2) y no ha respondido el 4, ir al 4 (para verificar base)
-      if (currentItemNum === 5 && currentScore === 2 && !scores[4]) {
-        return AN_ITEMS.findIndex(i => i.num === 4)
-      }
-      // Si viene del 4 con acierto (2) y ya respondió 5, ir al 6
-      if (currentItemNum === 4 && currentScore === 2 && scores[5] === 2 && !scores[6]) {
-        return AN_ITEMS.findIndex(i => i.num === 6)
-      }
-      // Si falla el 6 (puntaje 0 o 1) habiendo acertado 5, retrocede al 4
-      if (currentItemNum === 6 && (currentScore === 0 || currentScore === 1) && scores[5] === 2 && !scores[4]) {
-        return AN_ITEMS.findIndex(i => i.num === 4)
+      // Si no hay más ítems hacia atrás, salir del modo retroceso
+      setBacktrackMode(false)
+    }
+
+    // Si es el ítem de inicio y el puntaje no es máximo (0 o 1), iniciar retroceso
+    if (numericItem === realStart && currentScore !== 2) {
+      setBacktrackMode(true)
+      const prevItem = numericItem - 1
+      if (prevItem >= 1 && !scores[prevItem]) {
+        return AN_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
-    // Reglas para 12+ años
-    if (patientAge >= 12) {
-      // Si falla el ítem 8 (puntaje 0 o 1), retrocede al 7
-      if (currentItemNum === 8 && (currentScore === 0 || currentScore === 1)) {
-        return AN_ITEMS.findIndex(i => i.num === 7)
-      }
-      // Si acierta el ítem 8 (puntaje 2) y no ha respondido el 7, ir al 7
-      if (currentItemNum === 8 && currentScore === 2 && !scores[7]) {
-        return AN_ITEMS.findIndex(i => i.num === 7)
-      }
-      // Si viene del 7 con acierto (2) y ya respondió 8, ir al 9
-      if (currentItemNum === 7 && currentScore === 2 && scores[8] === 2 && !scores[9]) {
-        return AN_ITEMS.findIndex(i => i.num === 9)
-      }
-      // Si falla el 9 (puntaje 0 o 1) habiendo acertado 8, retrocede al 7
-      if (currentItemNum === 9 && (currentScore === 0 || currentScore === 1) && scores[8] === 2 && !scores[7]) {
-        return AN_ITEMS.findIndex(i => i.num === 7)
+    // Si es el segundo ítem (realStart + 1) y el primero fue éxito pero este falló
+    if (numericItem === realStart + 1 && scores[realStart] === 2 && currentScore !== 2) {
+      setBacktrackMode(true)
+      const prevItem = realStart - 1
+      if (prevItem >= 1 && !scores[prevItem]) {
+        return AN_ITEMS.findIndex(i => i.num === prevItem)
       }
     }
 
@@ -258,25 +297,28 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   const handleScore = (score: number) => {
     if (scores[currentItem.num]) return
 
-    const newScores = { ...scores, [currentItem.num]: score }
+    // Los ítems de práctica no suman puntos
+    const effectiveScore = isPractice ? 0 : score
+    const newScores = { ...scores, [currentItem.num]: effectiveScore }
     setScores(newScores)
     setResponse('')
     setSuggestion(null)
 
-    // Actualizar contador de ceros consecutivos
-    if (score === 0) {
-      const newConsecutiveZeros = consecutiveZeros + 1
-      setConsecutiveZeros(newConsecutiveZeros)
-      
-      // Suspensión después de 3 ceros consecutivos
-      if (newConsecutiveZeros >= 3) {
-        const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? 8 : 0)
-        setIsCompleted(true)
-        onCompleteRef.current(newScores, total)
-        return
+    // Solo contar para suspensión si no es práctica
+    if (!isPractice) {
+      if (effectiveScore === 0) {
+        const newConsecutiveZeros = consecutiveZeros + 1
+        setConsecutiveZeros(newConsecutiveZeros)
+        
+        if (newConsecutiveZeros >= 3) {
+          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? 8 : 0)
+          setIsCompleted(true)
+          onCompleteRef.current(newScores, total)
+          return
+        }
+      } else {
+        setConsecutiveZeros(0)
       }
-    } else {
-      setConsecutiveZeros(0)
     }
 
     // Determinar siguiente ítem
@@ -328,7 +370,8 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
             width: `${(Object.keys(scores).filter(k => !isNaN(Number(k))).length / AN_ITEMS.filter(i => !i.isPractice).length) * 100}%` 
           }} />
         </div>
-        {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo por reglas de aplicación...</p>}
+        {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo para verificar nivel basal...</p>}
+        {backtrackMode && <p className="text-xs text-orange-600 mt-1">Modo retroceso activo</p>}
         {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +8 puntos aplicado</p>}
       </div>
 
@@ -344,7 +387,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
           </span>
         </div>
         {isPractice && (
-          <p className="text-xs text-gray-400 mt-3">Ítem de práctica</p>
+          <p className="text-xs text-gray-400 mt-3">Ítem de práctica (no suma puntos)</p>
         )}
       </div>
 
@@ -362,7 +405,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
         />
         
         {/* Sugerencia de puntaje */}
-        {suggestion && !scores[currentItem.num] && (
+        {suggestion && !scores[currentItem.num] && !isPractice && (
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex justify-between items-center">
               <div>
@@ -390,7 +433,10 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       {/* Botones de puntaje */}
       {!scores[currentItem.num] && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-3">Puntaje para este ítem:</p>
+          <p className="text-sm text-gray-600 mb-3">
+            Puntaje para este ítem:
+            {isPractice && <span className="ml-2 text-xs text-gray-400">(no suma puntos)</span>}
+          </p>
           <div className="grid grid-cols-3 gap-3">
             <button
               onClick={() => handleScore(0)}
@@ -419,6 +465,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">
             ✓ Ítem respondido con puntaje {scores[currentItem.num]}
+            {isPractice && <span className="ml-2 text-xs">(no suma al total)</span>}
           </p>
         </div>
       )}
