@@ -1,9 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { DualTestWrapper } from './DualTestWrapper'
+import { CCInterface } from './wisc5/CC'
+import { ANInterface } from './wisc5/AN'
 
 // ============================================================
 // CONFIGURACIÓN DE SUBPRUEBAS WISC-V
@@ -11,7 +13,7 @@ import { DualTestWrapper } from './DualTestWrapper'
 
 const WISC_SUBTESTS = [
   { code: 'CC', name: 'Construcción con Cubos', primary: true, order: 1, canBeReplaced: true, replaceWith: 'RV', hasInterface: true },
-  { code: 'AN', name: 'Analogías', primary: true, order: 2, canBeReplaced: false, hasInterface: false },
+  { code: 'AN', name: 'Analogías', primary: true, order: 2, canBeReplaced: false, hasInterface: true },
   { code: 'MR', name: 'Matrices de Razonamiento', primary: true, order: 3, canBeReplaced: false, hasInterface: false },
   { code: 'RD', name: 'Retención de Dígitos', primary: true, order: 4, canBeReplaced: false, hasInterface: false },
   { code: 'CLA', name: 'Claves', primary: true, order: 5, canBeReplaced: false, hasInterface: false },
@@ -27,402 +29,36 @@ const WISC_SUBTESTS = [
   { code: 'ARI', name: 'Aritmética', primary: false, order: 15, canBeReplaced: false, hasInterface: false }
 ]
 
-// Configuración de ítems para Construcción con Cubos (CC)
-const CC_ITEMS_CONFIG = [
-  { num: 1, timeLimit: 30, twoAttempts: true, maxScore: 2, scores: { first: 2, second: 1, fail: 0 } },
-  { num: 2, timeLimit: 45, twoAttempts: true, maxScore: 2, scores: { first: 2, second: 1, fail: 0 } },
-  { num: 3, timeLimit: 45, twoAttempts: true, maxScore: 2, scores: { first: 2, second: 1, fail: 0 } },
-  { num: 4, timeLimit: 45, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
-  { num: 5, timeLimit: 45, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
-  { num: 6, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
-  { num: 7, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
-  { num: 8, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
-  { num: 9, timeLimit: 75, twoAttempts: false, maxScore: 4, scores: { success: 4, fail: 0 } },
-  { num: 10, timeLimit: 120, twoAttempts: false, maxScore: 7, scoresByTime: [
-    { maxTime: 30, score: 7 }, { maxTime: 60, score: 6 }, { maxTime: 70, score: 5 },
-    { maxTime: 120, score: 4 }, { maxTime: Infinity, score: 0 }
-  ]},
-  { num: 11, timeLimit: 120, twoAttempts: false, maxScore: 7, scoresByTime: [
-    { maxTime: 30, score: 7 }, { maxTime: 60, score: 6 }, { maxTime: 70, score: 5 },
-    { maxTime: 120, score: 4 }, { maxTime: Infinity, score: 0 }
-  ]},
-  { num: 12, timeLimit: 120, twoAttempts: false, maxScore: 7, scoresByTime: [
-    { maxTime: 30, score: 7 }, { maxTime: 60, score: 6 }, { maxTime: 70, score: 5 },
-    { maxTime: 120, score: 4 }, { maxTime: Infinity, score: 0 }
-  ]},
-  { num: 13, timeLimit: 120, twoAttempts: false, maxScore: 7, scoresByTime: [
-    { maxTime: 30, score: 7 }, { maxTime: 60, score: 6 }, { maxTime: 70, score: 5 },
-    { maxTime: 120, score: 4 }, { maxTime: Infinity, score: 0 }
-  ]}
-]
-
 // ============================================================
 // FUNCIONES DE APOYO
 // ============================================================
 
-const getStartingItem = (years: number): number => years <= 7 ? 1 : 3
-const getBonusPoints = (years: number): number => years <= 7 ? 0 : 4
-
-const getNextItemOnFailure = (failedItem: number, currentScores: Record<number, number>): number | null => {
-  if (failedItem === 3 && !currentScores[2]) return 2
-  if (failedItem === 4 && !currentScores[2]) return 2
-  if (failedItem === 2 && !currentScores[1]) return 1
-  if (failedItem === 1) {
-    for (let i = 5; i <= 13; i++) if (!currentScores[i]) return i
-    return null
-  }
-  const nextItem = failedItem + 1
-  if (nextItem <= 13 && !currentScores[nextItem]) return nextItem
-  return null
+const calculateAge = (birthDate: Date, evalDate: Date): { years: number; months: number; totalMonths: number } => {
+  let years = evalDate.getFullYear() - birthDate.getFullYear()
+  let months = evalDate.getMonth() - birthDate.getMonth()
+  let days = evalDate.getDate() - birthDate.getDate()
+  if (days < 0) months--
+  if (months < 0) { years--; months += 12 }
+  return { years, months, totalMonths: years * 12 + months }
 }
 
-// ============================================================
-// COMPONENTE DE CRONÓMETRO
-// ============================================================
-
-interface StopwatchProps {
-  timeLimit: number
-  onTimeUpdate: (seconds: number) => void
-  onTimeEnd: () => void
-  onStart?: () => void
+const getAgeGroup = (totalMonths: number): string => {
+  const groups = [
+    { min: 72, max: 77, label: '6:0-6:5' }, { min: 78, max: 83, label: '6:6-6:11' },
+    { min: 84, max: 89, label: '7:0-7:5' }, { min: 90, max: 95, label: '7:6-7:11' },
+    { min: 96, max: 101, label: '8:0-8:5' }, { min: 102, max: 107, label: '8:6-8:11' },
+    { min: 108, max: 113, label: '9:0-9:5' }, { min: 114, max: 119, label: '9:6-9:11' },
+    { min: 120, max: 125, label: '10:0-10:5' }, { min: 126, max: 131, label: '10:6-10:11' },
+    { min: 132, max: 137, label: '11:0-11:5' }, { min: 138, max: 143, label: '11:6-11:11' },
+    { min: 144, max: 149, label: '12:0-12:5' }, { min: 150, max: 155, label: '12:6-12:11' },
+    { min: 156, max: 161, label: '13:0-13:5' }, { min: 162, max: 167, label: '13:6-13:11' },
+    { min: 168, max: 173, label: '14:0-14:5' }, { min: 174, max: 179, label: '14:6-14:11' },
+    { min: 180, max: 185, label: '15:0-15:5' }, { min: 186, max: 191, label: '15:6-15:11' },
+    { min: 192, max: 197, label: '16:0-16:5' }, { min: 198, max: 203, label: '16:6-16:11' }
+  ]
+  const group = groups.find(g => totalMonths >= g.min && totalMonths <= g.max)
+  return group?.label || '6:0-6:5'
 }
-
-function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart }: StopwatchProps) {
-  const [seconds, setSeconds] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    if (isRunning) {
-      console.log('⏱️ Cronómetro iniciando intervalo')
-      intervalRef.current = setInterval(() => {
-        setSeconds(prev => {
-          const newSeconds = prev + 1
-          console.log('⏱️ Tiempo actual:', newSeconds)
-          onTimeUpdate(newSeconds)
-          if (newSeconds >= timeLimit) {
-            console.log('⏱️ Tiempo límite alcanzado')
-            setIsRunning(false)
-            onTimeEnd()
-            return timeLimit
-          }
-          return newSeconds
-        })
-      }, 1000)
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [isRunning, timeLimit, onTimeUpdate, onTimeEnd])
-
-  const startTimer = () => {
-    console.log('⏱️ Cronómetro iniciado manualmente - startTimer()')
-    setSeconds(0)
-    setIsRunning(true)
-    onStart?.()
-  }
-
-  const formatTime = (totalSeconds: number): string => {
-    const mins = Math.floor(totalSeconds / 60)
-    const secs = totalSeconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const getProgressPercent = (): number => Math.min((seconds / timeLimit) * 100, 100)
-
-  if (!isRunning && seconds === 0) {
-    return (
-      <div className="text-center">
-        <div className="text-3xl font-mono font-bold mb-2">{formatTime(0)}</div>
-        <button onClick={startTimer} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Iniciar tiempo</button>
-        <div className="text-xs text-gray-400 mt-2">Tiempo límite: {formatTime(timeLimit)}</div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="text-center">
-      <div className="text-3xl font-mono font-bold mb-2">{formatTime(seconds)}</div>
-      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${getProgressPercent()}%` }} />
-      </div>
-      <div className="text-xs text-gray-400 mt-1">Tiempo límite: {formatTime(timeLimit)}</div>
-    </div>
-  )
-}
-
-// ============================================================
-// INTERFAZ PARA CONSTRUCCIÓN CON CUBOS (CC)
-// ============================================================
-
-interface CcInterfaceProps {
-  onComplete: (scores: Record<number, number>, rawTotal: number) => void
-  onUpdatePatient: (content: any) => void
-  patientAge: number
-}
-
-const CcInterface = React.memo(function CcInterface({ onComplete, onUpdatePatient, patientAge }: CcInterfaceProps) {
-  const [currentItemNum, setCurrentItemNum] = useState<number | null>(() => getStartingItem(patientAge))
-  const [scores, setScores] = useState<Record<number, number>>({})
-  const [attempts, setAttempts] = useState<Record<number, number>>({})
-  const [showRetryButton, setShowRetryButton] = useState(false)
-  const [elapsedTime, setElapsedTime] = useState(0)
-  const [cronometroKey, setCronometroKey] = useState(0)
-  const [availableScores, setAvailableScores] = useState<number[]>([])
-  const [isPaused, setIsPaused] = useState(false)
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [timeEnded, setTimeEnded] = useState(false)
-  const [isGoingBack, setIsGoingBack] = useState(false)
-  
-  // Referencias estables
-  const sentItemsRef = useRef<Set<number>>(new Set())
-  const onCompleteRef = useRef(onComplete)
-  const onUpdatePatientRef = useRef(onUpdatePatient)
-
-  // Actualizar referencias cuando cambian las props
-  useEffect(() => {
-    onCompleteRef.current = onComplete
-    onUpdatePatientRef.current = onUpdatePatient
-  }, [onComplete, onUpdatePatient])
-
-  const currentItem = CC_ITEMS_CONFIG.find(i => i.num === currentItemNum)
-  const isTwoAttempts = currentItem?.twoAttempts || false
-  const currentAttempt = attempts[currentItem?.num || 0] || 1
-  const isTimeBased = currentItem?.scoresByTime !== undefined
-  const bonusPoints = getBonusPoints(patientAge)
-  const hasBonus = bonusPoints > 0
-
-  // Callbacks estables con useCallback
-  const handleTimeUpdate = useCallback((seconds: number) => {
-    console.log('📡 onTimeUpdate recibido:', seconds)
-    setElapsedTime(seconds)
-  }, [])
-
-  const handleTimeEnd = useCallback(() => {
-    console.log('⏰ Tiempo finalizado para el ítem:', currentItemNum)
-    setTimeEnded(true)
-  }, [currentItemNum])
-
-  const sendStimulus = useCallback(() => {
-    if (currentItem && !sentItemsRef.current.has(currentItem.num)) {
-      sentItemsRef.current.add(currentItem.num)
-      console.log('📤 Enviando estímulo al display - Ítem:', currentItem.num)
-      onUpdatePatientRef.current({
-        type: 'wisc5_cc',
-        stimulusNum: currentItem.num,
-        instructions: 'Construye la figura usando los cubos. Observa el modelo y repite la construcción.',
-        twoAttempts: isTwoAttempts,
-        currentAttempt: currentAttempt,
-        totalItems: CC_ITEMS_CONFIG.length
-      })
-    }
-  }, [currentItem, isTwoAttempts, currentAttempt])
-
-  const checkSuspension = (newScores: Record<number, number>): boolean => {
-    const items = Object.keys(newScores).map(Number).sort((a, b) => a - b)
-    if (items.length >= 2) {
-      const lastTwo = items.slice(-2)
-      if (newScores[lastTwo[0]] === 0 && newScores[lastTwo[1]] === 0) return true
-    }
-    return false
-  }
-
-  useEffect(() => {
-    if (isTimeBased && currentItem?.scoresByTime && !isPaused && !isCompleted && !timeEnded) {
-      const available: number[] = []
-      for (const tier of currentItem.scoresByTime) {
-        if (elapsedTime <= tier.maxTime) available.push(tier.score)
-      }
-      setAvailableScores(available)
-    }
-  }, [elapsedTime, isTimeBased, currentItem, isPaused, isCompleted, timeEnded])
-
-  const handleScore = (score: number, timeSeconds?: number) => {
-    console.log('📝 Registrando puntaje - Ítem:', currentItemNum, 'Puntaje:', score, 'Tiempo:', timeSeconds)
-    const newScores = { ...scores, [currentItemNum!]: score }
-    setScores(newScores)
-    
-    if (checkSuspension(newScores)) {
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
-      setIsCompleted(true)
-      onCompleteRef.current(newScores, total)
-      return
-    }
-    
-    let nextItem: number | null = null
-    if (score === 0 && patientAge >= 8) {
-      nextItem = getNextItemOnFailure(currentItemNum!, newScores)
-      if (nextItem) {
-        console.log('⬅️ Retrocediendo al ítem:', nextItem, 'por fallo')
-        setIsGoingBack(true)
-        setCurrentItemNum(nextItem)
-        setTimeEnded(false)
-        setElapsedTime(0)
-        setCronometroKey(prev => prev + 1)
-        setShowRetryButton(false)
-        setIsPaused(false)
-        setAvailableScores([])
-        return
-      }
-    }
-    
-    if (!nextItem) {
-      nextItem = currentItemNum! + 1
-      while (nextItem <= 13 && newScores[nextItem]) nextItem++
-    }
-    
-    if (nextItem > 13) {
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
-      console.log('✅ Subprueba completada. Total:', total)
-      setIsCompleted(true)
-      onCompleteRef.current(newScores, total)
-    } else {
-      console.log('➡️ Avanzando al ítem:', nextItem)
-      setCurrentItemNum(nextItem)
-      setTimeEnded(false)
-      setElapsedTime(0)
-      setCronometroKey(prev => prev + 1)
-      setShowRetryButton(false)
-      setIsPaused(false)
-      setAvailableScores([])
-      setIsGoingBack(false)
-    }
-  }
-
-  const handleRetry = () => {
-    console.log('🔄 Segundo intento para el ítem:', currentItemNum)
-    setAttempts({ ...attempts, [currentItemNum!]: 2 })
-    setShowRetryButton(false)
-    setTimeEnded(false)
-    setElapsedTime(0)
-    setCronometroKey(prev => prev + 1)
-    setIsPaused(false)
-    setAvailableScores([])
-  }
-
-  if (!currentItem) return null
-
-  if (isCompleted) {
-    return (
-      <div className="bg-green-50 rounded-lg p-4 text-center">
-        <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">
-          Puntaje total: {Object.values(scores).reduce((a, b) => a + b, 0) + bonusPoints} / 58
-          {hasBonus && ` (incluye ${bonusPoints} puntos por edad)`}
-        </p>
-      </div>
-    )
-  }
-
-  const getScoreLabel = (score: number): string => {
-    switch (score) {
-      case 7: return '7 (≤30s)'
-      case 6: return '6 (31-60s)'
-      case 5: return '5 (51-70s)'
-      case 4: return '4 (71-120s)'
-      default: return '0 - No logrado'
-    }
-  }
-
-  const isScoreDisabled = (score: number): boolean => {
-    if (timeEnded && score !== 0) return true
-    if (isTimeBased && !availableScores.includes(score)) return true
-    return false
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-gray-50 rounded-lg p-3">
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-600">Construcción con Cubos</span>
-          <span className="text-gray-800 font-medium">Ítem {currentItem.num}/{CC_ITEMS_CONFIG.length}</span>
-        </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${((currentItemNum! - 1) / CC_ITEMS_CONFIG.length) * 100}%` }} />
-        </div>
-        {hasBonus && !isGoingBack && <p className="text-xs text-blue-600 mt-1">Bonus por edad: +{bonusPoints} puntos</p>}
-        {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo por fallo...</p>}
-      </div>
-
-      {/* Vista del examinador (modelo invertido) */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <p className="text-sm font-medium text-gray-700 mb-2">Vista del examinador (modelo invertido)</p>
-        <img 
-          src={`/wisc5/cc/cubosinv${String(currentItem.num).padStart(3, '0')}.png`}
-          alt={`Modelo invertido ${currentItem.num}`}
-          className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg"
-          onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
-        />
-        <p className="text-xs text-gray-400 mt-2 text-center">Verifica que la construcción del paciente coincida con este modelo</p>
-      </div>
-
-      {/* Cronómetro */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <Stopwatch
-          key={cronometroKey}
-          timeLimit={currentItem.timeLimit}
-          onTimeUpdate={handleTimeUpdate}
-          onTimeEnd={handleTimeEnd}
-          onStart={sendStimulus}
-        />
-      </div>
-
-      {timeEnded && (
-        <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
-          <p className="text-yellow-700 text-sm">⏰ Tiempo finalizado. Solo puede registrar puntaje 0.</p>
-        </div>
-      )}
-
-      {!showRetryButton && !isPaused && !scores[currentItem.num] && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-3">
-            Puntaje para el ítem {currentItem.num}:
-            {isTwoAttempts && ` (Intento ${currentAttempt} de 2)`}
-          </p>
-          {isTimeBased ? (
-            <div className="grid grid-cols-5 gap-2">
-              {[7, 6, 5, 4, 0].map(score => (
-                <button key={score} onClick={() => handleScore(score, elapsedTime)} disabled={isScoreDisabled(score)}
-                  className={`py-2 rounded-lg text-sm font-medium transition-all ${!isScoreDisabled(score) ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
-                  {getScoreLabel(score)}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              {currentItem.maxScore === 2 ? (
-                <>
-                  <button onClick={() => handleScore(0, elapsedTime)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">0 - No logrado</button>
-                  <button onClick={() => handleScore(1, elapsedTime)} disabled={timeEnded} className={`py-2 rounded-lg border border-gray-200 text-sm ${timeEnded ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}>1 - Segundo intento</button>
-                  <button onClick={() => handleScore(2, elapsedTime)} disabled={timeEnded} className={`py-2 rounded-lg border border-gray-200 text-sm ${timeEnded ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}>2 - Primer intento</button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => handleScore(0, elapsedTime)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">0 - No logrado</button>
-                  <button onClick={() => handleScore(currentItem.maxScore, elapsedTime)} disabled={timeEnded} className={`py-2 rounded-lg border border-gray-200 text-sm ${timeEnded ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}>{currentItem.maxScore} - Logrado</button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {showRetryButton && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
-          <p className="text-sm text-gray-600 mb-3">No logró el ítem en el primer intento.</p>
-          <button onClick={handleRetry} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Segundo intento</button>
-        </div>
-      )}
-
-      <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 58{hasBonus && ` (sin bonus: +${bonusPoints} al final)`}</p>
-      </div>
-    </div>
-  )
-})
 
 // ============================================================
 // PANEL DE SUBPRUEBAS
@@ -600,33 +236,6 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     if (sessionId) loadSavedState()
   }, [sessionId])
 
-  const calculateAge = (birthDate: Date, evalDate: Date): { years: number; months: number; totalMonths: number } => {
-    let years = evalDate.getFullYear() - birthDate.getFullYear()
-    let months = evalDate.getMonth() - birthDate.getMonth()
-    let days = evalDate.getDate() - birthDate.getDate()
-    if (days < 0) months--
-    if (months < 0) { years--; months += 12 }
-    return { years, months, totalMonths: years * 12 + months }
-  }
-
-  const getAgeGroup = (totalMonths: number): string => {
-    const groups = [
-      { min: 72, max: 77, label: '6:0-6:5' }, { min: 78, max: 83, label: '6:6-6:11' },
-      { min: 84, max: 89, label: '7:0-7:5' }, { min: 90, max: 95, label: '7:6-7:11' },
-      { min: 96, max: 101, label: '8:0-8:5' }, { min: 102, max: 107, label: '8:6-8:11' },
-      { min: 108, max: 113, label: '9:0-9:5' }, { min: 114, max: 119, label: '9:6-9:11' },
-      { min: 120, max: 125, label: '10:0-10:5' }, { min: 126, max: 131, label: '10:6-10:11' },
-      { min: 132, max: 137, label: '11:0-11:5' }, { min: 138, max: 143, label: '11:6-11:11' },
-      { min: 144, max: 149, label: '12:0-12:5' }, { min: 150, max: 155, label: '12:6-12:11' },
-      { min: 156, max: 161, label: '13:0-13:5' }, { min: 162, max: 167, label: '13:6-13:11' },
-      { min: 168, max: 173, label: '14:0-14:5' }, { min: 174, max: 179, label: '14:6-14:11' },
-      { min: 180, max: 185, label: '15:0-15:5' }, { min: 186, max: 191, label: '15:6-15:11' },
-      { min: 192, max: 197, label: '16:0-16:5' }, { min: 198, max: 203, label: '16:6-16:11' }
-    ]
-    const group = groups.find(g => totalMonths >= g.min && totalMonths <= g.max)
-    return group?.label || '6:0-6:5'
-  }
-
   useEffect(() => {
     if (birthDate && evalDate) {
       const birth = new Date(birthDate)
@@ -691,10 +300,30 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     setShowSubtestPanel(true)
   }
 
+  const handleAnComplete = (itemScores: Record<string | number, number>, rawTotal: number) => {
+    console.log('✅ Subprueba AN completada. Puntaje bruto:', rawTotal)
+    setRawScores({ ...rawScores, AN: rawTotal })
+    setSubtestStatus(prev => ({ ...prev, AN: 'completed' }))
+    if (ageInfo?.group) {
+      fetchScaledScore('AN', rawTotal, ageInfo.group).then(scaled => {
+        if (scaled) {
+          console.log('📊 Puntaje escalado para AN:', scaled)
+          setScaledScores({ ...scaledScores, AN: scaled })
+        }
+      })
+    }
+    saveState('in_progress')
+    setActiveSubtest(null)
+    setShowSubtestPanel(true)
+  }
+
   const handleSelectSubtest = (code: string) => {
     console.log('🔘 Subprueba seleccionada:', code)
     if (code === 'CC' || (code === 'RV' && substitutionUsed)) {
       setActiveSubtest('CC')
+      setShowSubtestPanel(false)
+    } else if (code === 'AN') {
+      setActiveSubtest('AN')
       setShowSubtestPanel(false)
     } else {
       alert(`La subprueba ${code} está en desarrollo. Próximamente disponible.`)
@@ -780,7 +409,11 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
         </div>
 
         {activeSubtest === 'CC' && ageInfo && (
-          <CcInterface onComplete={handleCcComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />
+          <CCInterface onComplete={handleCcComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />
+        )}
+
+        {activeSubtest === 'AN' && ageInfo && (
+          <ANInterface onComplete={handleAnComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />
         )}
 
         {showSubtestPanel && (
