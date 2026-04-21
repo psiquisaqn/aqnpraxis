@@ -168,26 +168,52 @@ interface ANInterfaceProps {
 }
 
 export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdatePatient, patientAge }: ANInterfaceProps) {
-  // Determinar ítems de inicio según edad
+  // Determinar ítems de inicio según edad (WISC-V Chile)
   const getStartItems = (): { first: number; second: number; jumpAfterBacktrack: number } => {
     if (patientAge <= 7) {
-      return { first: 1, second: 2, jumpAfterBacktrack: 0 } // Sin retroceso
+      // 6-7 años: empiezan en ítem 1, sin retroceso
+      return { first: 1, second: 2, jumpAfterBacktrack: 0 }
     }
     if (patientAge <= 11) {
+      // 8-11 años: empiezan en ítem 5
       return { first: 5, second: 6, jumpAfterBacktrack: 7 }
     }
+    // 12-16 años: empiezan en ítem 8
     return { first: 8, second: 9, jumpAfterBacktrack: 10 }
   }
 
-  const checkBonusEligibility = (scores: Record<string | number, number>): boolean => {
-    const { first, second } = getStartItems()
-    if (patientAge <= 7) return false
-    return scores[first] === 2 && scores[second] === 2
+  /**
+   * Calcula los puntos bonus según el manual WISC-V.
+   * Si el niño acierta los dos primeros ítems administrados,
+   * se otorgan los puntos correspondientes a los ítems no administrados.
+   * Cada ítem no administrado vale 2 puntos.
+   */
+  const calculateBonusPoints = (): number => {
+    const { first } = getStartItems()
+    
+    // Niños de 6-7 años no tienen bonus (empiezan en ítem 1)
+    if (patientAge <= 7) return 0
+    
+    // Número de ítems no administrados = first - 1
+    // (si empieza en 5, hay 4 ítems no administrados: 1,2,3,4)
+    const unadministeredCount = first - 1
+    
+    // Cada ítem no administrado vale 2 puntos
+    return unadministeredCount * 2
   }
 
-  const getBonusPoints = (): number => {
-    if (patientAge >= 8 && patientAge <= 16) return 8
-    return 0
+  /**
+   * Verifica si el niño es elegible para recibir puntos bonus.
+   * Condición: Debe haber acertado (puntaje 2) en AMBOS primeros ítems administrados.
+   */
+  const checkBonusEligibility = (scores: Record<string | number, number>): boolean => {
+    const { first, second } = getStartItems()
+    
+    // Niños de 6-7 años no aplican bonus
+    if (patientAge <= 7) return false
+    
+    // Debe tener puntaje 2 en ambos ítems de inicio
+    return scores[first] === 2 && scores[second] === 2
   }
 
   const [currentIndex, setCurrentIndex] = useState<number>(0)
@@ -200,11 +226,12 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   const [isGoingBack, setIsGoingBack] = useState(false)
   const [backtrackMode, setBacktrackMode] = useState(false)
   const [failedStartItem, setFailedStartItem] = useState<number | null>(null)
+  const [consecutiveSuccessesInBacktrack, setConsecutiveSuccessesInBacktrack] = useState(0)
 
   const currentItem = AN_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
   const { first: firstStartItem, second: secondStartItem, jumpAfterBacktrack } = getStartItems()
-  const hasBacktrack = patientAge >= 8
+  const hasBacktrack = patientAge >= 8  // Solo niños ≥ 8 años tienen secuencia inversa
 
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
@@ -238,14 +265,29 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   useEffect(() => {
     if (!bonusApplied && checkBonusEligibility(scores)) {
       setBonusApplied(true)
-      console.log(`🎉 Bonus de +${getBonusPoints()} puntos aplicado por acertar ${firstStartItem} y ${secondStartItem}`)
+      const bonusPoints = calculateBonusPoints()
+      console.log(`🎉 Bonus de +${bonusPoints} puntos aplicado por acertar ítems ${firstStartItem} y ${secondStartItem}`)
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
-  const markSkippedItemsAsCorrect = (newScores: Record<string | number, number>, startItem: number, endItem: number): Record<string | number, number> => {
+  /**
+   * Marca los ítems no administrados como correctos (puntaje 2).
+   * Se usa cuando el niño obtiene dos aciertos consecutivos en secuencia inversa.
+   * @param newScores - Objeto de puntajes actual
+   * @param fromItem - Ítem donde comenzó el retroceso (el ítem de inicio que falló)
+   * @param toItem - Ítem donde terminó el retroceso (último ítem con puntaje 2)
+   */
+  const markSkippedItemsAsCorrect = (
+    newScores: Record<string | number, number>, 
+    fromItem: number, 
+    toItem: number
+  ): Record<string | number, number> => {
     const updatedScores = { ...newScores }
-    for (let i = startItem; i >= endItem; i--) {
-      if (updatedScores[i] === undefined && i >= 1 && !isNaN(i)) {
+    
+    // Marcar todos los ítems ENTRE toItem+1 y fromItem-1 como correctos
+    // (porque esos ítems NO fueron administrados y se asume que los habría acertado)
+    for (let i = toItem + 1; i < fromItem; i++) {
+      if (updatedScores[i] === undefined) {
         updatedScores[i] = 2
         console.log(`✓ Ítem ${i} no administrado - se asigna puntaje 2 automáticamente`)
       }
@@ -257,8 +299,10 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     let updatedScores = { ...scores }
     const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    // Prácticas
-    if (currentItemNum === 'PA') return { nextIndex: AN_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
+    // Ítems de práctica
+    if (currentItemNum === 'PA') {
+      return { nextIndex: AN_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
+    }
     if (currentItemNum === 'PB') {
       return { nextIndex: AN_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
     }
@@ -266,7 +310,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     // Si es menor de 8 años (sin retroceso), avanzar correlativamente
     if (!hasBacktrack) {
       let nextIdx = currentIdx + 1
-      while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num]) {
+      while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num] !== undefined) {
         nextIdx++
       }
       return { nextIndex: nextIdx, updatedScores }
@@ -274,46 +318,65 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
 
     const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
     
-    // Modo retroceso activo
+    // ============================================================
+    // MODO RETROCESO ACTIVO
+    // ============================================================
     if (backtrackMode) {
       if (currentScore === 2) {
-        const prevItem = numericItem - 1
-        if (prevItem >= 1 && updatedScores[prevItem] === 2) {
-          // Dos éxitos consecutivos - salir del retroceso
+        // Incrementar contador de éxitos consecutivos
+        const newConsecutiveSuccesses = consecutiveSuccessesInBacktrack + 1
+        setConsecutiveSuccessesInBacktrack(newConsecutiveSuccesses)
+        
+        // Verificar si tenemos DOS aciertos consecutivos
+        if (newConsecutiveSuccesses >= 2) {
+          // ¡Dos aciertos consecutivos! Salir del retroceso
           setBacktrackMode(false)
+          setConsecutiveSuccessesInBacktrack(0)
+          
           // Marcar ítems no administrados como correctos
-          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem! - 1, numericItem)
+          // fromItem = ítem que falló al inicio, toItem = ítem actual (último con puntaje 2)
+          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem!, numericItem)
+          
+          // Saltar al ítem después del punto de inicio original
           const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpAfterBacktrack)
           return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
         }
+        
+        // Solo un acierto hasta ahora - continuar retrocediendo
+        const prevItem = numericItem - 1
         if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
       } else {
-        // Puntaje 0 o 1 - continuar retrocediendo
+        // Fallo (0 o 1) en modo retroceso - reiniciar contador de éxitos consecutivos
+        setConsecutiveSuccessesInBacktrack(0)
+        
+        // Continuar retrocediendo
         const prevItem = numericItem - 1
         if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
       }
+      
+      // Si no hay más ítems para retroceder, salir del modo retroceso
       setBacktrackMode(false)
+      setConsecutiveSuccessesInBacktrack(0)
     }
 
-    // Caso 1: El primer ítem de inicio falló (puntaje 0 o 1)
-    if (numericItem === firstStartItem && (currentScore === 0 || currentScore === 1)) {
+    // ============================================================
+    // VERIFICAR SI SE DEBE ACTIVAR SECUENCIA INVERSA
+    // Regla WISC-V: Si el niño obtiene puntaje < 2 en CUALQUIERA de los
+    // dos primeros ítems administrados, se aplica secuencia inversa.
+    // ============================================================
+    const isFirstTwoAdministered = (numericItem === firstStartItem) || (numericItem === secondStartItem)
+    const isFailure = currentScore < 2  // 0 o 1 se considera fallo para activar retroceso
+    
+    if (isFirstTwoAdministered && isFailure) {
       setBacktrackMode(true)
       setFailedStartItem(numericItem)
+      setConsecutiveSuccessesInBacktrack(0)
+      
       const prevItem = numericItem - 1
-      if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
-        return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-      }
-    }
-
-    // Caso 2: El segundo ítem de inicio falló (puntaje 0 o 1) y el primero fue éxito
-    if (numericItem === secondStartItem && scores[firstStartItem] === 2 && (currentScore === 0 || currentScore === 1)) {
-      setBacktrackMode(true)
-      setFailedStartItem(firstStartItem)
-      const prevItem = firstStartItem - 1
       if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
         return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
@@ -321,14 +384,14 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
 
     // Avanzar al siguiente ítem no respondido
     let nextIdx = currentIdx + 1
-    while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num]) {
+    while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num] !== undefined) {
       nextIdx++
     }
     return { nextIndex: nextIdx, updatedScores }
   }
 
   const handleScore = (score: number) => {
-    if (scores[currentItem.num]) return
+    if (scores[currentItem.num] !== undefined) return
 
     const effectiveScore = isPractice ? 0 : score
     let newScores = { ...scores, [currentItem.num]: effectiveScore }
@@ -340,8 +403,11 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       if (effectiveScore === 0) {
         const newConsecutiveZeros = consecutiveZeros + 1
         setConsecutiveZeros(newConsecutiveZeros)
+        
+        // Regla de terminación: 3 fallos consecutivos (puntaje 0)
         if (newConsecutiveZeros >= 3) {
-          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
+          const bonusPoints = bonusApplied ? calculateBonusPoints() : 0
+          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
           setIsCompleted(true)
           onCompleteRef.current(newScores, total)
           return
@@ -351,12 +417,13 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       }
     }
 
-    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, score)
+    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, effectiveScore)
     newScores = updatedScores
     setScores(newScores)
     
     if (nextIndex >= AN_ITEMS.length) {
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
+      const bonusPoints = bonusApplied || checkBonusEligibility(newScores) ? calculateBonusPoints() : 0
+      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
       setIsCompleted(true)
       onCompleteRef.current(newScores, total)
     } else {
@@ -366,7 +433,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   }
 
   const applySuggestion = () => {
-    if (suggestion && !scores[currentItem.num]) {
+    if (suggestion && scores[currentItem.num] === undefined) {
       handleScore(suggestion.suggestedScore)
     }
   }
@@ -374,20 +441,32 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   if (!currentItem) return null
 
   if (isCompleted) {
-    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
+    const bonusPoints = bonusApplied ? calculateBonusPoints() : 0
+    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + bonusPoints
+    const maxPossible = 46
+    
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
         <p className="text-sm text-green-600 mt-1">
-          Puntaje total: {totalScore} / 46
-          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{getBonusPoints()} puntos por bonus)</span>}
+          Puntaje total: {totalScore} / {maxPossible}
+          {bonusApplied && (
+            <span className="ml-2 text-blue-600">
+              (incluye +{bonusPoints} puntos por bonus de {calculateBonusPoints() / 2} ítems no administrados)
+            </span>
+          )}
         </p>
       </div>
     )
   }
 
+  const bonusPoints = calculateBonusPoints()
+  const currentRawScore = Object.values(scores).reduce((a, b) => a + b, 0)
+  const displayScore = bonusApplied ? currentRawScore + bonusPoints : currentRawScore
+
   return (
     <div className="space-y-4">
+      {/* Barra de progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Analogías</span>
@@ -397,14 +476,25 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
           <div className="h-full bg-blue-500 rounded-full" style={{ 
-            width: `${(Object.keys(scores).filter(k => !isNaN(Number(k))).length / AN_ITEMS.filter(i => !i.isPractice).length) * 100}%` 
+            width: `${(Object.keys(scores).filter(k => k !== 'PA' && k !== 'PB').length / AN_ITEMS.filter(i => !i.isPractice).length) * 100}%` 
           }} />
         </div>
-        {isGoingBack && <p className="text-xs text-orange-600 mt-1">Retrocediendo para verificar nivel basal...</p>}
-        {backtrackMode && <p className="text-xs text-orange-600 mt-1">Modo retroceso activo</p>}
-        {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{getBonusPoints()} puntos aplicado</p>}
+        {isGoingBack && (
+          <p className="text-xs text-orange-600 mt-1">↩️ Retrocediendo para verificar nivel basal...</p>
+        )}
+        {backtrackMode && (
+          <p className="text-xs text-orange-600 mt-1">
+            🔄 Modo retroceso activo - Éxitos consecutivos: {consecutiveSuccessesInBacktrack}/2
+          </p>
+        )}
+        {bonusApplied && (
+          <p className="text-xs text-blue-600 mt-1">
+            ✓ Bonus de +{bonusPoints} puntos aplicado ({calculateBonusPoints() / 2} ítems no administrados)
+          </p>
+        )}
       </div>
 
+      {/* Estímulo */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
         <div className="flex justify-center items-center gap-8">
           <span className="text-2xl md:text-3xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
@@ -415,52 +505,83 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
             {currentItem.words[1]}
           </span>
         </div>
-        {isPractice && <p className="text-xs text-gray-400 mt-3">Ítem de práctica (no suma puntos)</p>}
+        {isPractice && (
+          <p className="text-xs text-gray-400 mt-3">Ítem de práctica (no suma puntos)</p>
+        )}
       </div>
 
+      {/* Campo de respuesta */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Respuesta del paciente</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Respuesta del paciente
+        </label>
         <textarea
           value={response}
           onChange={(e) => setResponse(e.target.value)}
-          disabled={!!scores[currentItem.num]}
+          disabled={scores[currentItem.num] !== undefined}
           placeholder="Escribe la respuesta del paciente..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] disabled:bg-gray-100 disabled:text-gray-500"
         />
         
-        {suggestion && !scores[currentItem.num] && !isPractice && (
+        {/* Sugerencia de puntaje */}
+        {suggestion && scores[currentItem.num] === undefined && !isPractice && (
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex justify-between items-center">
-              <div>
+            <div className="flex justify-between items-start gap-3">
+              <div className="flex-1">
                 <p className="text-sm text-blue-700">
                   <strong>Sugerencia de puntaje:</strong> {suggestion.suggestedScore}
                   <span className="text-xs ml-2 text-blue-500">
-                    ({suggestion.confidence === 'high' ? 'Alta confianza' : suggestion.confidence === 'medium' ? 'Confianza media' : 'Baja confianza'})
+                    ({suggestion.confidence === 'high' ? 'Alta confianza' : 
+                      suggestion.confidence === 'medium' ? 'Confianza media' : 'Baja confianza'})
                   </span>
                 </p>
-                {suggestion.reason && <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>}
+                {suggestion.reason && (
+                  <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>
+                )}
                 <p className="text-xs text-orange-600 mt-2">{suggestion.disclaimer}</p>
               </div>
-              <button onClick={applySuggestion} className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Aplicar</button>
+              <button 
+                onClick={applySuggestion} 
+                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap"
+              >
+                Aplicar
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {!scores[currentItem.num] && (
+      {/* Botones de puntaje */}
+      {scores[currentItem.num] === undefined && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-600 mb-3">
             Puntaje para este ítem:
             {isPractice && <span className="ml-2 text-xs text-gray-400">(no suma puntos)</span>}
           </p>
           <div className="grid grid-cols-3 gap-3">
-            <button onClick={() => handleScore(0)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">0 - No logrado</button>
-            <button onClick={() => handleScore(1)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">1 - Respuesta parcial</button>
-            <button onClick={() => handleScore(2)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50">2 - Respuesta correcta</button>
+            <button 
+              onClick={() => handleScore(0)} 
+              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors"
+            >
+              0 - No logrado
+            </button>
+            <button 
+              onClick={() => handleScore(1)} 
+              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors"
+            >
+              1 - Respuesta parcial
+            </button>
+            <button 
+              onClick={() => handleScore(2)} 
+              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors"
+            >
+              2 - Respuesta correcta
+            </button>
           </div>
         </div>
       )}
 
+      {/* Confirmación de ítem respondido */}
       {scores[currentItem.num] !== undefined && (
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">
@@ -470,11 +591,14 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
         </div>
       )}
 
+      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
-          Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 46
-          {!bonusApplied && patientAge >= 8 && patientAge <= 16 && scores[firstStartItem] === 2 && scores[secondStartItem] !== 2 && (
-            <span className="ml-2 text-xs text-blue-600">(Falta ítem {secondStartItem} para bonus de +8)</span>
+          Puntaje bruto acumulado: {displayScore} / 46
+          {!bonusApplied && patientAge >= 8 && (
+            <span className="ml-2 text-xs text-gray-500">
+              (Bonus potencial: +{bonusPoints} pts si acierta ítems {firstStartItem} y {secondStartItem})
+            </span>
           )}
         </p>
       </div>
