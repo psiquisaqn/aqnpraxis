@@ -82,62 +82,56 @@ function suggestScore(response: string, word1: string, word2: string, isPractice
     }
   }
 
-  // Palabras clave para puntaje 2 (respuesta certera) - COMPLETO hasta ítem 23
   const highKeywords: Record<string, string[]> = {
-    // Ítems 1-10
-    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio', 'vegetal', 'fruta tropical', 'alimento vegetal'],
-    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación', 'entretenimiento', 'objeto de juego'],
-    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria', 'atuendo', 'vestuario'],
-    'Agua-Leche': ['bebida', 'líquido', 'liquido', 'bebible', 'hidratante', 'bebestible', 'bebida liquida', 'lacteo', 'lácteo'],
-    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador', 'artrópodo', 'insecto volador'],
-    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares', 'parentela', 'miembro de la familia'],
-    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo', 'transportador', 'medio de desplazamiento'],
-    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época', 'periodo', 'estación del año'],
-    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia', 'disciplina deportiva', 'deporte olímpico'],
-    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto', 'sensación', 'estado emocional'],
-    // Ítems 11-15
-    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo', 'sabor básico', 'sensación gustativa'],
-    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro', 'articulación del cuerpo', 'parte del cuerpo'],
-    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro', 'cría animal', 'animal pequeño'],
-    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo', 'instrumento de medida', 'medidor'],
-    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico', 'manifestación artística', 'obra de arte'],
-    // Ítems 16-20
-    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación', 'estado del agua', 'cambio de estado'],
-    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo', 'ilusión', 'emoción positiva'],
-    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve', 'elemento natural', 'formación natural'],
-    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar', 'ubicación', 'posición en serie'],
-    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción', 'fenómeno físico', 'onda electromagnética'],
-    // Ítems 21-23
-    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición', 'atributo físico', 'propiedad física'],
-    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto', 'valor universal', 'concepto abstracto'],
-    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida', 'concepto abstracto', 'dimensión fundamental']
+    'Manzana-Plátano': ['fruta', 'frutas', 'alimento', 'comida', 'alimenticio', 'vegetal'],
+    'Muñeca-Pelota': ['juguete', 'juguetes', 'entretención', 'juego', 'recreación', 'entretenimiento'],
+    'Camisa-Zapato': ['ropa', 'vestimenta', 'prenda', 'vestir', 'indumentaria', 'atuendo'],
+    'Agua-Leche': ['bebida', 'líquido', 'liquido', 'bebible', 'hidratante', 'bebestible', 'lacteo', 'lácteo'],
+    'Mariposa-Abeja': ['insecto', 'insectos', 'bicho', 'animal volador', 'polinizador'],
+    'Abuelo-Primo': ['familia', 'familiar', 'parentesco', 'pariente', 'familiares'],
+    'Auto-Avión': ['transporte', 'vehículo', 'medio transporte', 'movilidad', 'vehiculo'],
+    'Invierno-Verano': ['estación', 'estaciones', 'clima', 'temporada', 'época', 'periodo'],
+    'Natación-Atletismo': ['deporte', 'deportes', 'actividad física', 'competencia'],
+    'Enojo-Alegría': ['emoción', 'emociones', 'sentimiento', 'estado ánimo', 'afecto'],
+    'Ácido-Salado': ['sabor', 'gusto', 'sabores', 'gustativo'],
+    'Codo-Rodilla': ['articulación', 'parte cuerpo', 'extremidad', 'miembro'],
+    'Ternero-Potrillo': ['cría', 'animal bebé', 'animal joven', 'cachorro'],
+    'Reloj-Termómetro': ['medición', 'instrumento', 'medir', 'aparato', 'dispositivo'],
+    'Escultura-Poema': ['arte', 'obra', 'creación artística', 'expresión', 'artístico'],
+    'Hielo-Vapor': ['agua', 'estado', 'fase', 'líquido transformado', 'agregación'],
+    'Esperanza-Deseo': ['sentimiento', 'emoción', 'anhelo', 'aspiración', 'deseo'],
+    'Montaña-Lago': ['naturaleza', 'paisaje', 'geografía', 'accidente geográfico', 'relieve'],
+    'Primero-Último': ['posición', 'orden', 'secuencia', 'número ordinal', 'lugar'],
+    'Luz-Sonido': ['onda', 'fenómeno', 'energía', 'física', 'percepción'],
+    'Estatura-Peso': ['medida', 'dimensión', 'característica física', 'medición'],
+    'Libertad-Justicia': ['valor', 'principio', 'derecho', 'ideal', 'concepto'],
+    'Tiempo-Espacio': ['concepto', 'dimensión', 'física', 'magnitud', 'medida']
   }
 
-  // Palabras clave para puntaje 1 (respuesta parcial) - COMPLETO hasta ítem 23
   const mediumKeywords: Record<string, string[]> = {
-    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde', 'fruta tropical'],
-    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido', 'pequeño'],
-    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar', 'vestimenta casual'],
-    'Agua-Leche': ['blanco', 'beber', 'tomar', 'hidratar', 'agua', 'leche', 'bebida blanca'],
-    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan', 'insecto volador'],
-    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares', 'miembro de la familia'],
-    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar', 'medio de transporte'],
-    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura', 'clima extremo'],
-    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio', 'deporte olímpico'],
-    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción', 'estado emocional'],
-    'Ácido-Salado': ['ácido', 'sal', 'sabor fuerte', 'condimento', 'gusto intenso'],
-    'Codo-Rodilla': ['hueso', 'brazo', 'pierna', 'extremidad', 'parte del cuerpo'],
-    'Ternero-Potrillo': ['vaca', 'caballo', 'animal', 'bebé animal', 'cría'],
-    'Reloj-Termómetro': ['tiempo', 'temperatura', 'medición', 'aparato', 'instrumento'],
-    'Escultura-Poema': ['belleza', 'creatividad', 'expresión artística', 'obra', 'arte'],
-    'Hielo-Vapor': ['frío', 'calor', 'agua', 'cambio', 'transformación', 'evaporación'],
-    'Esperanza-Deseo': ['futuro', 'anhelar', 'querer', 'ilusionarse', 'aspirar'],
-    'Montaña-Lago': ['alto', 'profundo', 'agua', 'tierra', 'paisaje', 'naturaleza'],
-    'Primero-Último': ['inicio', 'final', 'comienzo', 'termino', 'posición'],
-    'Luz-Sonido': ['ver', 'oír', 'sentido', 'percepción', 'estímulo'],
-    'Estatura-Peso': ['alto', 'bajo', 'gordo', 'flaco', 'físico', 'corporal'],
-    'Libertad-Justicia': ['igualdad', 'derecho', 'ética', 'moral', 'principio'],
-    'Tiempo-Espacio': ['duración', 'distancia', 'medida', 'extensión', 'dimensión']
+    'Manzana-Plátano': ['dulce', 'cáscara', 'semilla', 'color', 'amarillo', 'rojo', 'verde'],
+    'Muñeca-Pelota': ['niño', 'infancia', 'divertido', 'jugar', 'entretenido'],
+    'Camisa-Zapato': ['tela', 'cuero', 'usar', 'vestir', 'calzar'],
+    'Agua-Leche': ['blanco', 'beber', 'tomar', 'hidratar', 'agua', 'leche'],
+    'Mariposa-Abeja': ['vuela', 'alas', 'polen', 'color', 'vuelan'],
+    'Abuelo-Primo': ['persona', 'hombre', 'mayor', 'menor', 'familiares'],
+    'Auto-Avión': ['rueda', 'volar', 'conducir', 'moverse', 'trasladar'],
+    'Invierno-Verano': ['frío', 'calor', 'sol', 'lluvia', 'temperatura'],
+    'Natación-Atletismo': ['competencia', 'correr', 'nadar', 'piscina', 'estadio'],
+    'Enojo-Alegría': ['feliz', 'triste', 'enojado', 'contento', 'emoción'],
+    'Ácido-Salado': ['ácido', 'sal', 'sabor fuerte', 'condimento'],
+    'Codo-Rodilla': ['hueso', 'brazo', 'pierna', 'extremidad'],
+    'Ternero-Potrillo': ['vaca', 'caballo', 'animal', 'bebé animal'],
+    'Reloj-Termómetro': ['tiempo', 'temperatura', 'medición', 'aparato'],
+    'Escultura-Poema': ['belleza', 'creatividad', 'expresión artística', 'obra'],
+    'Hielo-Vapor': ['frío', 'calor', 'agua', 'cambio', 'transformación'],
+    'Esperanza-Deseo': ['futuro', 'anhelar', 'querer', 'ilusionarse'],
+    'Montaña-Lago': ['alto', 'profundo', 'agua', 'tierra', 'paisaje'],
+    'Primero-Último': ['inicio', 'final', 'comienzo', 'termino'],
+    'Luz-Sonido': ['ver', 'oír', 'sentido', 'percepción'],
+    'Estatura-Peso': ['alto', 'bajo', 'gordo', 'flaco', 'físico'],
+    'Libertad-Justicia': ['igualdad', 'derecho', 'ética', 'moral'],
+    'Tiempo-Espacio': ['duración', 'distancia', 'medida', 'extensión']
   }
 
   const key = `${word1}-${word2}`
@@ -145,42 +139,22 @@ function suggestScore(response: string, word1: string, word2: string, isPractice
   const keywords = highKeywords[key] || []
   for (const kw of keywords) {
     if (normalizedResponse.includes(kw)) {
-      return { 
-        suggestedScore: 2, 
-        confidence: 'high', 
-        reason: `Palabra clave "${kw}" detectada`,
-        disclaimer 
-      }
+      return { suggestedScore: 2, confidence: 'high', reason: `Palabra clave "${kw}" detectada`, disclaimer }
     }
   }
 
   const mediumKw = mediumKeywords[key] || []
   for (const kw of mediumKw) {
     if (normalizedResponse.includes(kw)) {
-      return { 
-        suggestedScore: 1, 
-        confidence: 'medium', 
-        reason: `Palabra clave "${kw}" detectada`,
-        disclaimer 
-      }
+      return { suggestedScore: 1, confidence: 'medium', reason: `Palabra clave "${kw}" detectada`, disclaimer }
     }
   }
 
   if (normalizedResponse.split(' ').length >= 3) {
-    return { 
-      suggestedScore: 1, 
-      confidence: 'low', 
-      reason: 'Respuesta elaborada, pero sin palabras clave',
-      disclaimer 
-    }
+    return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada, pero sin palabras clave', disclaimer }
   }
 
-  return { 
-    suggestedScore: 0, 
-    confidence: 'low', 
-    reason: 'Respuesta insuficiente',
-    disclaimer 
-  }
+  return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta insuficiente', disclaimer }
 }
 
 // ============================================================
@@ -194,36 +168,26 @@ interface ANInterfaceProps {
 }
 
 export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdatePatient, patientAge }: ANInterfaceProps) {
-  const getStartItems = (): { first: number; second: number } => {
-    if (patientAge <= 7) return { first: 1, second: 2 }
-    if (patientAge <= 11) return { first: 5, second: 6 }
-    return { first: 8, second: 9 }
+  // Determinar ítems de inicio según edad
+  const getStartItems = (): { first: number; second: number; jumpAfterBacktrack: number } => {
+    if (patientAge <= 7) {
+      return { first: 1, second: 2, jumpAfterBacktrack: 0 } // Sin retroceso
+    }
+    if (patientAge <= 11) {
+      return { first: 5, second: 6, jumpAfterBacktrack: 7 }
+    }
+    return { first: 8, second: 9, jumpAfterBacktrack: 10 }
   }
 
   const checkBonusEligibility = (scores: Record<string | number, number>): boolean => {
     const { first, second } = getStartItems()
+    if (patientAge <= 7) return false
     return scores[first] === 2 && scores[second] === 2
   }
 
   const getBonusPoints = (): number => {
-    if (patientAge >= 8 && patientAge <= 11) return 8
+    if (patientAge >= 8 && patientAge <= 16) return 8
     return 0
-  }
-
-  const getJumpItemAfterBacktrack = (failedItem: number): number => {
-    if (patientAge <= 7) {
-      if (failedItem === 1) return 3
-      if (failedItem === 2) return 4
-      return failedItem + 1
-    }
-    if (patientAge <= 11) {
-      if (failedItem === 5) return 7
-      if (failedItem === 6) return 8
-      return failedItem + 1
-    }
-    if (failedItem === 8) return 11
-    if (failedItem === 9) return 12
-    return failedItem + 1
   }
 
   const [currentIndex, setCurrentIndex] = useState<number>(0)
@@ -239,7 +203,8 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
 
   const currentItem = AN_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
-  const { first: firstStartItem, second: secondStartItem } = getStartItems()
+  const { first: firstStartItem, second: secondStartItem, jumpAfterBacktrack } = getStartItems()
+  const hasBacktrack = patientAge >= 8
 
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
@@ -277,9 +242,9 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
-  const markSkippedItemsAsCorrect = (newScores: Record<string | number, number>, failedItem: number, successItem: number): Record<string | number, number> => {
+  const markSkippedItemsAsCorrect = (newScores: Record<string | number, number>, startItem: number, endItem: number): Record<string | number, number> => {
     const updatedScores = { ...newScores }
-    for (let i = failedItem - 1; i >= successItem; i--) {
+    for (let i = startItem; i >= endItem; i--) {
       if (updatedScores[i] === undefined && i >= 1 && !isNaN(i)) {
         updatedScores[i] = 2
         console.log(`✓ Ítem ${i} no administrado - se asigna puntaje 2 automáticamente`)
@@ -292,27 +257,40 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     let updatedScores = { ...scores }
     const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItemNum)
     
+    // Prácticas
     if (currentItemNum === 'PA') return { nextIndex: AN_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
     if (currentItemNum === 'PB') {
       return { nextIndex: AN_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
     }
 
+    // Si es menor de 8 años (sin retroceso), avanzar correlativamente
+    if (!hasBacktrack) {
+      let nextIdx = currentIdx + 1
+      while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num]) {
+        nextIdx++
+      }
+      return { nextIndex: nextIdx, updatedScores }
+    }
+
     const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
     
+    // Modo retroceso activo
     if (backtrackMode) {
       if (currentScore === 2) {
         const prevItem = numericItem - 1
         if (prevItem >= 1 && updatedScores[prevItem] === 2) {
+          // Dos éxitos consecutivos - salir del retroceso
           setBacktrackMode(false)
-          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem || firstStartItem, numericItem)
-          const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
-          const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
+          // Marcar ítems no administrados como correctos
+          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem! - 1, numericItem)
+          const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpAfterBacktrack)
           return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
         }
         if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
       } else {
+        // Puntaje 0 o 1 - continuar retrocediendo
         const prevItem = numericItem - 1
         if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
@@ -321,7 +299,8 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       setBacktrackMode(false)
     }
 
-    if (numericItem === firstStartItem && currentScore !== 2) {
+    // Caso 1: El primer ítem de inicio falló (puntaje 0 o 1)
+    if (numericItem === firstStartItem && (currentScore === 0 || currentScore === 1)) {
       setBacktrackMode(true)
       setFailedStartItem(numericItem)
       const prevItem = numericItem - 1
@@ -330,7 +309,8 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       }
     }
 
-    if (numericItem === secondStartItem && scores[firstStartItem] === 2 && currentScore !== 2) {
+    // Caso 2: El segundo ítem de inicio falló (puntaje 0 o 1) y el primero fue éxito
+    if (numericItem === secondStartItem && scores[firstStartItem] === 2 && (currentScore === 0 || currentScore === 1)) {
       setBacktrackMode(true)
       setFailedStartItem(firstStartItem)
       const prevItem = firstStartItem - 1
@@ -339,6 +319,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       }
     }
 
+    // Avanzar al siguiente ítem no respondido
     let nextIdx = currentIdx + 1
     while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num]) {
       nextIdx++
@@ -492,7 +473,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
           Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 46
-          {!bonusApplied && patientAge >= 8 && patientAge <= 11 && scores[firstStartItem] === 2 && scores[secondStartItem] !== 2 && (
+          {!bonusApplied && patientAge >= 8 && patientAge <= 16 && scores[firstStartItem] === 2 && scores[secondStartItem] !== 2 && (
             <span className="ml-2 text-xs text-blue-600">(Falta ítem {secondStartItem} para bonus de +8)</span>
           )}
         </p>

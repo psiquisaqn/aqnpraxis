@@ -1,6 +1,4 @@
 'use client'
-// app/dual-control/[dualSessionId]/DualTestWrapper.tsx
-// Modificado para reducir altura de navegación y que el botón finalizar sea visible sin scroll
 
 import { ReactNode } from 'react'
 
@@ -15,6 +13,7 @@ interface DualTestWrapperProps {
   onItemSelect: (itemNum: number) => void
   items: Array<{ num: number; label?: string }>
   answeredItems?: Set<number>
+  hideNavigation?: boolean  // Nueva prop
 }
 
 export function DualTestWrapper({
@@ -28,6 +27,7 @@ export function DualTestWrapper({
   onItemSelect,
   items,
   answeredItems,
+  hideNavigation = false,  // Por defecto false para otros tests
 }: DualTestWrapperProps) {
   if (showQuestionZero) {
     return (
@@ -47,17 +47,26 @@ export function DualTestWrapper({
     )
   }
 
-  // Altura de la barra de navegación reducida para que el botón finalizar sea visible
+  // Si hideNavigation es true, no mostrar la barra de navegación
+  if (hideNavigation) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <div className="p-3">
+          {children}
+        </div>
+      </div>
+    )
+  }
+
+  // Altura de la barra de navegación reducida
   const NAV_HEIGHT = 140
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Contenido con padding inferior reducido */}
       <div className="p-3" style={{ paddingBottom: NAV_HEIGHT }}>
         {children}
       </div>
 
-      {/* Barra de navegación fija al fondo - más compacta */}
       <div
         className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-20"
         style={{ padding: '4px 12px 8px' }}

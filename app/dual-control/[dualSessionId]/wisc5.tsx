@@ -423,7 +423,17 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   }
 
   return (
-    <DualTestWrapper title="Evaluación WISC-V - Escala Wechsler" totalItems={15} currentItem={1} completed={Object.keys(rawScores).length} onItemSelect={() => {}} items={wiscItemsList} showQuestionZero={false} onStart={() => {}}>
+    <DualTestWrapper 
+      title="Evaluación WISC-V - Escala Wechsler" 
+      totalItems={15} 
+      currentItem={1} 
+      completed={Object.keys(rawScores).length} 
+      onItemSelect={() => {}} 
+      items={wiscItemsList} 
+      showQuestionZero={false} 
+      onStart={() => {}}
+      hideNavigation={true}
+    >
       <div className="space-y-4">
         <div className="bg-gray-50 rounded-lg p-3">
           <p className="text-sm text-gray-600">Edad: {ageInfo?.years} años, {ageInfo?.months} meses | Grupo: {ageInfo?.group}</p>
