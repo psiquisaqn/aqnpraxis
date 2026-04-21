@@ -137,12 +137,25 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
-  const getNextItemIndex = (currentItemNum: number | string, currentScore: number): number => {
+  // Marcar ítems no administrados como correctos
+  const markSkippedItemsAsCorrect = (newScores: Record<string | number, number>, failedItem: number, successItem: number): Record<string | number, number> => {
+    const updatedScores = { ...newScores }
+    for (let i = failedItem - 1; i >= successItem; i--) {
+      if (updatedScores[i] === undefined && i >= 1 && !isNaN(i)) {
+        updatedScores[i] = 1 // Puntaje máximo para MR
+        console.log(`✓ Ítem ${i} no administrado - se asigna puntaje 1 automáticamente`)
+      }
+    }
+    return updatedScores
+  }
+
+  const getNextItemIndex = (currentItemNum: number | string, currentScore: number): { nextIndex: number; updatedScores: Record<string | number, number> } => {
+    let updatedScores = { ...scores }
     const currentIdx = MR_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    if (currentItemNum === 'PA') return MR_ITEMS.findIndex(i => i.num === 'PB')
+    if (currentItemNum === 'PA') return { nextIndex: MR_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
     if (currentItemNum === 'PB') {
-      return MR_ITEMS.findIndex(i => i.num === firstStartItem)
+      return { nextIndex: MR_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
     }
 
     const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
@@ -151,21 +164,22 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       if (currentScore === 1) {
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
-          return MR_ITEMS.findIndex(i => i.num === prevItem)
+          return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
         setBacktrackMode(false)
+        updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem || firstStartItem, numericItem)
         const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
         const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
-        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
+        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       } else {
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
-          return MR_ITEMS.findIndex(i => i.num === prevItem)
+          return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
         setBacktrackMode(false)
         const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
         const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
-        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
+        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       }
     }
 
@@ -174,7 +188,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       setFailedStartItem(numericItem)
       const prevItem = numericItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
-        return MR_ITEMS.findIndex(i => i.num === prevItem)
+        return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
 
@@ -183,15 +197,15 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       setFailedStartItem(firstStartItem)
       const prevItem = firstStartItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
-        return MR_ITEMS.findIndex(i => i.num === prevItem)
+        return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
 
     let nextIdx = currentIdx + 1
-    while (nextIdx < MR_ITEMS.length && scores[MR_ITEMS[nextIdx].num]) {
+    while (nextIdx < MR_ITEMS.length && updatedScores[MR_ITEMS[nextIdx].num]) {
       nextIdx++
     }
-    return nextIdx
+    return { nextIndex: nextIdx, updatedScores }
   }
 
   const handleAnswer = (selected: number) => {
@@ -200,7 +214,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     const isCorrect = selected === currentItem.correctAnswer
     const score = isCorrect ? 1 : 0
     const effectiveScore = isPractice ? 0 : score
-    const newScores = { ...scores, [currentItem.num]: effectiveScore }
+    let newScores = { ...scores, [currentItem.num]: effectiveScore }
     setScores(newScores)
     setSelectedAnswer(null)
 
@@ -219,7 +233,9 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       }
     }
 
-    const nextIndex = getNextItemIndex(currentItem.num, score)
+    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, score)
+    newScores = updatedScores
+    setScores(newScores)
     
     if (nextIndex >= MR_ITEMS.length) {
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)

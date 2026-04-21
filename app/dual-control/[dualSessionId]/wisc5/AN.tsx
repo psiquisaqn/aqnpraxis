@@ -42,7 +42,7 @@ const AN_ITEMS: ANItem[] = [
 ]
 
 // ============================================================
-// FUNCIÓN DE SUGERENCIA DE PUNTUAJE - MEJORADA
+// FUNCIÓN DE SUGERENCIA DE PUNTUAJE
 // ============================================================
 
 const normalizeText = (text: string): string => {
@@ -142,14 +142,12 @@ interface ANInterfaceProps {
 }
 
 export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdatePatient, patientAge }: ANInterfaceProps) {
-  // Determinar los ítems de inicio según edad
   const getStartItems = (): { first: number; second: number } => {
     if (patientAge <= 7) return { first: 1, second: 2 }
     if (patientAge <= 11) return { first: 5, second: 6 }
     return { first: 8, second: 9 }
   }
 
-  // Verificar si se aplica bonus (ambos primeros ítems con puntaje 2)
   const checkBonusEligibility = (scores: Record<string | number, number>): boolean => {
     const { first, second } = getStartItems()
     return scores[first] === 2 && scores[second] === 2
@@ -160,7 +158,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     return 0
   }
 
-  // Obtener el ítem al que saltar después del retroceso
   const getJumpItemAfterBacktrack = (failedItem: number): number => {
     if (patientAge <= 7) {
       if (failedItem === 1) return 3
@@ -177,7 +174,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     return failedItem + 1
   }
 
-  // Siempre empezar desde PA (índice 0)
   const [currentIndex, setCurrentIndex] = useState<number>(0)
   const [response, setResponse] = useState('')
   const [suggestion, setSuggestion] = useState<SuggestionResult | null>(null)
@@ -229,12 +225,26 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
-  const getNextItemIndex = (currentItemNum: number | string, currentScore: number): number => {
+  // Marcar ítems no administrados como correctos
+  const markSkippedItemsAsCorrect = (newScores: Record<string | number, number>, failedItem: number, successItem: number): Record<string | number, number> => {
+    const updatedScores = { ...newScores }
+    // Marcar todos los ítems entre el fallo y el éxito (excluyendo los ya respondidos)
+    for (let i = failedItem - 1; i >= successItem; i--) {
+      if (updatedScores[i] === undefined && i >= 1 && !isNaN(i)) {
+        updatedScores[i] = 2 // Puntaje máximo para AN
+        console.log(`✓ Ítem ${i} no administrado - se asigna puntaje 2 automáticamente`)
+      }
+    }
+    return updatedScores
+  }
+
+  const getNextItemIndex = (currentItemNum: number | string, currentScore: number): { nextIndex: number; updatedScores: Record<string | number, number> } => {
+    let updatedScores = { ...scores }
     const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    if (currentItemNum === 'PA') return AN_ITEMS.findIndex(i => i.num === 'PB')
+    if (currentItemNum === 'PA') return { nextIndex: AN_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
     if (currentItemNum === 'PB') {
-      return AN_ITEMS.findIndex(i => i.num === firstStartItem)
+      return { nextIndex: AN_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
     }
 
     const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
@@ -243,21 +253,24 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       if (currentScore === 2) {
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
-          return AN_ITEMS.findIndex(i => i.num === prevItem)
+          return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
+        // Se completó el retroceso con dos éxitos consecutivos
         setBacktrackMode(false)
+        // Marcar ítems no administrados como correctos
+        updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem || firstStartItem, numericItem)
         const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
         const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
-        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
+        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       } else {
         const prevItem = numericItem - 1
         if (prevItem >= 1 && !scores[prevItem]) {
-          return AN_ITEMS.findIndex(i => i.num === prevItem)
+          return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
         setBacktrackMode(false)
         const jumpItem = getJumpItemAfterBacktrack(failedStartItem || firstStartItem)
         const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpItem)
-        return jumpIndex >= 0 ? jumpIndex : currentIdx + 1
+        return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
       }
     }
 
@@ -266,7 +279,7 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       setFailedStartItem(numericItem)
       const prevItem = numericItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
-        return AN_ITEMS.findIndex(i => i.num === prevItem)
+        return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
 
@@ -275,22 +288,22 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       setFailedStartItem(firstStartItem)
       const prevItem = firstStartItem - 1
       if (prevItem >= 1 && !scores[prevItem]) {
-        return AN_ITEMS.findIndex(i => i.num === prevItem)
+        return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
 
     let nextIdx = currentIdx + 1
-    while (nextIdx < AN_ITEMS.length && scores[AN_ITEMS[nextIdx].num]) {
+    while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num]) {
       nextIdx++
     }
-    return nextIdx
+    return { nextIndex: nextIdx, updatedScores }
   }
 
   const handleScore = (score: number) => {
     if (scores[currentItem.num]) return
 
     const effectiveScore = isPractice ? 0 : score
-    const newScores = { ...scores, [currentItem.num]: effectiveScore }
+    let newScores = { ...scores, [currentItem.num]: effectiveScore }
     setScores(newScores)
     setResponse('')
     setSuggestion(null)
@@ -310,7 +323,9 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       }
     }
 
-    const nextIndex = getNextItemIndex(currentItem.num, score)
+    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, score)
+    newScores = updatedScores
+    setScores(newScores)
     
     if (nextIndex >= AN_ITEMS.length) {
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
