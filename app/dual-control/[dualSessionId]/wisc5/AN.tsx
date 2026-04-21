@@ -206,37 +206,45 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
 
     // Reglas para 8-11 años
     if (patientAge >= 8 && patientAge <= 11) {
-      if (currentItemNum === 5 && currentScore === 0) {
+      // Si falla el ítem 5 (puntaje 0 o 1), retrocede al 4
+      if (currentItemNum === 5 && (currentScore === 0 || currentScore === 1)) {
         return AN_ITEMS.findIndex(i => i.num === 4)
       }
+      // Si acierta el ítem 5 (puntaje 2) y no ha respondido el 4, ir al 4 (para verificar base)
       if (currentItemNum === 5 && currentScore === 2 && !scores[4]) {
         return AN_ITEMS.findIndex(i => i.num === 4)
       }
+      // Si viene del 4 con acierto (2) y ya respondió 5, ir al 6
       if (currentItemNum === 4 && currentScore === 2 && scores[5] === 2 && !scores[6]) {
         return AN_ITEMS.findIndex(i => i.num === 6)
       }
-      if (currentItemNum === 6 && (currentScore === 0 || currentScore === 1) && !scores[4]) {
+      // Si falla el 6 (puntaje 0 o 1) habiendo acertado 5, retrocede al 4
+      if (currentItemNum === 6 && (currentScore === 0 || currentScore === 1) && scores[5] === 2 && !scores[4]) {
         return AN_ITEMS.findIndex(i => i.num === 4)
       }
     }
 
     // Reglas para 12+ años
     if (patientAge >= 12) {
-      if (currentItemNum === 8 && currentScore === 0) {
+      // Si falla el ítem 8 (puntaje 0 o 1), retrocede al 7
+      if (currentItemNum === 8 && (currentScore === 0 || currentScore === 1)) {
         return AN_ITEMS.findIndex(i => i.num === 7)
       }
+      // Si acierta el ítem 8 (puntaje 2) y no ha respondido el 7, ir al 7
       if (currentItemNum === 8 && currentScore === 2 && !scores[7]) {
         return AN_ITEMS.findIndex(i => i.num === 7)
       }
+      // Si viene del 7 con acierto (2) y ya respondió 8, ir al 9
       if (currentItemNum === 7 && currentScore === 2 && scores[8] === 2 && !scores[9]) {
         return AN_ITEMS.findIndex(i => i.num === 9)
       }
-      if (currentItemNum === 9 && (currentScore === 0 || currentScore === 1) && !scores[7]) {
+      // Si falla el 9 (puntaje 0 o 1) habiendo acertado 8, retrocede al 7
+      if (currentItemNum === 9 && (currentScore === 0 || currentScore === 1) && scores[8] === 2 && !scores[7]) {
         return AN_ITEMS.findIndex(i => i.num === 7)
       }
     }
 
-    // Avanzar al siguiente ítem
+    // Avanzar al siguiente ítem no respondido
     let nextIdx = currentIdx + 1
     while (nextIdx < AN_ITEMS.length && scores[AN_ITEMS[nextIdx].num]) {
       nextIdx++
