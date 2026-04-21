@@ -160,20 +160,18 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
 
   /**
    * Marca ítems no administrados como correctos durante el retroceso.
-   * Cuando el niño obtiene 2 aciertos consecutivos en retroceso,
-   * se asume que habría acertado los ítems intermedios.
    */
   const markSkippedItemsAsCorrect = (
     newScores: Record<string | number, number>, 
-    fromItem: number,  // Ítem donde empezó el retroceso (el que falló)
-    toItem: number     // Ítem donde terminó el retroceso (último acierto)
+    fromItem: number,
+    toItem: number
   ): Record<string | number, number> => {
     const updatedScores = { ...newScores }
     
     // Marcar todos los ítems ENTRE toItem+1 y fromItem-1 como correctos
     for (let i = toItem + 1; i < fromItem; i++) {
       if (updatedScores[i] === undefined) {
-        updatedScores[i] = 1 // Puntaje máximo para MR
+        updatedScores[i] = 1
         console.log(`✓ Ítem ${i} no administrado - se asigna puntaje 1 automáticamente`)
       }
     }
@@ -219,17 +217,23 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
         }
         
         // Solo un acierto hasta ahora - continuar retrocediendo
-        const prevItem = numericItem - 1
-        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
+        let prevItem = numericItem - 1
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+          prevItem--
+        }
+        if (prevItem >= 1) {
           return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
       } else {
         // Fallo (0) en modo retroceso - reiniciar contador
         setConsecutiveSuccessesInBacktrack(0)
         
-        // Continuar retrocediendo
-        const prevItem = numericItem - 1
-        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
+        // Buscar el primer ítem NO administrado hacia atrás
+        let prevItem = numericItem - 1
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+          prevItem--
+        }
+        if (prevItem >= 1) {
           return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
       }
@@ -241,8 +245,6 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
 
     // ============================================================
     // VERIFICAR SI SE DEBE ACTIVAR SECUENCIA INVERSA
-    // Regla WISC-V: Si el niño falla (puntaje 0) en CUALQUIERA
-    // de los dos primeros ítems administrados, se aplica retroceso.
     // ============================================================
     const isFirstTwoAdministered = (numericItem === firstStartItem) || (numericItem === secondStartItem)
     
@@ -251,8 +253,13 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       setFailedStartItem(numericItem)
       setConsecutiveSuccessesInBacktrack(0)
       
-      const prevItem = numericItem - 1
-      if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
+      // Buscar el primer ítem NO administrado hacia atrás
+      let prevItem = numericItem - 1
+      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+        prevItem--
+      }
+      
+      if (prevItem >= 1) {
         return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }

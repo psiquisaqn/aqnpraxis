@@ -195,7 +195,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     if (patientAge <= 7) return 0
     
     // Número de ítems no administrados = first - 1
-    // (si empieza en 5, hay 4 ítems no administrados: 1,2,3,4)
     const unadministeredCount = first - 1
     
     // Cada ítem no administrado vale 2 puntos
@@ -273,9 +272,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   /**
    * Marca los ítems no administrados como correctos (puntaje 2).
    * Se usa cuando el niño obtiene dos aciertos consecutivos en secuencia inversa.
-   * @param newScores - Objeto de puntajes actual
-   * @param fromItem - Ítem donde comenzó el retroceso (el ítem de inicio que falló)
-   * @param toItem - Ítem donde terminó el retroceso (último ítem con puntaje 2)
    */
   const markSkippedItemsAsCorrect = (
     newScores: Record<string | number, number>, 
@@ -285,7 +281,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     const updatedScores = { ...newScores }
     
     // Marcar todos los ítems ENTRE toItem+1 y fromItem-1 como correctos
-    // (porque esos ítems NO fueron administrados y se asume que los habría acertado)
     for (let i = toItem + 1; i < fromItem; i++) {
       if (updatedScores[i] === undefined) {
         updatedScores[i] = 2
@@ -334,7 +329,6 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
           setConsecutiveSuccessesInBacktrack(0)
           
           // Marcar ítems no administrados como correctos
-          // fromItem = ítem que falló al inicio, toItem = ítem actual (último con puntaje 2)
           updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem!, numericItem)
           
           // Saltar al ítem después del punto de inicio original
@@ -343,17 +337,23 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
         }
         
         // Solo un acierto hasta ahora - continuar retrocediendo
-        const prevItem = numericItem - 1
-        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
+        let prevItem = numericItem - 1
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+          prevItem--
+        }
+        if (prevItem >= 1) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
       } else {
         // Fallo (0 o 1) en modo retroceso - reiniciar contador de éxitos consecutivos
         setConsecutiveSuccessesInBacktrack(0)
         
-        // Continuar retrocediendo
-        const prevItem = numericItem - 1
-        if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
+        // Buscar el primer ítem NO administrado hacia atrás
+        let prevItem = numericItem - 1
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+          prevItem--
+        }
+        if (prevItem >= 1) {
           return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
         }
       }
@@ -376,8 +376,13 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       setFailedStartItem(numericItem)
       setConsecutiveSuccessesInBacktrack(0)
       
-      const prevItem = numericItem - 1
-      if (prevItem >= 1 && updatedScores[prevItem] === undefined) {
+      // Buscar el primer ítem NO administrado hacia atrás
+      let prevItem = numericItem - 1
+      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+        prevItem--
+      }
+      
+      if (prevItem >= 1) {
         return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
     }
