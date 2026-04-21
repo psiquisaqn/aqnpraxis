@@ -119,6 +119,113 @@ export default function SalaDisplayPage() {
     if (!currentDisplay) return null
 
     switch (currentDisplay.type) {
+      case 'coopersmith':
+        const progress = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 58)) * 100
+        return (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Progreso</span>
+                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 58}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+            <div className="text-sm text-gray-400 mb-4">
+              Ítem {currentDisplay.item} de {currentDisplay.totalItems || 58}
+            </div>
+            <div className="text-2xl font-medium text-gray-800 mb-6 leading-relaxed">
+              {currentDisplay.text}
+            </div>
+            <div className="flex gap-4 justify-center">
+              {currentDisplay.options?.map((opt: string, idx: number) => (
+                <div
+                  key={idx}
+                  className={`px-6 py-3 rounded-xl text-sm font-medium ${
+                    currentDisplay.selected === (idx === 0 ? 'igual' : 'diferente')
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {opt}
+                </div>
+              ))}
+            </div>
+            {currentDisplay.selected && (
+              <p className="text-xs text-green-600 mt-6 flex items-center justify-center gap-1">
+                ✓ Respuesta registrada
+              </p>
+            )}
+          </div>
+        )
+
+      case 'bdi2':
+        const progressBdi = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 21)) * 100
+        return (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Progreso</span>
+                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 21}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressBdi + '%' }} />
+              </div>
+            </div>
+            <div className="text-sm text-gray-400 mb-4">Item {currentDisplay.item} de {currentDisplay.totalItems || 21}</div>
+            <div className="text-xl font-medium text-gray-800 mb-6 leading-relaxed">{currentDisplay.label}</div>
+            <div className="space-y-3 max-w-md mx-auto">
+              {currentDisplay.options?.map((opt: any) => (
+                <div key={opt.value}
+                  className={"p-3 rounded-xl border text-sm " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}
+                >
+                  {opt.label}
+                </div>
+              ))}
+            </div>
+            {currentDisplay.selected !== undefined && <p className="text-xs text-green-600 mt-4">Respuesta registrada</p>}
+          </div>
+        )
+
+      case 'peca':
+        const progressPeca = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 45)) * 100
+        return (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Progreso</span>
+                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 45}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressPeca + '%' }} />
+              </div>
+            </div>
+            <div className="text-sm text-gray-400 mb-6">Item {currentDisplay.item} de {currentDisplay.totalItems || 45}</div>
+            <div className="flex justify-between gap-6 mb-8">
+              <span className="flex-1 text-left text-lg font-medium text-gray-800">{currentDisplay.leftPhrase}</span>
+              <span className="text-gray-400 text-lg">vs</span>
+              <span className="flex-1 text-right text-lg font-medium text-gray-800">{currentDisplay.rightPhrase}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto">
+              {currentDisplay.options?.map((opt: any) => (
+                <div key={opt.value}
+                  className={"p-3 rounded-xl border text-sm font-medium " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}
+                >
+                  {opt.value}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between text-xs text-gray-400 mt-2 max-w-sm mx-auto px-2">
+              <span>Izquierda</span><span>Derecha</span>
+            </div>
+            {currentDisplay.selected && <p className="text-xs text-green-600 mt-4">Respuesta registrada</p>}
+          </div>
+        )
+
+      // ============================================================
+      // WISC-V - Construcción con Cubos (CC)
+      // ============================================================
       case 'wisc5_cc':
         const stimulusNum = currentDisplay.stimulusNum || 1
         const imagePath = `/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.png`
@@ -164,6 +271,44 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V - Analogías (AN)
+      // ============================================================
+      case 'wisc5_an':
+        const word1 = currentDisplay.word1 || ''
+        const word2 = currentDisplay.word2 || ''
+        const itemNum = currentDisplay.itemNum || ''
+        const isPractice = currentDisplay.isPractice || false
+        
+        return (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Analogías</span>
+                <span>{isPractice ? 'Práctica' : `Ítem ${itemNum}`}</span>
+              </div>
+            </div>
+            
+            <div className="flex justify-center items-center gap-6 md:gap-12 mb-8">
+              <span className="text-2xl md:text-4xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
+                {word1}
+              </span>
+              <span className="text-xl text-gray-400">—</span>
+              <span className="text-2xl md:text-4xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
+                {word2}
+              </span>
+            </div>
+            
+            <div className="text-gray-600 text-sm mb-4">
+              ¿Qué tienen en común? ¿Qué clase o categoría une estas dos palabras?
+            </div>
+            
+            {isPractice && (
+              <div className="text-xs text-gray-400 mt-2">Ítem de práctica</div>
+            )}
+          </div>
+        )
+
       default:
         return (
           <div className="text-center">
@@ -197,7 +342,7 @@ export default function SalaDisplayPage() {
         {waiting && !currentDisplay ? (
           <div className="text-center">
             <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl font-medium text-gray-700 mb-2">Aquí se verán los estímulos de la evaluación</h2>
+            <h2 className="text-xl font-medium text-gray-700 mb-2">Esperando al psicólogo</h2>
             <p className="text-gray-400 text-sm">La evaluación comenzará en breve. Por favor, espera las instrucciones.</p>
             <div className="mt-6 flex justify-center">
               <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -209,7 +354,7 @@ export default function SalaDisplayPage() {
           <div className="text-center">
             <div className="text-4xl mb-4">⚠️</div>
             <h2 className="text-xl font-medium text-gray-700 mb-2">Tiempo de espera agotado</h2>
-            <p className="text-gray-400 text-sm">La evaluación no ha comenzado. Contacta al especialista.</p>
+            <p className="text-gray-400 text-sm">La evaluación no ha comenzado. Contacta al psicólogo.</p>
           </div>
         )}
       </div>
