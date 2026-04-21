@@ -133,14 +133,15 @@ interface ANInterfaceProps {
 }
 
 export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdatePatient, patientAge }: ANInterfaceProps) {
-  // Determinar ítems de inicio según edad
-  const getStartIndex = (): number => {
-    if (patientAge <= 7) return 0 // Empieza desde PA (índice 0)
-    if (patientAge <= 11) return AN_ITEMS.findIndex(item => item.num === 5) // Empieza en ítem 5
-    return AN_ITEMS.findIndex(item => item.num === 8) // Empieza en ítem 8
+  // Determinar el ítem de inicio REAL después de las prácticas
+  const getRealStartItem = (): number => {
+    if (patientAge <= 7) return 1
+    if (patientAge <= 11) return 5
+    return 8
   }
 
-  const [currentIndex, setCurrentIndex] = useState<number>(getStartIndex())
+  // Siempre empezar desde PA (índice 0)
+  const [currentIndex, setCurrentIndex] = useState<number>(0)
   const [response, setResponse] = useState('')
   const [suggestion, setSuggestion] = useState<SuggestionResult | null>(null)
   const [scores, setScores] = useState<Record<string | number, number>>({})
@@ -197,11 +198,13 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
   const getNextItemIndex = (currentItemNum: number | string, currentScore: number): number => {
     const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItemNum)
     
-    // Si es práctica, pasar al siguiente
+    // Si es práctica PA, pasar a PB
     if (currentItemNum === 'PA') return AN_ITEMS.findIndex(i => i.num === 'PB')
+    
+    // Si es práctica PB, pasar al ítem real de inicio según edad
     if (currentItemNum === 'PB') {
-      // Después de PB, ir al ítem de inicio según edad
-      return getStartIndex()
+      const realStartItem = getRealStartItem()
+      return AN_ITEMS.findIndex(i => i.num === realStartItem)
     }
 
     // Reglas para 8-11 años
