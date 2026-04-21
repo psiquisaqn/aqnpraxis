@@ -277,15 +277,15 @@ export default function SalaDisplayPage() {
       case 'wisc5_an':
         const word1 = currentDisplay.word1 || ''
         const word2 = currentDisplay.word2 || ''
-        const itemNum = currentDisplay.itemNum || ''
-        const isPractice = currentDisplay.isPractice || false
+        const itemNumAn = currentDisplay.itemNum || ''
+        const isPracticeAn = currentDisplay.isPractice || false
         
         return (
           <div className="text-center">
             <div className="mb-6">
               <div className="flex justify-between text-sm text-gray-500 mb-1">
                 <span>Analogías</span>
-                <span>{isPractice ? 'Práctica' : `Ítem ${itemNum}`}</span>
+                <span>{isPracticeAn ? 'Práctica' : `Ítem ${itemNumAn}`}</span>
               </div>
             </div>
             
@@ -303,7 +303,46 @@ export default function SalaDisplayPage() {
               ¿Qué tienen en común? ¿Qué clase o categoría une estas dos palabras?
             </div>
             
-            {isPractice && (
+            {isPracticeAn && (
+              <div className="text-xs text-gray-400 mt-2">Ítem de práctica</div>
+            )}
+          </div>
+        )
+
+      // ============================================================
+      // WISC-V - Matrices de Razonamiento (MR)
+      // ============================================================
+      case 'wisc5_mr':
+        const imagePathMr = currentDisplay.imagePath || ''
+        const itemNumMr = currentDisplay.itemNum || ''
+        const isPracticeMr = currentDisplay.isPractice || false
+        
+        return (
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <span>Matrices de Razonamiento</span>
+                <span>{isPracticeMr ? 'Práctica' : `Ítem ${itemNumMr}`}</span>
+              </div>
+            </div>
+            
+            <div className="mb-8">
+              <img 
+                src={imagePathMr} 
+                alt={`Matriz ${itemNumMr}`}
+                className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-md"
+                onError={(e) => {
+                  console.error(`Error cargando imagen: ${imagePathMr}`)
+                  e.currentTarget.src = '/placeholder-image.png'
+                }}
+              />
+            </div>
+            
+            <div className="text-gray-600 text-sm mb-4">
+              Selecciona la opción que completa la secuencia
+            </div>
+            
+            {isPracticeMr && (
               <div className="text-xs text-gray-400 mt-2">Ítem de práctica</div>
             )}
           </div>

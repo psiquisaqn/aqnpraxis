@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { DualTestWrapper } from './DualTestWrapper'
 import { CCInterface } from './wisc5/CC'
 import { ANInterface } from './wisc5/AN'
+import { MRInterface } from './wisc5/MR'
 
 // ============================================================
 // CONFIGURACIÓN DE SUBPRUEBAS WISC-V
@@ -14,7 +15,7 @@ import { ANInterface } from './wisc5/AN'
 const WISC_SUBTESTS = [
   { code: 'CC', name: 'Construcción con Cubos', primary: true, order: 1, canBeReplaced: true, replaceWith: 'RV', hasInterface: true },
   { code: 'AN', name: 'Analogías', primary: true, order: 2, canBeReplaced: false, hasInterface: true },
-  { code: 'MR', name: 'Matrices de Razonamiento', primary: true, order: 3, canBeReplaced: false, hasInterface: false },
+  { code: 'MR', name: 'Matrices de Razonamiento', primary: true, order: 3, canBeReplaced: false, hasInterface: true },
   { code: 'RD', name: 'Retención de Dígitos', primary: true, order: 4, canBeReplaced: false, hasInterface: false },
   { code: 'CLA', name: 'Claves', primary: true, order: 5, canBeReplaced: false, hasInterface: false },
   { code: 'VOC', name: 'Vocabulario', primary: true, order: 6, canBeReplaced: false, hasInterface: false },
@@ -317,6 +318,23 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     setShowSubtestPanel(true)
   }
 
+  const handleMrComplete = (itemScores: Record<string | number, number>, rawTotal: number) => {
+    console.log('✅ Subprueba MR completada. Puntaje bruto:', rawTotal)
+    setRawScores({ ...rawScores, MR: rawTotal })
+    setSubtestStatus(prev => ({ ...prev, MR: 'completed' }))
+    if (ageInfo?.group) {
+      fetchScaledScore('MR', rawTotal, ageInfo.group).then(scaled => {
+        if (scaled) {
+          console.log('📊 Puntaje escalado para MR:', scaled)
+          setScaledScores({ ...scaledScores, MR: scaled })
+        }
+      })
+    }
+    saveState('in_progress')
+    setActiveSubtest(null)
+    setShowSubtestPanel(true)
+  }
+
   const handleSelectSubtest = (code: string) => {
     console.log('🔘 Subprueba seleccionada:', code)
     if (code === 'CC' || (code === 'RV' && substitutionUsed)) {
@@ -324,6 +342,9 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       setShowSubtestPanel(false)
     } else if (code === 'AN') {
       setActiveSubtest('AN')
+      setShowSubtestPanel(false)
+    } else if (code === 'MR') {
+      setActiveSubtest('MR')
       setShowSubtestPanel(false)
     } else {
       alert(`La subprueba ${code} está en desarrollo. Próximamente disponible.`)
@@ -414,6 +435,10 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
         {activeSubtest === 'AN' && ageInfo && (
           <ANInterface onComplete={handleAnComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />
+        )}
+
+        {activeSubtest === 'MR' && ageInfo && (
+          <MRInterface onComplete={handleMrComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />
         )}
 
         {showSubtestPanel && (
