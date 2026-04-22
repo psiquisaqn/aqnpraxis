@@ -8,6 +8,7 @@ import { CCInterface } from './wisc5/CC'
 import { ANInterface } from './wisc5/AN'
 import { MRInterface } from './wisc5/MR'
 import { RDInterface } from './wisc5/RD'
+import { CLAInterface } from './wisc5/CLA'
 
 // ============================================================
 // CONFIGURACIÓN DE SUBPRUEBAS WISC-V
@@ -18,7 +19,7 @@ const WISC_SUBTESTS = [
   { code: 'AN', name: 'Analogías', primary: true, order: 2, canBeReplaced: false, hasInterface: true },
   { code: 'MR', name: 'Matrices de Razonamiento', primary: true, order: 3, canBeReplaced: false, hasInterface: true },
   { code: 'RD', name: 'Retención de Dígitos', primary: true, order: 4, canBeReplaced: false, hasInterface: true },
-  { code: 'CLA', name: 'Claves', primary: true, order: 5, canBeReplaced: false, hasInterface: false },
+  { code: 'CLA', name: 'Claves', primary: true, order: 5, canBeReplaced: false, hasInterface: true },
   { code: 'VOC', name: 'Vocabulario', primary: true, order: 6, canBeReplaced: false, hasInterface: false },
   { code: 'BAL', name: 'Balanzas', primary: true, order: 7, canBeReplaced: false, hasInterface: false },
   { code: 'RV', name: 'Rompecabezas Visuales', primary: false, order: 8, canBeReplaced: false, hasInterface: false },
@@ -353,6 +354,23 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     setShowSubtestPanel(true)
   }
 
+  const handleClaComplete = (itemScores: Record<string, number>, rawTotal: number) => {
+    console.log('✅ Subprueba CLA completada. Puntaje bruto:', rawTotal)
+    setRawScores({ ...rawScores, CLA: rawTotal })
+    setSubtestStatus(prev => ({ ...prev, CLA: 'completed' }))
+    if (ageInfo?.group) {
+      fetchScaledScore('CLA', rawTotal, ageInfo.group).then(scaled => {
+        if (scaled) {
+          console.log('📊 Puntaje escalado para CLA:', scaled)
+          setScaledScores({ ...scaledScores, CLA: scaled })
+        }
+      })
+    }
+    saveState('in_progress')
+    setActiveSubtest(null)
+    setShowSubtestPanel(true)
+  }
+
   const handleSelectSubtest = (code: string) => {
     console.log('🔘 Subprueba seleccionada:', code)
     if (code === 'CC' || (code === 'RV' && substitutionUsed)) {
@@ -366,6 +384,9 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       setShowSubtestPanel(false)
     } else if (code === 'RD') {
       setActiveSubtest('RD')
+      setShowSubtestPanel(false)
+    } else if (code === 'CLA') {
+      setActiveSubtest('CLA')
       setShowSubtestPanel(false)
     } else {
       alert(`La subprueba ${code} está en desarrollo. Próximamente disponible.`)
@@ -474,6 +495,10 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
         {activeSubtest === 'RD' && ageInfo && (
           <RDInterface onComplete={handleRdComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />
+        )}
+
+        {activeSubtest === 'CLA' && ageInfo && (
+          <CLAInterface onComplete={handleClaComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />
         )}
 
         {showSubtestPanel && (
