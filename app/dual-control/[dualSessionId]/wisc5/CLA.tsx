@@ -116,7 +116,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onT
 }
 
 // ============================================================
-// COMPONENTE DE CÁMARA - CORREGIDO
+// COMPONENTE DE CÁMARA - CORREGIDO (CANVAS SIEMPRE EN DOM)
 // ============================================================
 
 interface CameraCaptureProps {
@@ -145,7 +145,6 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
           throw new Error('Tu navegador no soporta acceso a la cámara')
         }
 
-        // Intentar con cámara trasera primero
         let mediaStream: MediaStream
         try {
           mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -174,10 +173,10 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream
           
-          // Esperar a que el video esté listo
           videoRef.current.onloadedmetadata = () => {
             setCameraReady(true)
             console.log('✅ Video listo para capturar')
+            console.log('canvasRef.current:', canvasRef.current)
           }
         }
       } catch (err: any) {
@@ -203,59 +202,57 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
     
     setCapturing(true)
     
-    try {
-      if (!videoRef.current) {
-        throw new Error('Video no disponible')
+    // Pequeño delay para asegurar que el DOM está listo
+    setTimeout(() => {
+      try {
+        if (!videoRef.current) {
+          throw new Error('Video no disponible')
+        }
+        if (!canvasRef.current) {
+          throw new Error('Canvas no disponible - intenta de nuevo')
+        }
+        
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+          throw new Error('El video no tiene dimensiones válidas. Espera un momento.')
+        }
+        
+        console.log(`Video dimensiones: ${video.videoWidth}x${video.videoHeight}`)
+        
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        
+        const context = canvas.getContext('2d')
+        if (!context) {
+          throw new Error('No se pudo obtener contexto del canvas')
+        }
+        
+        if (applyMirror) {
+          context.translate(canvas.width, 0)
+          context.scale(-1, 1)
+        }
+        
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+        
+        if (applyMirror) {
+          context.setTransform(1, 0, 0, 1, 0, 0)
+        }
+        
+        const imageData = canvas.toDataURL('image/jpeg', 0.85)
+        console.log('✅ Foto capturada, tamaño:', Math.round(imageData.length / 1024), 'KB')
+        
+        setCapturedImage(imageData)
+        setShowPreview(true)
+        setCapturing(false)
+        
+      } catch (err: any) {
+        console.error('❌ Error al capturar foto:', err)
+        setError(`Error al capturar: ${err.message}`)
+        setCapturing(false)
       }
-      if (!canvasRef.current) {
-        throw new Error('Canvas no disponible')
-      }
-      
-      const video = videoRef.current
-      const canvas = canvasRef.current
-      
-      // Verificar que el video tenga dimensiones válidas
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        throw new Error('El video no tiene dimensiones válidas. Espera un momento.')
-      }
-      
-      console.log(`Video dimensiones: ${video.videoWidth}x${video.videoHeight}`)
-      
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      
-      const context = canvas.getContext('2d')
-      if (!context) {
-        throw new Error('No se pudo obtener contexto del canvas')
-      }
-      
-      // Aplicar transformación si es necesario
-      if (applyMirror) {
-        context.translate(canvas.width, 0)
-        context.scale(-1, 1)
-      }
-      
-      // Dibujar el frame actual del video
-      context.drawImage(video, 0, 0, canvas.width, canvas.height)
-      
-      // Restaurar transformación
-      if (applyMirror) {
-        context.setTransform(1, 0, 0, 1, 0, 0)
-      }
-      
-      // Convertir a data URL
-      const imageData = canvas.toDataURL('image/jpeg', 0.85)
-      console.log('✅ Foto capturada, tamaño:', Math.round(imageData.length / 1024), 'KB')
-      
-      setCapturedImage(imageData)
-      setShowPreview(true)
-      setCapturing(false)
-      
-    } catch (err: any) {
-      console.error('❌ Error al capturar foto:', err)
-      setError(`Error al capturar: ${err.message}`)
-      setCapturing(false)
-    }
+    }, 100)
   }
 
   const confirmCapture = () => {
@@ -311,6 +308,14 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
                 </div>
               )}
             </div>
+            
+            {/* CANVAS SIEMPRE PRESENTE EN EL DOM (oculto con CSS) */}
+            <canvas 
+              ref={canvasRef} 
+              style={{ display: 'none' }}
+              width="640"
+              height="480"
+            />
             
             {isFrontCamera && (
               <div className="mb-3 flex items-center gap-2">
@@ -784,7 +789,7 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
       return
     }
 
-    const maxScore = 120 // Ajustar según la versión de Claves
+    const maxScore = 120
     if (score > maxScore) {
       alert(`El puntaje máximo es ${maxScore}`)
       return
@@ -985,8 +990,8 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
       <div className="bg-blue-50 rounded-lg p-3">
         <p className="text-xs text-blue-700">
           <strong>Instrucciones para el evaluador:</strong> Entrega la hoja de respuestas al paciente. 
-          Di: "Copia los símbolos en las casillas correspondientes. Trabaja lo más rápido que puedas. 
-          Tienes 2 minutos. Comienza ahora."
+          Di: &quot;Copia los símbolos en las casillas correspondientes. Trabaja lo más rápido que puedas. 
+          Tienes 2 minutos. Comienza ahora.&quot;
         </p>
       </div>
     </div>
