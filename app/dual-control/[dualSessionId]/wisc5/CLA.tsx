@@ -116,7 +116,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onT
 }
 
 // ============================================================
-// COMPONENTE DE CÁMARA PARA VERIFICACIÓN POR FOTO
+// COMPONENTE DE CÁMARA - CORREGIDO
 // ============================================================
 
 interface CameraCaptureProps {
@@ -133,32 +133,56 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   const [mirrorPreview, setMirrorPreview] = useState(true)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
+  const [capturing, setCapturing] = useState(false)
 
   useEffect(() => {
     const initCamera = async () => {
       try {
-        // Primero intentar con cámara trasera (environment)
+        console.log('📷 Iniciando cámara...')
+        
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Tu navegador no soporta acceso a la cámara')
+        }
+
+        // Intentar con cámara trasera primero
         let mediaStream: MediaStream
         try {
           mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
+            video: { 
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            } 
           })
           setIsFrontCamera(false)
-        } catch {
-          // Si no hay trasera, usar frontal
+          console.log('✅ Cámara trasera iniciada')
+        } catch (backErr) {
+          console.log('⚠️ Cámara trasera no disponible, usando frontal')
           mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user' } 
+            video: { 
+              facingMode: 'user',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            } 
           })
           setIsFrontCamera(true)
+          console.log('✅ Cámara frontal iniciada')
         }
         
         setStream(mediaStream)
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream
+          
+          // Esperar a que el video esté listo
+          videoRef.current.onloadedmetadata = () => {
+            setCameraReady(true)
+            console.log('✅ Video listo para capturar')
+          }
         }
-      } catch (err) {
-        console.error('Error accediendo a la cámara:', err)
-        setError('No se pudo acceder a la cámara. Verifica los permisos.')
+      } catch (err: any) {
+        console.error('❌ Error accediendo a la cámara:', err)
+        setError(`No se pudo acceder a la cámara: ${err.message}`)
       }
     }
 
@@ -172,31 +196,65 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   }, [])
 
   const capturePhoto = (applyMirror: boolean) => {
-    if (videoRef.current && canvasRef.current) {
+    console.log('📸 Intentando capturar foto... applyMirror:', applyMirror)
+    console.log('videoRef.current:', videoRef.current)
+    console.log('canvasRef.current:', canvasRef.current)
+    console.log('cameraReady:', cameraReady)
+    
+    setCapturing(true)
+    
+    try {
+      if (!videoRef.current) {
+        throw new Error('Video no disponible')
+      }
+      if (!canvasRef.current) {
+        throw new Error('Canvas no disponible')
+      }
+      
       const video = videoRef.current
       const canvas = canvasRef.current
-      const context = canvas.getContext('2d')
+      
+      // Verificar que el video tenga dimensiones válidas
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        throw new Error('El video no tiene dimensiones válidas. Espera un momento.')
+      }
+      
+      console.log(`Video dimensiones: ${video.videoWidth}x${video.videoHeight}`)
       
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       
-      if (context) {
-        if (applyMirror) {
-          // Aplicar espejo horizontal
-          context.translate(canvas.width, 0)
-          context.scale(-1, 1)
-        }
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        
-        // Restaurar transformación si se aplicó
-        if (applyMirror) {
-          context.setTransform(1, 0, 0, 1, 0, 0)
-        }
-        
-        const imageData = canvas.toDataURL('image/jpeg', 0.85)
-        setCapturedImage(imageData)
-        setShowPreview(true)
+      const context = canvas.getContext('2d')
+      if (!context) {
+        throw new Error('No se pudo obtener contexto del canvas')
       }
+      
+      // Aplicar transformación si es necesario
+      if (applyMirror) {
+        context.translate(canvas.width, 0)
+        context.scale(-1, 1)
+      }
+      
+      // Dibujar el frame actual del video
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+      
+      // Restaurar transformación
+      if (applyMirror) {
+        context.setTransform(1, 0, 0, 1, 0, 0)
+      }
+      
+      // Convertir a data URL
+      const imageData = canvas.toDataURL('image/jpeg', 0.85)
+      console.log('✅ Foto capturada, tamaño:', Math.round(imageData.length / 1024), 'KB')
+      
+      setCapturedImage(imageData)
+      setShowPreview(true)
+      setCapturing(false)
+      
+    } catch (err: any) {
+      console.error('❌ Error al capturar foto:', err)
+      setError(`Error al capturar: ${err.message}`)
+      setCapturing(false)
     }
   }
 
@@ -219,7 +277,10 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl p-6 max-w-md w-full">
           <p className="text-red-600 mb-4">{error}</p>
-          <button onClick={onClose} className="w-full py-2 bg-gray-200 rounded-lg">
+          <button 
+            onClick={onClose} 
+            className="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+          >
             Cerrar
           </button>
         </div>
@@ -244,6 +305,11 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
                   transform: mirrorPreview && isFrontCamera ? 'scaleX(-1)' : 'none' 
                 }}
               />
+              {!cameraReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                  <div className="text-white text-sm">Iniciando cámara...</div>
+                </div>
+              )}
             </div>
             
             {isFrontCamera && (
@@ -256,23 +322,37 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
                   className="rounded border-gray-300"
                 />
                 <label htmlFor="mirrorPreview" className="text-sm text-gray-600">
-                  Vista previa en espejo (más natural)
+                  Vista previa en espejo
                 </label>
               </div>
             )}
+            
+            <div className="text-xs text-gray-500 mb-3">
+              Estado: {cameraReady ? '✅ Cámara lista' : '⏳ Iniciando...'}
+            </div>
             
             <div className="flex flex-col gap-2">
               <div className="flex gap-3">
                 <button
                   onClick={() => capturePhoto(false)}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                  disabled={!cameraReady || capturing}
+                  className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
+                    !cameraReady || capturing
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
                 >
-                  📸 Capturar (orientación normal)
+                  {capturing ? 'Capturando...' : '📸 Capturar (orientación normal)'}
                 </button>
                 {isFrontCamera && (
                   <button
                     onClick={() => capturePhoto(true)}
-                    className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+                    disabled={!cameraReady || capturing}
+                    className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
+                      !cameraReady || capturing
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
                   >
                     🔄 Capturar con espejo
                   </button>
@@ -285,9 +365,10 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
                 Cancelar
               </button>
             </div>
+            
             <p className="text-xs text-gray-500 mt-3 text-center">
               {isFrontCamera 
-                ? 'Cámara frontal detectada. Si el texto aparece al revés, usa "Capturar (orientación normal)".'
+                ? 'Cámara frontal. Si el texto se ve al revés, usa "Capturar (orientación normal)".'
                 : 'Asegúrate de que la hoja esté bien iluminada y enfocada.'}
             </p>
           </>
@@ -665,6 +746,7 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
   }, [])
 
   const handleCapture = (imageData: string) => {
+    console.log('📸 Imagen capturada y guardada')
     setCapturedImage(imageData)
     setShowCamera(false)
   }
@@ -684,6 +766,7 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
         ctx.scale(-1, 1)
         ctx.drawImage(img, 0, 0)
         setCapturedImage(canvas.toDataURL('image/jpeg', 0.85))
+        console.log('🔄 Imagen invertida horizontalmente')
       }
     }
   }
@@ -691,7 +774,7 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
   const handleScoreCalculated = (score: number, markedCells: boolean[]) => {
     setRawScore(score.toString())
     setShowScoringGrid(false)
-    console.log('Casillas marcadas:', markedCells.filter(m => m).length)
+    console.log('✅ Puntaje calculado con plantilla:', score, 'casillas marcadas:', markedCells.filter(m => m).length)
   }
 
   const handleComplete = () => {
