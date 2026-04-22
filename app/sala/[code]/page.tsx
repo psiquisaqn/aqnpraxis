@@ -348,6 +348,55 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V - Retención de Dígitos (RD)
+      // ============================================================
+      case 'wisc5_rd':
+        const partName = currentDisplay.partName || 'Retención de Dígitos'
+        const instruction = currentDisplay.instruction || 'Escucha con atención las instrucciones del evaluador'
+        const isPracticeRd = currentDisplay.isPractice || false
+        const part = currentDisplay.part || 'RD-D'
+        
+        return (
+          <div className="text-center py-8">
+            <div className="mb-6">
+              <div className="flex justify-center gap-2 mb-2">
+                <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  {partName}
+                </span>
+                {isPracticeRd && (
+                  <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">
+                    Práctica
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="text-xl md:text-2xl font-medium text-gray-800 mb-6 leading-relaxed max-w-lg mx-auto px-4">
+              {instruction}
+            </div>
+            
+            <div className="mt-8 flex justify-center">
+              <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" className="text-blue-500">
+                  <path d="M12 4C9.5 4 7 5 5 7C3 9 2 12 2 12C2 12 3 15 5 17C7 19 9.5 20 12 20C14.5 20 17 19 19 17C21 15 22 12 22 12C22 12 21 9 19 7C17 5 14.5 4 12 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+              </div>
+            </div>
+            
+            <p className="text-gray-500 text-sm mt-6">
+              Escucha los números y responde al evaluador
+            </p>
+            
+            <div className="mt-4 text-xs text-gray-400">
+              {part === 'RD-D' && 'Orden directo - Repite en el MISMO orden'}
+              {part === 'RD-I' && 'Orden inverso - Repite AL REVÉS'}
+              {part === 'RD-S' && 'Orden secuenciado - Repite de MENOR a MAYOR'}
+            </div>
+          </div>
+        )
+
       default:
         return (
           <div className="text-center">

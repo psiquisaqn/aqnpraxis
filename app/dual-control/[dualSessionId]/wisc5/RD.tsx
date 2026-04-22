@@ -89,7 +89,6 @@ const reverseArray = (arr: number[]): number[] => [...arr].reverse()
 const sortAscending = (arr: number[]): number[] => [...arr].sort((a, b) => a - b)
 
 const validateResponse = (part: RDPart, trial: number[], digits: (number | null)[]): boolean => {
-  // Filtrar valores nulos
   const userDigits = digits.filter(d => d !== null) as number[]
   
   let expected: number[]
@@ -136,7 +135,6 @@ function DigitInput({ length, value, onChange, disabled = false, autoFocus = tru
   const handleChange = (index: number, newValue: string) => {
     if (disabled) return
     
-    // Solo permitir un dígito
     const digit = newValue.replace(/\D/g, '').slice(0, 1)
     const numDigit = digit ? parseInt(digit, 10) : null
     
@@ -144,7 +142,6 @@ function DigitInput({ length, value, onChange, disabled = false, autoFocus = tru
     newDigits[index] = numDigit
     onChange(newDigits)
     
-    // Auto-avanzar al siguiente campo
     if (digit && index < length - 1) {
       inputRefs.current[index + 1]?.focus()
     }
@@ -154,7 +151,6 @@ function DigitInput({ length, value, onChange, disabled = false, autoFocus = tru
     if (disabled) return
     
     if (e.key === 'Backspace' && !value[index] && index > 0) {
-      // Si está vacío y presiona Backspace, ir al campo anterior
       inputRefs.current[index - 1]?.focus()
     } else if (e.key === 'ArrowLeft' && index > 0) {
       inputRefs.current[index - 1]?.focus()
@@ -176,7 +172,6 @@ function DigitInput({ length, value, onChange, disabled = false, autoFocus = tru
     })
     onChange(newDigits)
     
-    // Enfocar el siguiente campo vacío o el último
     const nextEmptyIndex = newDigits.findIndex((d, i) => d === null && i >= digits.length)
     if (nextEmptyIndex !== -1) {
       inputRefs.current[nextEmptyIndex]?.focus()
@@ -228,7 +223,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   
   // Estado de puntuación
   const [scores, setScores] = useState<Record<string, number>>({})
-  const [consecutiveZeros, setConsecutiveZeros] = useState(0)
+  const [consecutiveZeros, setConsecutiveZeros] = useState(0)  // Para RD-S
   const [isCompleted, setIsCompleted] = useState(false)
   
   // Estado del input
@@ -280,10 +275,25 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     return `${part}-${itemNum}-trial${trial}`
   }
 
+  // Verificar si se debe suspender RD-D o RD-I (falló AMBOS intentos del ítem actual)
+  const shouldSuspendDDorDI = (part: RDPart, itemNum: number | string, newScores: Record<string, number>): boolean => {
+    if (part === 'RD-S') return false  // RD-S tiene su propia regla
+    
+    const trial1Key = getScoreKey(part, itemNum, 0)
+    const trial2Key = getScoreKey(part, itemNum, 1)
+    
+    // Si AMBOS intentos tienen puntaje 0, suspender
+    return newScores[trial1Key] === 0 && newScores[trial2Key] === 0
+  }
+
+  // Verificar si se debe suspender RD-S (2 fallos consecutivos)
+  const shouldSuspendDS = (newConsecutiveZeros: number): boolean => {
+    return newConsecutiveZeros >= 2
+  }
+
   const handleSubmit = () => {
     if (!currentTrialDigits) return
 
-    // Verificar que todos los dígitos estén completos
     if (digits.some(d => d === null)) {
       alert('Por favor, completa todos los dígitos')
       return
@@ -299,12 +309,22 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
       const newScores = { ...scores, [scoreKey]: score }
       setScores(newScores)
 
-      // Verificar reglas de terminación
-      if (currentPart === 'RD-S') {
+      // Verificar reglas de terminación según la parte
+      if (currentPart === 'RD-D' || currentPart === 'RD-I') {
+        // Para RD-D y RD-I: suspender si falló AMBOS intentos
+        if (shouldSuspendDDorDI(currentPart, currentItem.num, newScores)) {
+          console.log(`⏹️ Suspensión en ${currentPart}: falló ambos intentos del ítem ${currentItem.num}`)
+          moveToNextPartOrComplete(newScores)
+          return
+        }
+      } else if (currentPart === 'RD-S') {
+        // Para RD-S: suspender después de 2 fallos consecutivos
         if (score === 0) {
           const newConsecutiveZeros = consecutiveZeros + 1
           setConsecutiveZeros(newConsecutiveZeros)
-          if (newConsecutiveZeros >= 2) {
+          
+          if (shouldSuspendDS(newConsecutiveZeros)) {
+            console.log(`⏹️ Suspensión en RD-S: 2 fallos consecutivos`)
             moveToNextPartOrComplete(newScores)
             return
           }
@@ -319,14 +339,21 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     setShowResult(null)
     setIsCorrect(null)
 
-    const scoreKey = getScoreKey(currentPart, currentItem.num, currentTrial)
-    const currentScore = scores[scoreKey]
+    const trial1Key = getScoreKey(currentPart, currentItem.num, 0)
+    const trial2Key = getScoreKey(currentPart, currentItem.num, 1)
+    const trial1Score = scores[trial1Key]
+    const trial2Score = scores[trial2Key]
 
     // Determinar siguiente paso
-    if (!isPractice && currentScore === 0 && currentTrial === 0) {
-      // Falló primer intento, pasar al segundo intento
-      setCurrentTrial(1)
-      return
+    if (!isPractice) {
+      // Verificar si debemos pasar al segundo intento
+      if (currentTrial === 0 && trial1Score === 0 && trial2Score === undefined) {
+        // Falló primer intento, pasar al segundo intento
+        setCurrentTrial(1)
+        return
+      }
+      
+      // Si estamos en el segundo intento O ya se completaron ambos intentos, avanzar al siguiente ítem
     }
 
     // Avanzar al siguiente ítem
@@ -342,6 +369,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   const moveToNextPartOrComplete = (currentScores: Record<string, number>) => {
     if (currentPartIndex + 1 < ALL_PARTS.length) {
       // Pasar a la siguiente parte
+      console.log(`➡️ Pasando de ${currentPart} a ${ALL_PARTS[currentPartIndex + 1]}`)
       setCurrentPartIndex(currentPartIndex + 1)
       setCurrentItemIndex(0)
       setCurrentTrial(0)
@@ -351,6 +379,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     } else {
       // Completar la subprueba
       const total = Object.values(currentScores).reduce((a, b) => a + b, 0)
+      console.log(`✅ Subprueba RD completada. Puntaje total: ${total}`)
       setIsCompleted(true)
       onCompleteRef.current(currentScores, total)
     }
@@ -410,6 +439,9 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         </div>
         <p className="text-xs text-gray-500 mt-1">
           Parte {currentPartIndex + 1} de {ALL_PARTS.length}
+          {currentPart === 'RD-S' && consecutiveZeros > 0 && (
+            <span className="ml-2 text-orange-600">Fallos consecutivos: {consecutiveZeros}/2</span>
+          )}
         </p>
       </div>
 
