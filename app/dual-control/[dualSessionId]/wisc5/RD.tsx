@@ -68,33 +68,30 @@ const getItemsForPart = (part: RDPart): RDItem[] => {
   }
 }
 
+// Instrucciones para el display
+const getPartInstruction = (part: RDPart): string => {
+  switch (part) {
+    case 'RD-D':
+      return 'Voy a decir unos números. Escucha con atención y cuando termine, repítelos en el MISMO orden.'
+    case 'RD-I':
+      return 'Ahora voy a decir más números. Esta vez quiero que los repitas AL REVÉS, de atrás hacia adelante. Por ejemplo, si digo 8-2, tú dices 2-8.'
+    case 'RD-S':
+      return 'Ahora voy a decir otros números. Esta vez quiero que los repitas en orden DE MENOR A MAYOR. Por ejemplo, si digo 3-1-6, tú dices 1-3-6.'
+  }
+}
+
 // ============================================================
 // FUNCIONES DE VALIDACIÓN
 // ============================================================
 
-/**
- * Invierte un array de números (para RD-I)
- */
 const reverseArray = (arr: number[]): number[] => [...arr].reverse()
 
-/**
- * Ordena un array de números de menor a mayor (para RD-S)
- */
 const sortAscending = (arr: number[]): number[] => [...arr].sort((a, b) => a - b)
 
-/**
- * Verifica si la respuesta del evaluador coincide con la respuesta correcta
- */
-const validateResponse = (part: RDPart, trial: number[], userInput: string): boolean => {
-  // Limpiar input: eliminar espacios, guiones, comas y convertir a array de números
-  const cleaned = userInput
-    .trim()
-    .replace(/[,\-\s]+/g, ' ')
-    .split(' ')
-    .filter(s => s.length > 0)
-    .map(s => parseInt(s, 10))
-    .filter(n => !isNaN(n))
-
+const validateResponse = (part: RDPart, trial: number[], digits: (number | null)[]): boolean => {
+  // Filtrar valores nulos
+  const userDigits = digits.filter(d => d !== null) as number[]
+  
   let expected: number[]
   switch (part) {
     case 'RD-D':
@@ -108,12 +105,109 @@ const validateResponse = (part: RDPart, trial: number[], userInput: string): boo
       break
   }
 
-  // Comparar arrays
-  if (cleaned.length !== expected.length) return false
-  for (let i = 0; i < cleaned.length; i++) {
-    if (cleaned[i] !== expected[i]) return false
+  if (userDigits.length !== expected.length) return false
+  for (let i = 0; i < userDigits.length; i++) {
+    if (userDigits[i] !== expected[i]) return false
   }
   return true
+}
+
+// ============================================================
+// COMPONENTE DE INPUT DE DÍGITOS (TIPO CÓDIGO DE VERIFICACIÓN)
+// ============================================================
+
+interface DigitInputProps {
+  length: number
+  value: (number | null)[]
+  onChange: (digits: (number | null)[]) => void
+  disabled?: boolean
+  autoFocus?: boolean
+}
+
+function DigitInput({ length, value, onChange, disabled = false, autoFocus = true }: DigitInputProps) {
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  useEffect(() => {
+    if (autoFocus && inputRefs.current[0] && !disabled) {
+      inputRefs.current[0].focus()
+    }
+  }, [autoFocus, disabled, length])
+
+  const handleChange = (index: number, newValue: string) => {
+    if (disabled) return
+    
+    // Solo permitir un dígito
+    const digit = newValue.replace(/\D/g, '').slice(0, 1)
+    const numDigit = digit ? parseInt(digit, 10) : null
+    
+    const newDigits = [...value]
+    newDigits[index] = numDigit
+    onChange(newDigits)
+    
+    // Auto-avanzar al siguiente campo
+    if (digit && index < length - 1) {
+      inputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return
+    
+    if (e.key === 'Backspace' && !value[index] && index > 0) {
+      // Si está vacío y presiona Backspace, ir al campo anterior
+      inputRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowRight' && index < length - 1) {
+      inputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (disabled) return
+    
+    e.preventDefault()
+    const pastedText = e.clipboardData.getData('text')
+    const digits = pastedText.replace(/\D/g, '').split('').map(d => parseInt(d, 10)).slice(0, length)
+    
+    const newDigits = [...value]
+    digits.forEach((digit, i) => {
+      if (i < length) newDigits[i] = digit
+    })
+    onChange(newDigits)
+    
+    // Enfocar el siguiente campo vacío o el último
+    const nextEmptyIndex = newDigits.findIndex((d, i) => d === null && i >= digits.length)
+    if (nextEmptyIndex !== -1) {
+      inputRefs.current[nextEmptyIndex]?.focus()
+    } else if (digits.length < length) {
+      inputRefs.current[digits.length]?.focus()
+    }
+  }
+
+  return (
+    <div className="flex justify-center gap-2" onPaste={handlePaste}>
+      {Array.from({ length }).map((_, index) => (
+        <input
+          key={index}
+          ref={el => { inputRefs.current[index] = el }}
+          type="text"
+          inputMode="numeric"
+          pattern="\d*"
+          maxLength={1}
+          value={value[index] !== null ? value[index]?.toString() : ''}
+          onChange={(e) => handleChange(index, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(index, e)}
+          disabled={disabled}
+          className={`w-12 h-14 text-center text-2xl font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+            disabled 
+              ? 'bg-gray-100 text-gray-500 border-gray-200' 
+              : 'border-gray-300 text-gray-800'
+          }`}
+        />
+      ))}
+    </div>
+  )
 }
 
 // ============================================================
@@ -138,7 +232,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   const [isCompleted, setIsCompleted] = useState(false)
   
   // Estado del input
-  const [userInput, setUserInput] = useState('')
+  const [digits, setDigits] = useState<(number | null)[]>([])
   const [showResult, setShowResult] = useState<boolean | null>(null)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
 
@@ -156,21 +250,26 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     onUpdatePatientRef.current = onUpdatePatient
   }, [onComplete, onUpdatePatient])
 
+  // Resetear dígitos cuando cambia el ítem/intento
+  useEffect(() => {
+    if (currentTrialDigits) {
+      setDigits(new Array(currentTrialDigits.length).fill(null))
+      setShowResult(null)
+      setIsCorrect(null)
+    }
+  }, [currentPartIndex, currentItemIndex, currentTrial])
+
   // Enviar instrucción al display
   useEffect(() => {
     if (currentItem && !isCompleted) {
-      let instruction = ''
-      if (currentPart === 'RD-D') {
-        instruction = 'Voy a decir unos números. Escucha con atención y cuando termine, repítelos en el MISMO orden.'
-      } else if (currentPart === 'RD-I') {
-        instruction = 'Ahora voy a decir más números. Esta vez quiero que los repitas AL REVÉS, de atrás hacia adelante.'
-      } else if (currentPart === 'RD-S') {
-        instruction = 'Ahora voy a decir otros números. Esta vez quiero que los repitas en orden DE MENOR A MAYOR.'
-      }
-
+      const instruction = getPartInstruction(currentPart)
+      
       onUpdatePatientRef.current({
         type: 'wisc5_rd',
         part: currentPart,
+        partName: currentPart === 'RD-D' ? 'Dígitos en orden directo' :
+                  currentPart === 'RD-I' ? 'Dígitos en orden inverso' :
+                  'Dígitos en orden secuenciado',
         instruction,
         isPractice: currentItem.isPractice || false
       })
@@ -184,7 +283,13 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   const handleSubmit = () => {
     if (!currentTrialDigits) return
 
-    const correct = validateResponse(currentPart, currentTrialDigits, userInput)
+    // Verificar que todos los dígitos estén completos
+    if (digits.some(d => d === null)) {
+      alert('Por favor, completa todos los dígitos')
+      return
+    }
+
+    const correct = validateResponse(currentPart, currentTrialDigits, digits)
     setIsCorrect(correct)
     setShowResult(true)
 
@@ -213,7 +318,6 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   const handleContinue = () => {
     setShowResult(null)
     setIsCorrect(null)
-    setUserInput('')
 
     const scoreKey = getScoreKey(currentPart, currentItem.num, currentTrial)
     const currentScore = scores[scoreKey]
@@ -244,7 +348,6 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
       setConsecutiveZeros(0)
       setShowResult(null)
       setIsCorrect(null)
-      setUserInput('')
     } else {
       // Completar la subprueba
       const total = Object.values(currentScores).reduce((a, b) => a + b, 0)
@@ -253,14 +356,13 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     }
   }
 
-  // Saltar práctica (solo para ítems de práctica)
+  // Saltar práctica
   const skipPractice = () => {
     if (currentItemIndex + 1 < partItems.length) {
       setCurrentItemIndex(currentItemIndex + 1)
       setCurrentTrial(0)
       setShowResult(null)
       setIsCorrect(null)
-      setUserInput('')
     }
   }
 
@@ -268,7 +370,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
 
   if (isCompleted) {
     const totalScore = Object.values(scores).reduce((a, b) => a + b, 0)
-    const maxScore = 54 // 18 + 18 + 18
+    const maxScore = 54
     
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
@@ -291,9 +393,9 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">
-            {currentPart === 'RD-D' && 'Dígitos en orden directo'}
-            {currentPart === 'RD-I' && 'Dígitos en orden inverso'}
-            {currentPart === 'RD-S' && 'Dígitos en orden secuenciado'}
+            {currentPart === 'RD-D' && '📋 Dígitos en orden directo'}
+            {currentPart === 'RD-I' && '🔄 Dígitos en orden inverso'}
+            {currentPart === 'RD-S' && '🔢 Dígitos en orden secuenciado'}
           </span>
           <span className="text-gray-800 font-medium">
             {isPractice ? 'Práctica' : `Ítem ${currentItem.num}`} / {partItems.filter(i => !i.isPractice).length}
@@ -302,7 +404,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-blue-500 rounded-full" 
+            className="h-full bg-blue-500 rounded-full transition-all" 
             style={{ width: `${(currentPartIndex / ALL_PARTS.length) * 100}%` }} 
           />
         </div>
@@ -313,8 +415,8 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
 
       {/* Dígitos a leer (solo visible para el evaluador) */}
       <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 text-center">
-        <p className="text-sm text-blue-700 mb-3">Dígitos para leer al paciente:</p>
-        <p className="text-4xl font-mono font-bold tracking-wider text-gray-800">
+        <p className="text-sm text-blue-700 mb-3">📢 Dígitos para leer al paciente:</p>
+        <p className="text-5xl font-mono font-bold tracking-wider text-gray-800">
           {currentTrialDigits?.join(' - ')}
         </p>
         {isPractice && (
@@ -324,26 +426,22 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         )}
       </div>
 
-      {/* Campo de entrada para el evaluador */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Dígitos que dijo el paciente:
+      {/* Campo de entrada de dígitos (tipo código) */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <label className="block text-sm font-medium text-gray-700 mb-4 text-center">
+          ✏️ Dígitos que dijo el paciente:
         </label>
-        <input
-          type="text"
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
+        
+        <DigitInput
+          length={currentTrialDigits?.length || 0}
+          value={digits}
+          onChange={setDigits}
           disabled={showResult === true}
-          placeholder="Ej: 2 9 o 2-9 o 2,9"
-          className="w-full px-4 py-3 text-lg font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !showResult && userInput.trim()) {
-              handleSubmit()
-            }
-          }}
+          autoFocus={!showResult}
         />
-        <p className="text-xs text-gray-400 mt-2">
-          Separa los números con espacios, guiones o comas
+        
+        <p className="text-xs text-gray-400 mt-4 text-center">
+          Ingresa un dígito por casilla. Usa Tab o flechas para navegar.
         </p>
       </div>
 
@@ -352,18 +450,20 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         <div className={`rounded-lg p-4 text-center ${
           isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
         }`}>
-          <p className={`font-medium ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+          <p className={`font-medium text-lg ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
             {isCorrect ? '✓ ¡Correcto!' : '✗ Incorrecto'}
           </p>
-          {!isCorrect && (
+          {!isCorrect && currentTrialDigits && (
             <p className="text-sm text-gray-600 mt-2">
-              Respuesta esperada: {
-                currentPart === 'RD-D' 
-                  ? currentTrialDigits?.join(' - ')
+              <strong>Respuesta esperada:</strong>{' '}
+              <span className="font-mono text-lg">
+                {currentPart === 'RD-D' 
+                  ? currentTrialDigits.join(' - ')
                   : currentPart === 'RD-I'
-                    ? reverseArray(currentTrialDigits!).join(' - ')
-                    : sortAscending(currentTrialDigits!).join(' - ')
-              }
+                    ? reverseArray(currentTrialDigits).join(' - ')
+                    : sortAscending(currentTrialDigits).join(' - ')
+                }
+              </span>
             </p>
           )}
         </div>
@@ -374,7 +474,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <button
             onClick={handleSubmit}
-            disabled={!userInput.trim()}
+            disabled={digits.some(d => d === null)}
             className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             Verificar respuesta
