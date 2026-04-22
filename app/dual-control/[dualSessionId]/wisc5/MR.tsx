@@ -178,107 +178,17 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     return updatedScores
   }
 
-  const getNextItemIndex = (currentItemNum: number | string, currentScore: number): { nextIndex: number; updatedScores: Record<string | number, number> } => {
-    let updatedScores = { ...scores }
-    const currentIdx = MR_ITEMS.findIndex(i => i.num === currentItemNum)
-    
-    // Ítems de práctica
-    if (currentItemNum === 'PA') {
-      return { nextIndex: MR_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
-    }
-    if (currentItemNum === 'PB') {
-      return { nextIndex: MR_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
-    }
-
-    const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
-    
-    // ============================================================
-    // MODO RETROCESO ACTIVO
-    // ============================================================
-    if (backtrackMode) {
-      if (currentScore === 1) {
-        // Incrementar contador de éxitos consecutivos
-        const newConsecutiveSuccesses = consecutiveSuccessesInBacktrack + 1
-        setConsecutiveSuccessesInBacktrack(newConsecutiveSuccesses)
-        
-        // Verificar si tenemos DOS aciertos consecutivos
-        if (newConsecutiveSuccesses >= 2) {
-          // ¡Dos aciertos consecutivos! Salir del retroceso
-          setBacktrackMode(false)
-          setConsecutiveSuccessesInBacktrack(0)
-          
-          // Marcar ítems no administrados como correctos
-          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem!, numericItem)
-          
-          // Saltar al ítem después del punto de inicio original
-          const jumpItem = getJumpItemAfterBacktrack(failedStartItem!)
-          const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
-          return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
-        }
-        
-        // Solo un acierto hasta ahora - continuar retrocediendo
-        let prevItem = numericItem - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          prevItem--
-        }
-        if (prevItem >= 1) {
-          return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
-      } else {
-        // Fallo (0) en modo retroceso - reiniciar contador
-        setConsecutiveSuccessesInBacktrack(0)
-        
-        // Buscar el primer ítem NO administrado hacia atrás
-        let prevItem = numericItem - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          prevItem--
-        }
-        if (prevItem >= 1) {
-          return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
-      }
-      
-      // Si no hay más ítems para retroceder, salir del modo retroceso
-      setBacktrackMode(false)
-      setConsecutiveSuccessesInBacktrack(0)
-    }
-
-    // ============================================================
-    // VERIFICAR SI SE DEBE ACTIVAR SECUENCIA INVERSA
-    // ============================================================
-    const isFirstTwoAdministered = (numericItem === firstStartItem) || (numericItem === secondStartItem)
-    
-    if (isFirstTwoAdministered && currentScore === 0) {
-      setBacktrackMode(true)
-      setFailedStartItem(numericItem)
-      setConsecutiveSuccessesInBacktrack(0)
-      
-      // Buscar el primer ítem NO administrado hacia atrás
-      let prevItem = numericItem - 1
-      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-        prevItem--
-      }
-      
-      if (prevItem >= 1) {
-        return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-      }
-    }
-
-    // Avanzar al siguiente ítem no respondido
-    let nextIdx = currentIdx + 1
-    while (nextIdx < MR_ITEMS.length && updatedScores[MR_ITEMS[nextIdx].num] !== undefined) {
-      nextIdx++
-    }
-    return { nextIndex: nextIdx, updatedScores }
-  }
-
   const handleAnswer = (selected: number) => {
     if (scores[currentItem.num] !== undefined) return
 
     const isCorrect = selected === currentItem.correctAnswer
     const score = isCorrect ? 1 : 0
     const effectiveScore = isPractice ? 0 : score
+    
+    // Crear nuevos scores con el puntaje actual
     let newScores = { ...scores, [currentItem.num]: effectiveScore }
+    
+    // Actualizar el estado inmediatamente para la UI
     setScores(newScores)
     setSelectedAnswer(null)
 
@@ -300,15 +210,95 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       }
     }
 
-    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, effectiveScore)
-    newScores = updatedScores
-    setScores(newScores)
+    // Función interna para calcular el siguiente ítem usando los scores actualizados
+    const getNextWithScores = (scoresArg: Record<string | number, number>): { nextIndex: number; updatedScores: Record<string | number, number> } => {
+      let updatedScores = { ...scoresArg }
+      const currentIdx = MR_ITEMS.findIndex(i => i.num === currentItem.num)
+      
+      // Ítems de práctica
+      if (currentItem.num === 'PA') {
+        return { nextIndex: MR_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
+      }
+      if (currentItem.num === 'PB') {
+        return { nextIndex: MR_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
+      }
+
+      const numericItem = typeof currentItem.num === 'number' ? currentItem.num : parseInt(currentItem.num as string)
+      
+      // Modo retroceso activo
+      if (backtrackMode) {
+        if (effectiveScore === 1) {
+          const newConsecutiveSuccesses = consecutiveSuccessesInBacktrack + 1
+          setConsecutiveSuccessesInBacktrack(newConsecutiveSuccesses)
+          
+          if (newConsecutiveSuccesses >= 2) {
+            setBacktrackMode(false)
+            setConsecutiveSuccessesInBacktrack(0)
+            updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem!, numericItem)
+            const jumpItem = getJumpItemAfterBacktrack(failedStartItem!)
+            const jumpIndex = MR_ITEMS.findIndex(i => i.num === jumpItem)
+            return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
+          }
+          
+          let prevItem = numericItem - 1
+          while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+            prevItem--
+          }
+          if (prevItem >= 1) {
+            return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
+          }
+        } else {
+          setConsecutiveSuccessesInBacktrack(0)
+          
+          let prevItem = numericItem - 1
+          while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+            prevItem--
+          }
+          if (prevItem >= 1) {
+            return { nextIndex: MR_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
+          }
+        }
+        
+        setBacktrackMode(false)
+        setConsecutiveSuccessesInBacktrack(0)
+      }
+
+      // Verificar si se debe activar secuencia inversa
+      const isFirstTwoAdministered = (numericItem === firstStartItem) || (numericItem === secondStartItem)
+      
+      if (isFirstTwoAdministered && effectiveScore === 0) {
+        setBacktrackMode(true)
+        setFailedStartItem(numericItem)
+        setConsecutiveSuccessesInBacktrack(0)
+        
+        let prevItem = numericItem - 1
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+          prevItem--
+        }
+        
+        if (prevItem >= 1) {
+          const nextIdx = MR_ITEMS.findIndex(i => i.num === prevItem)
+          return { nextIndex: nextIdx, updatedScores }
+        }
+      }
+
+      let nextIdx = currentIdx + 1
+      while (nextIdx < MR_ITEMS.length && updatedScores[MR_ITEMS[nextIdx].num] !== undefined) {
+        nextIdx++
+      }
+      return { nextIndex: nextIdx, updatedScores }
+    }
+
+    const { nextIndex, updatedScores } = getNextWithScores(newScores)
+    
+    // Actualizar scores con los cambios del retroceso (ítems marcados como correctos)
+    setScores(updatedScores)
     
     if (nextIndex >= MR_ITEMS.length) {
-      const bonusPoints = bonusApplied || checkBonusEligibility(newScores) ? getBonusPoints() : 0
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
+      const bonusPoints = bonusApplied || checkBonusEligibility(updatedScores) ? getBonusPoints() : 0
+      const total = Object.values(updatedScores).reduce((a, b) => a + b, 0) + bonusPoints
       setIsCompleted(true)
-      onCompleteRef.current(newScores, total)
+      onCompleteRef.current(updatedScores, total)
     } else {
       setCurrentIndex(nextIndex)
       setIsGoingBack(nextIndex < currentIndex)

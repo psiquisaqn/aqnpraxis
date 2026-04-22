@@ -261,128 +261,14 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
     return updatedScores
   }
 
-  const getNextItemIndex = (currentItemNum: number | string, currentScore: number): { nextIndex: number; updatedScores: Record<string | number, number> } => {
-    let updatedScores = { ...scores }
-    const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItemNum)
-    
-    console.log('=== getNextItemIndex ===')
-    console.log('currentItemNum:', currentItemNum)
-    console.log('currentScore:', currentScore)
-    console.log('backtrackMode:', backtrackMode)
-    console.log('scores actuales:', JSON.stringify(scores))
-    
-    if (currentItemNum === 'PA') {
-      console.log('→ PA: siguiente = PB')
-      return { nextIndex: AN_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
-    }
-    if (currentItemNum === 'PB') {
-      console.log('→ PB: siguiente =', firstStartItem)
-      return { nextIndex: AN_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
-    }
-
-    if (!hasBacktrack) {
-      let nextIdx = currentIdx + 1
-      while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num] !== undefined) {
-        nextIdx++
-      }
-      console.log('→ <8 años: siguiente índice =', nextIdx)
-      return { nextIndex: nextIdx, updatedScores }
-    }
-
-    const numericItem = typeof currentItemNum === 'number' ? currentItemNum : parseInt(currentItemNum as string)
-    
-    // ============================================================
-    // MODO RETROCESO ACTIVO
-    // ============================================================
-    if (backtrackMode) {
-      console.log('→ MODO RETROCESO ACTIVO')
-      if (currentScore === 2) {
-        const newConsecutiveSuccesses = consecutiveSuccessesInBacktrack + 1
-        setConsecutiveSuccessesInBacktrack(newConsecutiveSuccesses)
-        console.log('  - Acierto! Éxitos consecutivos:', newConsecutiveSuccesses)
-        
-        if (newConsecutiveSuccesses >= 2) {
-          console.log('  - ¡2 aciertos consecutivos! Saliendo de retroceso')
-          setBacktrackMode(false)
-          setConsecutiveSuccessesInBacktrack(0)
-          updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem!, numericItem)
-          const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpAfterBacktrack)
-          console.log('  - Saltando a ítem:', jumpAfterBacktrack, 'índice:', jumpIndex)
-          return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
-        }
-        
-        let prevItem = numericItem - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          console.log(`  - Ítem ${prevItem} ya tiene puntaje (${updatedScores[prevItem]}), retrocediendo más...`)
-          prevItem--
-        }
-        console.log('  - Siguiente ítem hacia atrás:', prevItem)
-        if (prevItem >= 1) {
-          return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
-      } else {
-        console.log('  - Fallo (0 o 1). Reiniciando contador de éxitos')
-        setConsecutiveSuccessesInBacktrack(0)
-        
-        let prevItem = numericItem - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          console.log(`  - Ítem ${prevItem} ya tiene puntaje (${updatedScores[prevItem]}), retrocediendo más...`)
-          prevItem--
-        }
-        console.log('  - Siguiente ítem hacia atrás:', prevItem)
-        if (prevItem >= 1) {
-          return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
-      }
-      
-      console.log('  - No hay más ítems hacia atrás, saliendo de retroceso')
-      setBacktrackMode(false)
-      setConsecutiveSuccessesInBacktrack(0)
-    }
-
-    // ============================================================
-    // VERIFICAR SI SE DEBE ACTIVAR SECUENCIA INVERSA
-    // ============================================================
-    const isFirstTwoAdministered = (numericItem === firstStartItem) || (numericItem === secondStartItem)
-    const isFailure = currentScore < 2
-    
-    console.log('¿Es uno de los primeros dos?', isFirstTwoAdministered, '(ítem:', numericItem, 'first:', firstStartItem, 'second:', secondStartItem, ')')
-    console.log('¿Es fallo (<2)?', isFailure, '(score:', currentScore, ')')
-    
-    if (isFirstTwoAdministered && isFailure) {
-      console.log('→ ¡ACTIVANDO SECUENCIA INVERSA!')
-      setBacktrackMode(true)
-      setFailedStartItem(numericItem)
-      setConsecutiveSuccessesInBacktrack(0)
-      
-      let prevItem = numericItem - 1
-      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-        console.log(`  - Ítem ${prevItem} ya tiene puntaje (${updatedScores[prevItem]}), retrocediendo más...`)
-        prevItem--
-      }
-      console.log('  - Primer ítem no administrado hacia atrás:', prevItem)
-      
-      if (prevItem >= 1) {
-        const nextIdx = AN_ITEMS.findIndex(i => i.num === prevItem)
-        console.log('  - Índice en AN_ITEMS:', nextIdx)
-        return { nextIndex: nextIdx, updatedScores }
-      }
-      console.log('  - No hay ítems hacia atrás sin administrar')
-    }
-
-    let nextIdx = currentIdx + 1
-    while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num] !== undefined) {
-      nextIdx++
-    }
-    console.log('→ Avance normal: siguiente índice =', nextIdx)
-    return { nextIndex: nextIdx, updatedScores }
-  }
-
   const handleScore = (score: number) => {
     if (scores[currentItem.num] !== undefined) return
 
     const effectiveScore = isPractice ? 0 : score
+    // Crear nuevos scores con el puntaje actual
     let newScores = { ...scores, [currentItem.num]: effectiveScore }
+    
+    // Actualizar el estado inmediatamente para la UI
     setScores(newScores)
     setResponse('')
     setSuggestion(null)
@@ -404,15 +290,103 @@ export const ANInterface = React.memo(function ANInterface({ onComplete, onUpdat
       }
     }
 
-    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, effectiveScore)
-    newScores = updatedScores
-    setScores(newScores)
+    // Función interna para calcular el siguiente ítem usando los scores actualizados
+    const getNextWithScores = (scoresArg: Record<string | number, number>): { nextIndex: number; updatedScores: Record<string | number, number> } => {
+      let updatedScores = { ...scoresArg }
+      const currentIdx = AN_ITEMS.findIndex(i => i.num === currentItem.num)
+      
+      // Ítems de práctica
+      if (currentItem.num === 'PA') {
+        return { nextIndex: AN_ITEMS.findIndex(i => i.num === 'PB'), updatedScores }
+      }
+      if (currentItem.num === 'PB') {
+        return { nextIndex: AN_ITEMS.findIndex(i => i.num === firstStartItem), updatedScores }
+      }
+
+      if (!hasBacktrack) {
+        let nextIdx = currentIdx + 1
+        while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num] !== undefined) {
+          nextIdx++
+        }
+        return { nextIndex: nextIdx, updatedScores }
+      }
+
+      const numericItem = typeof currentItem.num === 'number' ? currentItem.num : parseInt(currentItem.num as string)
+      
+      // Modo retroceso activo
+      if (backtrackMode) {
+        if (effectiveScore === 2) {
+          const newConsecutiveSuccesses = consecutiveSuccessesInBacktrack + 1
+          setConsecutiveSuccessesInBacktrack(newConsecutiveSuccesses)
+          
+          if (newConsecutiveSuccesses >= 2) {
+            setBacktrackMode(false)
+            setConsecutiveSuccessesInBacktrack(0)
+            updatedScores = markSkippedItemsAsCorrect(updatedScores, failedStartItem!, numericItem)
+            const jumpIndex = AN_ITEMS.findIndex(i => i.num === jumpAfterBacktrack)
+            return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
+          }
+          
+          let prevItem = numericItem - 1
+          while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+            prevItem--
+          }
+          if (prevItem >= 1) {
+            return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
+          }
+        } else {
+          setConsecutiveSuccessesInBacktrack(0)
+          
+          let prevItem = numericItem - 1
+          while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+            prevItem--
+          }
+          if (prevItem >= 1) {
+            return { nextIndex: AN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
+          }
+        }
+        
+        setBacktrackMode(false)
+        setConsecutiveSuccessesInBacktrack(0)
+      }
+
+      // Verificar si se debe activar secuencia inversa
+      const isFirstTwoAdministered = (numericItem === firstStartItem) || (numericItem === secondStartItem)
+      const isFailure = effectiveScore < 2
+      
+      if (isFirstTwoAdministered && isFailure) {
+        setBacktrackMode(true)
+        setFailedStartItem(numericItem)
+        setConsecutiveSuccessesInBacktrack(0)
+        
+        let prevItem = numericItem - 1
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
+          prevItem--
+        }
+        
+        if (prevItem >= 1) {
+          const nextIdx = AN_ITEMS.findIndex(i => i.num === prevItem)
+          return { nextIndex: nextIdx, updatedScores }
+        }
+      }
+
+      let nextIdx = currentIdx + 1
+      while (nextIdx < AN_ITEMS.length && updatedScores[AN_ITEMS[nextIdx].num] !== undefined) {
+        nextIdx++
+      }
+      return { nextIndex: nextIdx, updatedScores }
+    }
+
+    const { nextIndex, updatedScores } = getNextWithScores(newScores)
+    
+    // Actualizar scores con los cambios del retroceso (ítems marcados como correctos)
+    setScores(updatedScores)
     
     if (nextIndex >= AN_ITEMS.length) {
-      const bonusPoints = bonusApplied || checkBonusEligibility(newScores) ? calculateBonusPoints() : 0
-      const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonusPoints
+      const bonusPoints = bonusApplied || checkBonusEligibility(updatedScores) ? calculateBonusPoints() : 0
+      const total = Object.values(updatedScores).reduce((a, b) => a + b, 0) + bonusPoints
       setIsCompleted(true)
-      onCompleteRef.current(newScores, total)
+      onCompleteRef.current(updatedScores, total)
     } else {
       setCurrentIndex(nextIndex)
       setIsGoingBack(nextIndex < currentIndex)
