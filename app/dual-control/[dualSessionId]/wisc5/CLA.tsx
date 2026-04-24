@@ -176,7 +176,6 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
           videoRef.current.onloadedmetadata = () => {
             setCameraReady(true)
             console.log('✅ Video listo para capturar')
-            console.log('canvasRef.current:', canvasRef.current)
           }
         }
       } catch (err: any) {
@@ -196,38 +195,26 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
 
   const capturePhoto = (applyMirror: boolean) => {
     console.log('📸 Intentando capturar foto... applyMirror:', applyMirror)
-    console.log('videoRef.current:', videoRef.current)
-    console.log('canvasRef.current:', canvasRef.current)
-    console.log('cameraReady:', cameraReady)
     
     setCapturing(true)
     
-    // Pequeño delay para asegurar que el DOM está listo
     setTimeout(() => {
       try {
-        if (!videoRef.current) {
-          throw new Error('Video no disponible')
-        }
-        if (!canvasRef.current) {
-          throw new Error('Canvas no disponible - intenta de nuevo')
-        }
+        if (!videoRef.current) throw new Error('Video no disponible')
+        if (!canvasRef.current) throw new Error('Canvas no disponible')
         
         const video = videoRef.current
         const canvas = canvasRef.current
         
         if (video.videoWidth === 0 || video.videoHeight === 0) {
-          throw new Error('El video no tiene dimensiones válidas. Espera un momento.')
+          throw new Error('El video no tiene dimensiones válidas')
         }
-        
-        console.log(`Video dimensiones: ${video.videoWidth}x${video.videoHeight}`)
         
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
         
         const context = canvas.getContext('2d')
-        if (!context) {
-          throw new Error('No se pudo obtener contexto del canvas')
-        }
+        if (!context) throw new Error('No se pudo obtener contexto del canvas')
         
         if (applyMirror) {
           context.translate(canvas.width, 0)
@@ -258,9 +245,7 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   const confirmCapture = () => {
     if (capturedImage) {
       onCapture(capturedImage)
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop())
-      }
+      if (stream) stream.getTracks().forEach(track => track.stop())
     }
   }
 
@@ -274,12 +259,7 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl p-6 max-w-md w-full">
           <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={onClose} 
-            className="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-          >
-            Cerrar
-          </button>
+          <button onClick={onClose} className="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cerrar</button>
         </div>
       </div>
     )
@@ -298,9 +278,7 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
                 autoPlay 
                 playsInline 
                 className="w-full h-auto"
-                style={{ 
-                  transform: mirrorPreview && isFrontCamera ? 'scaleX(-1)' : 'none' 
-                }}
+                style={{ transform: mirrorPreview && isFrontCamera ? 'scaleX(-1)' : 'none' }}
               />
               {!cameraReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -309,97 +287,51 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
               )}
             </div>
             
-            {/* CANVAS SIEMPRE PRESENTE EN EL DOM (oculto con CSS) */}
-            <canvas 
-              ref={canvasRef} 
-              style={{ display: 'none' }}
-              width="640"
-              height="480"
-            />
+            <canvas ref={canvasRef} style={{ display: 'none' }} width="640" height="480" />
             
             {isFrontCamera && (
               <div className="mb-3 flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="mirrorPreview"
-                  checked={mirrorPreview}
-                  onChange={(e) => setMirrorPreview(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <label htmlFor="mirrorPreview" className="text-sm text-gray-600">
-                  Vista previa en espejo
-                </label>
+                <input type="checkbox" id="mirrorPreview" checked={mirrorPreview}
+                  onChange={(e) => setMirrorPreview(e.target.checked)} className="rounded border-gray-300" />
+                <label htmlFor="mirrorPreview" className="text-sm text-gray-600">Vista previa en espejo</label>
               </div>
             )}
             
-            <div className="text-xs text-gray-500 mb-3">
-              Estado: {cameraReady ? '✅ Cámara lista' : '⏳ Iniciando...'}
-            </div>
+            <div className="text-xs text-gray-500 mb-3">Estado: {cameraReady ? '✅ Cámara lista' : '⏳ Iniciando...'}</div>
             
             <div className="flex flex-col gap-2">
               <div className="flex gap-3">
-                <button
-                  onClick={() => capturePhoto(false)}
-                  disabled={!cameraReady || capturing}
+                <button onClick={() => capturePhoto(false)} disabled={!cameraReady || capturing}
                   className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
-                    !cameraReady || capturing
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                >
+                    !cameraReady || capturing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}>
                   {capturing ? 'Capturando...' : '📸 Capturar (orientación normal)'}
                 </button>
                 {isFrontCamera && (
-                  <button
-                    onClick={() => capturePhoto(true)}
-                    disabled={!cameraReady || capturing}
+                  <button onClick={() => capturePhoto(true)} disabled={!cameraReady || capturing}
                     className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
-                      !cameraReady || capturing
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                  >
+                      !cameraReady || capturing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}>
                     🔄 Capturar con espejo
                   </button>
                 )}
               </div>
-              <button
-                onClick={onClose}
-                className="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300"
-              >
-                Cancelar
-              </button>
+              <button onClick={onClose} className="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Cancelar</button>
             </div>
             
             <p className="text-xs text-gray-500 mt-3 text-center">
-              {isFrontCamera 
-                ? 'Cámara frontal. Si el texto se ve al revés, usa "Capturar (orientación normal)".'
-                : 'Asegúrate de que la hoja esté bien iluminada y enfocada.'}
+              {isFrontCamera ? 'Cámara frontal. Si el texto se ve al revés, usa "Capturar (orientación normal)".' : 'Asegúrate de que la hoja esté bien iluminada y enfocada.'}
             </p>
           </>
         ) : (
           <>
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-2">Vista previa de la foto:</p>
-              <img 
-                src={capturedImage!} 
-                alt="Vista previa" 
-                className="max-h-64 mx-auto rounded-lg border border-gray-200"
-              />
+              <img src={capturedImage!} alt="Vista previa" className="max-h-64 mx-auto rounded-lg border border-gray-200" />
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={confirmCapture}
-                className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
-              >
-                ✓ Usar esta foto
-              </button>
-              <button
-                onClick={retakePhoto}
-                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300"
-              >
-                Volver a capturar
-              </button>
+              <button onClick={confirmCapture} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">✓ Usar esta foto</button>
+              <button onClick={retakePhoto} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Volver a capturar</button>
             </div>
           </>
         )}
@@ -409,106 +341,153 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
 }
 
 // ============================================================
-// COMPONENTE DE PLANTILLA DE CORRECCIÓN (REJILLA INTERACTIVA)
+// COMPONENTE DE PLANTILLA DE CORRECCIÓN (CON PROPORCIONES REALES)
 // ============================================================
 
 interface ScoringGridProps {
   imageData: string
+  patientAge: number
   onScoreCalculated: (score: number, markedCells: boolean[]) => void
   onClose: () => void
 }
 
-function ScoringGrid({ imageData, onScoreCalculated, onClose }: ScoringGridProps) {
+function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: ScoringGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [image, setImage] = useState<HTMLImageElement | null>(null)
-  const [gridPosition, setGridPosition] = useState({ x: 50, y: 50 })
-  const [markedCells, setMarkedCells] = useState<boolean[]>([])
+  const [baseImage, setBaseImage] = useState<HTMLImageElement | null>(null)
+  const [overlayImage, setOverlayImage] = useState<HTMLImageElement | null>(null)
+  const [overlayPosition, setOverlayPosition] = useState({ x: 0, y: 0 })
+  const [overlayScale, setOverlayScale] = useState({ x: 1, y: 1 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  const [scale, setScale] = useState(1)
-  const [cellSize, setCellSize] = useState({ width: 30, height: 35 })
+  const [markedCells, setMarkedCells] = useState<boolean[]>([])
+  const [showGrid, setShowGrid] = useState(true)
 
-  // Configuración de la rejilla - Valores típicos para Claves
-  const COLS = 15
-  const ROWS = 8
+  // Configuración según la edad
+  const useTemplateA = patientAge <= 7
+  const templatePath = useTemplateA 
+    ? '/wisc5/cla/plantilla-claves-a.png'
+    : '/wisc5/cla/plantilla-claves-b.png'
+  
+  // Proporciones reales de las plantillas (CORREGIDO)
+  const RATIO = useTemplateA 
+    ? { transparent: 18, opaque: 7 }   // Plantilla A: ventana 18, opaco 7
+    : { transparent: 14, opaque: 10 }  // Plantilla B: ventana 14, opaco 10
+  
+  const PAIR_HEIGHT = RATIO.transparent + RATIO.opaque
+  
+  // Configuración de columnas (distribución uniforme horizontal)
+  const COLS = useTemplateA ? 8 : 15
+  
+  // Pares de filas (cada par = 1 fila opaca + 1 fila transparente)
+  const TOTAL_PAIRS = 4
+  const TOTAL_SCORABLE = TOTAL_PAIRS * COLS
 
-  // Cargar imagen
-  useEffect(() => {
-    const img = new Image()
-    img.src = imageData
-    img.onload = () => {
-      setImage(img)
-      setMarkedCells(new Array(COLS * ROWS).fill(false))
+  // Calcular la posición Y relativa de cada fila evaluable dentro del PNG (0 a 1)
+  const getScorableRowPositions = (): number[] => {
+    const positions: number[] = []
+    for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
+      const yStart = pair * PAIR_HEIGHT + RATIO.opaque
+      const yCenter = yStart / (TOTAL_PAIRS * PAIR_HEIGHT)
+      positions.push(yCenter)
     }
-  }, [imageData])
+    return positions
+  }
+
+  // Altura relativa de cada fila evaluable
+  const getScorableRowHeight = (): number => {
+    return RATIO.transparent / (TOTAL_PAIRS * PAIR_HEIGHT)
+  }
+
+  // Cargar ambas imágenes
+  useEffect(() => {
+    console.log('📐 Cargando plantilla:', templatePath)
+    console.log('📐 Proporciones:', `${RATIO.transparent}:${RATIO.opaque}`)
+    
+    setMarkedCells(new Array(TOTAL_SCORABLE).fill(false))
+
+    const base = new Image()
+    base.src = imageData
+    base.onload = () => {
+      setBaseImage(base)
+      setOverlayPosition({
+        x: (base.width - (base.width * 0.7)) / 2,
+        y: (base.height - (base.height * 0.7)) / 2
+      })
+    }
+
+    const overlay = new Image()
+    overlay.src = templatePath
+    overlay.onload = () => {
+      console.log('✅ Plantilla cargada:', overlay.width, 'x', overlay.height)
+      setOverlayImage(overlay)
+    }
+  }, [imageData, templatePath])
 
   // Dibujar canvas
   useEffect(() => {
-    if (!image || !canvasRef.current) return
+    if (!baseImage || !overlayImage || !canvasRef.current) return
     
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    canvas.width = image.width
-    canvas.height = image.height
+    canvas.width = baseImage.width
+    canvas.height = baseImage.height
     
-    // Dibujar imagen
-    ctx.drawImage(image, 0, 0)
+    // 1. Dibujar imagen base (foto de la hoja)
+    ctx.drawImage(baseImage, 0, 0)
     
-    // Calcular tamaño de celda basado en escala
-    const baseCellWidth = cellSize.width
-    const baseCellHeight = cellSize.height
-    const scaledCellWidth = baseCellWidth * scale
-    const scaledCellHeight = baseCellHeight * scale
+    // 2. Dibujar overlay (plantilla PNG) con transformaciones
+    ctx.save()
+    ctx.translate(overlayPosition.x, overlayPosition.y)
+    ctx.scale(overlayScale.x, overlayScale.y)
+    ctx.globalAlpha = 0.85
+    ctx.drawImage(overlayImage, 0, 0)
+    ctx.globalAlpha = 1.0
+    ctx.restore()
     
-    // Dibujar rejilla
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        const x = gridPosition.x + col * scaledCellWidth
-        const y = gridPosition.y + row * scaledCellHeight
-        const index = row * COLS + col
-        
-        // Dibujar celda
-        if (markedCells[index]) {
-          // Celda marcada como correcta - fondo verde semitransparente
-          ctx.fillStyle = 'rgba(34, 197, 94, 0.35)'
-          ctx.fillRect(x, y, scaledCellWidth, scaledCellHeight)
-          ctx.strokeStyle = '#22C55E'
-          ctx.lineWidth = 2.5
-        } else {
-          // Celda no marcada - solo borde
-          ctx.strokeStyle = '#3B82F6'
-          ctx.lineWidth = 2
+    // 3. Dibujar rejilla de marcado con proporciones correctas
+    if (showGrid && overlayImage) {
+      const scaledWidth = overlayImage.width * overlayScale.x
+      const scaledHeight = overlayImage.height * overlayScale.y
+      const cellWidth = scaledWidth / COLS
+      const rowPositions = getScorableRowPositions()
+      const rowHeight = getScorableRowHeight()
+      
+      let cellIndex = 0
+      for (const rowY of rowPositions) {
+        for (let col = 0; col < COLS; col++) {
+          const x = overlayPosition.x + col * cellWidth
+          const y = overlayPosition.y + rowY * scaledHeight
+          const h = rowHeight * scaledHeight
+          
+          if (markedCells[cellIndex]) {
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.35)'
+            ctx.fillRect(x, y, cellWidth, h)
+            ctx.strokeStyle = '#22C55E'
+            ctx.lineWidth = 2.5
+          } else {
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.7)'
+            ctx.lineWidth = 1.5
+          }
+          ctx.strokeRect(x, y, cellWidth, h)
+          
+          if (markedCells[cellIndex]) {
+            ctx.font = 'bold 14px Arial'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillStyle = '#16A34A'
+            ctx.fillText('✓', x + cellWidth / 2, y + h / 2)
+          }
+          
+          cellIndex++
         }
-        ctx.strokeRect(x, y, scaledCellWidth, scaledCellHeight)
       }
     }
-    
-    // Dibujar números de fila/columna
-    ctx.font = 'bold 12px Arial'
-    ctx.fillStyle = '#374151'
-    ctx.shadowColor = 'white'
-    ctx.shadowBlur = 4
-    for (let col = 0; col < COLS; col++) {
-      ctx.fillText(
-        (col + 1).toString(), 
-        gridPosition.x + col * scaledCellWidth + 5, 
-        gridPosition.y - 8
-      )
-    }
-    for (let row = 0; row < ROWS; row++) {
-      ctx.fillText(
-        (row + 1).toString(), 
-        gridPosition.x - 25, 
-        gridPosition.y + row * scaledCellHeight + 20
-      )
-    }
-    ctx.shadowBlur = 0
-  }, [image, gridPosition, scale, markedCells, cellSize])
+  }, [baseImage, overlayImage, overlayPosition, overlayScale, markedCells, showGrid])
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return
+    if (!canvasRef.current || !overlayImage) return
     
     const canvas = canvasRef.current
     const rect = canvas.getBoundingClientRect()
@@ -518,43 +497,49 @@ function ScoringGrid({ imageData, onScoreCalculated, onClose }: ScoringGridProps
     const canvasX = (e.clientX - rect.left) * scaleX
     const canvasY = (e.clientY - rect.top) * scaleY
     
-    const scaledCellWidth = cellSize.width * scale
-    const scaledCellHeight = cellSize.height * scale
+    const scaledWidth = overlayImage.width * overlayScale.x
+    const scaledHeight = overlayImage.height * overlayScale.y
+    const cellWidth = scaledWidth / COLS
+    const rowPositions = getScorableRowPositions()
+    const rowHeight = getScorableRowHeight()
     
-    // Encontrar celda clickeada
-    const col = Math.floor((canvasX - gridPosition.x) / scaledCellWidth)
-    const row = Math.floor((canvasY - gridPosition.y) / scaledCellHeight)
-    
-    if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
-      const index = row * COLS + col
-      const newMarkedCells = [...markedCells]
-      newMarkedCells[index] = !newMarkedCells[index]
-      setMarkedCells(newMarkedCells)
+    let cellIndex = 0
+    for (const rowY of rowPositions) {
+      for (let col = 0; col < COLS; col++) {
+        const cellX = overlayPosition.x + col * cellWidth
+        const cellY = overlayPosition.y + rowY * scaledHeight
+        const cellH = rowHeight * scaledHeight
+        
+        if (canvasX >= cellX && canvasX <= cellX + cellWidth &&
+            canvasY >= cellY && canvasY <= cellY + cellH) {
+          
+          const newMarkedCells = [...markedCells]
+          newMarkedCells[cellIndex] = !newMarkedCells[cellIndex]
+          setMarkedCells(newMarkedCells)
+          
+          const pairIndex = rowPositions.indexOf(rowY)
+          console.log(`✅ Ventana [Par ${pairIndex + 1}, Col ${col + 1}] → ${newMarkedCells[cellIndex] ? 'CORRECTA' : 'INCORRECTA'}`)
+          return
+        }
+        cellIndex++
+      }
     }
   }
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.shiftKey) {
       setIsDragging(true)
-      setDragStart({ 
-        x: e.clientX - gridPosition.x, 
-        y: e.clientY - gridPosition.y 
-      })
+      setDragStart({ x: e.clientX - overlayPosition.x, y: e.clientY - overlayPosition.y })
     }
   }
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isDragging) {
-      setGridPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      })
+      setOverlayPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })
     }
   }
 
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
+  const handleMouseUp = () => setIsDragging(false)
 
   const calculateScore = () => {
     const score = markedCells.filter(marked => marked).length
@@ -563,29 +548,28 @@ function ScoringGrid({ imageData, onScoreCalculated, onClose }: ScoringGridProps
 
   const toggleAll = () => {
     const allMarked = markedCells.every(m => m)
-    setMarkedCells(new Array(COLS * ROWS).fill(!allMarked))
+    setMarkedCells(new Array(markedCells.length).fill(!allMarked))
   }
 
-  const clearAll = () => {
-    setMarkedCells(new Array(COLS * ROWS).fill(false))
-  }
+  const clearAll = () => setMarkedCells(new Array(markedCells.length).fill(false))
 
   const markedCount = markedCells.filter(m => m).length
-  const maxScore = COLS * ROWS
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl p-4 max-w-6xl w-full max-h-screen overflow-auto">
-        <h3 className="text-lg font-semibold mb-3">Plantilla de corrección - Claves</h3>
+        <h3 className="text-lg font-semibold mb-3">
+          Plantilla de corrección - Claves {useTemplateA ? 'A' : 'B'} 
+          <span className="text-sm text-gray-500 ml-2">({useTemplateA ? '6-7' : '8-16'} años)</span>
+        </h3>
         
         <div className="bg-blue-50 rounded-lg p-3 mb-3">
           <p className="text-xs text-blue-700">
-            <strong>Instrucciones:</strong> Haz clic en cada casilla para marcarla como correcta (verde).<br />
-            <strong>Shift + Arrastrar</strong> para mover la rejilla. Usa los controles para ajustar el tamaño.
+            <strong>Instrucciones:</strong> Haz clic en cada ventana de la rejilla azul para marcarla como correcta ✓.<br />
+            <strong>Shift + Arrastrar</strong> para mover la plantilla. Ajusta Zoom X/Y hasta alinear perfectamente.
           </p>
         </div>
         
-        {/* Canvas para la imagen con rejilla */}
         <div className="overflow-auto border border-gray-200 rounded-lg mb-3 bg-gray-100" style={{ maxHeight: '55vh' }}>
           <canvas
             ref={canvasRef}
@@ -599,98 +583,55 @@ function ScoringGrid({ imageData, onScoreCalculated, onClose }: ScoringGridProps
           />
         </div>
         
-        {/* Controles */}
         <div className="space-y-3">
+          <div className="bg-yellow-50 rounded-lg p-3 mb-2">
+            <p className="text-xs text-yellow-700">
+              <strong>💡 Tip:</strong> Ajusta primero el Zoom Y para que la altura de las ventanas coincida. 
+              Luego ajusta el Zoom X para el ancho. Arrastra con Shift para posicionar.
+            </p>
+          </div>
+          
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-600 block mb-1">Zoom: {scale.toFixed(1)}x</label>
-              <input
-                type="range"
-                min="0.5"
-                max="2.5"
-                step="0.1"
-                value={scale}
-                onChange={(e) => setScale(parseFloat(e.target.value))}
-                className="w-full"
-              />
+              <label className="text-xs text-gray-600 block mb-1">Zoom Horizontal: {overlayScale.x.toFixed(2)}x</label>
+              <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.x}
+                onChange={(e) => setOverlayScale({ ...overlayScale, x: parseFloat(e.target.value) })} className="w-full" />
             </div>
             <div>
-              <label className="text-xs text-gray-600 block mb-1">Ancho celda: {cellSize.width}px</label>
-              <input
-                type="range"
-                min="15"
-                max="60"
-                step="1"
-                value={cellSize.width}
-                onChange={(e) => setCellSize({ ...cellSize, width: parseInt(e.target.value) })}
-                className="w-full"
-              />
+              <label className="text-xs text-gray-600 block mb-1">Zoom Vertical: {overlayScale.y.toFixed(2)}x</label>
+              <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.y}
+                onChange={(e) => setOverlayScale({ ...overlayScale, y: parseFloat(e.target.value) })} className="w-full" />
             </div>
-          </div>
-          <div>
-            <label className="text-xs text-gray-600 block mb-1">Alto celda: {cellSize.height}px</label>
-            <input
-              type="range"
-              min="15"
-              max="60"
-              step="1"
-              value={cellSize.height}
-              onChange={(e) => setCellSize({ ...cellSize, height: parseInt(e.target.value) })}
-              className="w-full"
-            />
           </div>
           
           <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setGridPosition({ x: 50, y: 50 })}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
-            >
-              ↻ Reiniciar posición
+            <button onClick={() => setOverlayScale({ x: 1, y: 1 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Zoom</button>
+            <button onClick={() => setOverlayPosition({ x: 50, y: 50 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Posición</button>
+            <button onClick={() => setShowGrid(!showGrid)} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
+              {showGrid ? '👁 Ocultar rejilla' : '👁 Mostrar rejilla'}
             </button>
-            <button
-              onClick={toggleAll}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
-            >
+          </div>
+          
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={toggleAll} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
               {markedCells.every(m => m) ? '◻ Desmarcar todas' : '☑ Marcar todas'}
             </button>
-            <button
-              onClick={clearAll}
-              className="px-3 py-1.5 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100"
-            >
-              ✕ Limpiar todas
-            </button>
+            <button onClick={clearAll} className="px-3 py-1.5 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100">✕ Limpiar todas</button>
           </div>
           
           <div className="bg-blue-50 rounded-lg p-3">
             <div className="flex justify-between items-center">
-              <p className="text-sm">
-                <strong>Progreso:</strong> {markedCount} de {maxScore} casillas
-              </p>
-              <p className="text-lg font-bold text-blue-700">
-                Puntaje: {markedCount}
-              </p>
+              <p className="text-sm"><strong>Progreso:</strong> {markedCount} de {TOTAL_SCORABLE} ventanas</p>
+              <p className="text-lg font-bold text-blue-700">Puntaje: {markedCount}</p>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all" 
-                style={{ width: `${(markedCount / maxScore) * 100}%` }}
-              />
+              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${(markedCount / TOTAL_SCORABLE) * 100}%` }} />
             </div>
           </div>
           
           <div className="flex gap-3">
-            <button
-              onClick={calculateScore}
-              className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
-            >
-              Aplicar puntaje ({markedCount})
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300"
-            >
-              Cancelar
-            </button>
+            <button onClick={calculateScore} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Aplicar puntaje ({markedCount})</button>
+            <button onClick={onClose} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Cancelar</button>
           </div>
         </div>
       </div>
@@ -727,7 +668,6 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
     onUpdatePatientRef.current = onUpdatePatient
   }, [onComplete, onUpdatePatient])
 
-  // Enviar instrucción al display
   useEffect(() => {
     onUpdatePatientRef.current({
       type: 'wisc5_cla',
@@ -737,18 +677,9 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
     })
   }, [isRunning, elapsedTime])
 
-  const handleTimeUpdate = useCallback((seconds: number) => {
-    setElapsedTime(seconds)
-  }, [])
-
-  const handleTimeEnd = useCallback(() => {
-    setTimeEnded(true)
-    setIsRunning(false)
-  }, [])
-
-  const toggleRunning = useCallback(() => {
-    setIsRunning(prev => !prev)
-  }, [])
+  const handleTimeUpdate = useCallback((seconds: number) => setElapsedTime(seconds), [])
+  const handleTimeEnd = useCallback(() => { setTimeEnded(true); setIsRunning(false) }, [])
+  const toggleRunning = useCallback(() => setIsRunning(prev => !prev), [])
 
   const handleCapture = (imageData: string) => {
     console.log('📸 Imagen capturada y guardada')
@@ -758,43 +689,29 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
 
   const flipImageHorizontally = () => {
     if (!capturedImage) return
-    
     const img = new Image()
     img.src = capturedImage
     img.onload = () => {
       const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
+      canvas.width = img.width; canvas.height = img.height
       const ctx = canvas.getContext('2d')
-      if (ctx) {
-        ctx.translate(canvas.width, 0)
-        ctx.scale(-1, 1)
-        ctx.drawImage(img, 0, 0)
-        setCapturedImage(canvas.toDataURL('image/jpeg', 0.85))
-        console.log('🔄 Imagen invertida horizontalmente')
-      }
+      if (ctx) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0) }
+      setCapturedImage(canvas.toDataURL('image/jpeg', 0.85))
+      console.log('🔄 Imagen invertida horizontalmente')
     }
   }
 
   const handleScoreCalculated = (score: number, markedCells: boolean[]) => {
     setRawScore(score.toString())
     setShowScoringGrid(false)
-    console.log('✅ Puntaje calculado con plantilla:', score, 'casillas marcadas:', markedCells.filter(m => m).length)
+    console.log('✅ Puntaje calculado con plantilla:', score)
   }
 
   const handleComplete = () => {
     const score = parseInt(rawScore, 10)
-    if (isNaN(score) || score < 0) {
-      alert('Por favor, ingresa un puntaje válido')
-      return
-    }
-
-    const maxScore = 120
-    if (score > maxScore) {
-      alert(`El puntaje máximo es ${maxScore}`)
-      return
-    }
-
+    if (isNaN(score) || score < 0) { alert('Por favor, ingresa un puntaje válido'); return }
+    const maxScore = patientAge <= 7 ? 64 : 120
+    if (score > maxScore) { alert(`El puntaje máximo es ${maxScore}`); return }
     const scores = { CLA: score }
     setIsCompleted(true)
     onCompleteRef.current(scores, score)
@@ -802,18 +719,14 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
 
   const applyManualCount = () => {
     const count = parseInt(manualCount, 10)
-    if (!isNaN(count) && count >= 0) {
-      setRawScore(count.toString())
-    }
+    if (!isNaN(count) && count >= 0) setRawScore(count.toString())
   }
 
   if (isCompleted) {
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">
-          Puntaje total: {rawScore} / 120
-        </p>
+        <p className="text-sm text-green-600 mt-1">Puntaje total: {rawScore} / {patientAge <= 7 ? 64 : 120}</p>
         {capturedImage && (
           <div className="mt-4">
             <p className="text-xs text-gray-500 mb-2">Foto de respaldo guardada</p>
@@ -824,169 +737,84 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
     )
   }
 
+  const maxScore = patientAge <= 7 ? 64 : 120
+
   return (
     <div className="space-y-4">
-      {/* Barra de progreso e instrucciones */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-600">Claves</span>
+          <span className="text-gray-600">Claves {patientAge <= 7 ? 'A' : 'B'}</span>
           <span className="text-gray-800 font-medium">Tiempo límite: 2 minutos</span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-blue-500 rounded-full transition-all" 
-            style={{ width: `${(elapsedTime / 120) * 100}%` }} 
-          />
+          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(elapsedTime / 120) * 100}%` }} />
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          El paciente debe copiar los símbolos en las casillas correspondientes
-        </p>
+        <p className="text-xs text-gray-500 mt-2">El paciente debe copiar los símbolos en las casillas correspondientes</p>
       </div>
 
-      {/* Cronómetro */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <Stopwatch
-          timeLimit={120}
-          onTimeUpdate={handleTimeUpdate}
-          onTimeEnd={handleTimeEnd}
-          isRunning={isRunning}
-          onToggleRunning={toggleRunning}
-        />
+        <Stopwatch timeLimit={120} onTimeUpdate={handleTimeUpdate} onTimeEnd={handleTimeEnd} isRunning={isRunning} onToggleRunning={toggleRunning} />
       </div>
 
-      {/* Aviso de tiempo finalizado */}
       {timeEnded && (
         <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
           <p className="text-yellow-700 text-sm">⏰ ¡Tiempo finalizado! Ingresa el puntaje obtenido.</p>
         </div>
       )}
 
-      {/* Ingreso de puntaje bruto */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Puntaje bruto total (símbolos correctos)
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Puntaje bruto total (símbolos correctos)</label>
         <div className="flex gap-3">
-          <input
-            type="number"
-            value={rawScore}
-            onChange={(e) => setRawScore(e.target.value)}
-            min="0"
-            max="120"
-            placeholder="0-120"
-            className="flex-1 px-4 py-2 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleComplete}
-            disabled={!rawScore || !timeEnded}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-              rawScore && timeEnded
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
+          <input type="number" value={rawScore} onChange={(e) => setRawScore(e.target.value)} min="0" max={maxScore} placeholder={`0-${maxScore}`}
+            className="flex-1 px-4 py-2 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <button onClick={handleComplete} disabled={!rawScore || !timeEnded}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${rawScore && timeEnded ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
             Completar
           </button>
         </div>
-        {!timeEnded && (
-          <p className="text-xs text-gray-400 mt-2">
-            Debes esperar a que termine el tiempo (o pausar el cronómetro) para completar
-          </p>
-        )}
+        {!timeEnded && <p className="text-xs text-gray-400 mt-2">Debes esperar a que termine el tiempo (o pausar el cronómetro) para completar</p>}
       </div>
 
-      {/* Verificación por foto (opcional) */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <p className="text-sm font-medium text-gray-700 mb-3">
-          📸 Verificación por foto (opcional)
-        </p>
-        
+        <p className="text-sm font-medium text-gray-700 mb-3">📸 Verificación por foto (opcional)</p>
         {!capturedImage ? (
-          <button
-            onClick={() => setShowCamera(true)}
-            className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-          >
+          <button onClick={() => setShowCamera(true)} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm">
             📷 Capturar foto de la hoja de respuestas
           </button>
         ) : (
           <div>
             <div className="mb-3">
-              <img 
-                src={capturedImage} 
-                alt="Hoja capturada" 
-                className="max-h-48 mx-auto rounded-lg border border-gray-200"
-              />
+              <img src={capturedImage} alt="Hoja capturada" className="max-h-48 mx-auto rounded-lg border border-gray-200" />
             </div>
             <div className="flex gap-2 mb-2">
-              <button
-                onClick={() => setShowCamera(true)}
-                className="flex-1 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs"
-              >
-                Volver a capturar
-              </button>
-              <button
-                onClick={() => setCapturedImage(null)}
-                className="flex-1 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-xs"
-              >
-                Eliminar
-              </button>
+              <button onClick={() => setShowCamera(true)} className="flex-1 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs">Volver a capturar</button>
+              <button onClick={() => setCapturedImage(null)} className="flex-1 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-xs">Eliminar</button>
             </div>
-            <button
-              onClick={flipImageHorizontally}
-              className="w-full py-1.5 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 text-xs mb-2"
-            >
+            <button onClick={flipImageHorizontally} className="w-full py-1.5 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 text-xs mb-2">
               🔄 Invertir horizontalmente (corregir espejo)
             </button>
-            <button
-              onClick={() => setShowScoringGrid(true)}
-              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-            >
+            <button onClick={() => setShowScoringGrid(true)} className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
               🔲 Usar plantilla de corrección
             </button>
-            
-            {/* Ayuda para conteo manual desde la foto */}
             <div className="mt-4 pt-3 border-t border-gray-200">
               <p className="text-xs text-gray-600 mb-2">O ingresa el conteo manualmente:</p>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={manualCount}
-                  onChange={(e) => setManualCount(e.target.value)}
-                  min="0"
-                  max="120"
-                  placeholder="Cantidad"
-                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded"
-                />
-                <button
-                  onClick={applyManualCount}
-                  className="px-4 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
-                >
-                  Aplicar
-                </button>
+                <input type="number" value={manualCount} onChange={(e) => setManualCount(e.target.value)} min="0" max={maxScore} placeholder="Cantidad"
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded" />
+                <button onClick={applyManualCount} className="px-4 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700">Aplicar</button>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal de cámara */}
-      {showCamera && (
-        <CameraCapture
-          onCapture={handleCapture}
-          onClose={() => setShowCamera(false)}
-        />
-      )}
+      {showCamera && <CameraCapture onCapture={handleCapture} onClose={() => setShowCamera(false)} />}
 
-      {/* Modal de plantilla de corrección */}
       {showScoringGrid && capturedImage && (
-        <ScoringGrid
-          imageData={capturedImage}
-          onScoreCalculated={handleScoreCalculated}
-          onClose={() => setShowScoringGrid(false)}
-        />
+        <ScoringGrid imageData={capturedImage} patientAge={patientAge}
+          onScoreCalculated={handleScoreCalculated} onClose={() => setShowScoringGrid(false)} />
       )}
 
-      {/* Instrucciones para el evaluador */}
       <div className="bg-blue-50 rounded-lg p-3">
         <p className="text-xs text-blue-700">
           <strong>Instrucciones para el evaluador:</strong> Entrega la hoja de respuestas al paciente. 
