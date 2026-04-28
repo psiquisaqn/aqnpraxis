@@ -13,8 +13,10 @@ import { useRouter } from 'next/navigation'
 interface GridConfig {
   template_a_row_positions: number[]
   template_a_row_height: number
+  template_a_cell_widths: number[]
   template_b_row_positions: number[]
   template_b_row_height: number
+  template_b_cell_widths: number[]
 }
 
 export default function Wisc5ClaConfigPage() {
@@ -33,8 +35,10 @@ export default function Wisc5ClaConfigPage() {
   const [config, setConfig] = useState<GridConfig>({
     template_a_row_positions: [0.15, 0.38, 0.62, 0.85],
     template_a_row_height: 0.15,
+    template_a_cell_widths: Array(8).fill(1/8),
     template_b_row_positions: [0.15, 0.38, 0.62, 0.85],
     template_b_row_height: 0.15,
+    template_b_cell_widths: Array(15).fill(1/15),
   })
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -42,6 +46,7 @@ export default function Wisc5ClaConfigPage() {
   const [overlayPosition, setOverlayPosition] = useState({ x: 50, y: 50 })
   const [overlayScale, setOverlayScale] = useState({ x: 1, y: 1 })
   const [showOverlay, setShowOverlay] = useState(true)
+  const [showColumnAdjust, setShowColumnAdjust] = useState(false)
 
   // Cargar configuración guardada desde Supabase
   useEffect(() => {
@@ -54,10 +59,12 @@ export default function Wisc5ClaConfigPage() {
       
       if (data) {
         setConfig({
-          template_a_row_positions: data.template_a_row_positions as number[],
-          template_a_row_height: data.template_a_row_height as number,
-          template_b_row_positions: data.template_b_row_positions as number[],
-          template_b_row_height: data.template_b_row_height as number,
+          template_a_row_positions: (data.template_a_row_positions as number[]) || [0.15, 0.38, 0.62, 0.85],
+          template_a_row_height: data.template_a_row_height || 0.15,
+          template_a_cell_widths: (data.template_a_cell_widths as number[]) || Array(8).fill(1/8),
+          template_b_row_positions: (data.template_b_row_positions as number[]) || [0.15, 0.38, 0.62, 0.85],
+          template_b_row_height: data.template_b_row_height || 0.15,
+          template_b_cell_widths: (data.template_b_cell_widths as number[]) || Array(15).fill(1/15),
         })
       }
       setLoading(false)
@@ -77,6 +84,12 @@ export default function Wisc5ClaConfigPage() {
       : config.template_b_row_height
   }
 
+  const getActiveCellWidths = (): number[] => {
+    return activeTemplate === 'A' 
+      ? [...config.template_a_cell_widths]
+      : [...config.template_b_cell_widths]
+  }
+
   const updatePositions = (newPositions: number[]) => {
     if (activeTemplate === 'A') {
       setConfig({ ...config, template_a_row_positions: newPositions })
@@ -93,6 +106,14 @@ export default function Wisc5ClaConfigPage() {
     }
   }
 
+  const updateCellWidths = (newWidths: number[]) => {
+    if (activeTemplate === 'A') {
+      setConfig({ ...config, template_a_cell_widths: newWidths })
+    } else {
+      setConfig({ ...config, template_b_cell_widths: newWidths })
+    }
+  }
+
   const saveConfig = async () => {
     const { error } = await supabase
       .from('wisc5_cla_grid_config')
@@ -100,8 +121,10 @@ export default function Wisc5ClaConfigPage() {
         id: 1,
         template_a_row_positions: config.template_a_row_positions,
         template_a_row_height: config.template_a_row_height,
+        template_a_cell_widths: config.template_a_cell_widths,
         template_b_row_positions: config.template_b_row_positions,
         template_b_row_height: config.template_b_row_height,
+        template_b_cell_widths: config.template_b_cell_widths,
         updated_at: new Date().toISOString(),
       })
 
@@ -124,7 +147,7 @@ export default function Wisc5ClaConfigPage() {
     reader.readAsDataURL(file)
   }
 
-  // Dibujar previsualización en canvas cuando hay imagen de prueba
+  // Dibujar previsualización en canvas
   useEffect(() => {
     if (!testImage || !canvasRef.current) return
 
@@ -159,21 +182,25 @@ export default function Wisc5ClaConfigPage() {
         const scaledWidth = overlayImg.width * overlayScale.x
         const scaledHeight = overlayImg.height * overlayScale.y
         const cellsPerRow = activeTemplate === 'A' ? 8 : 15
-        const cellWidth = scaledWidth / cellsPerRow
         const positions = getActivePositions()
         const rowH = getActiveHeight()
+        const colWidths = getActiveCellWidths()
         
+        let xOffset = 0
         for (let pair = 0; pair < 4; pair++) {
+          xOffset = 0
           for (let col = 0; col < cellsPerRow; col++) {
-            const x = col * cellWidth
+            const w = colWidths[col] * scaledWidth
+            const x = xOffset
             const y = positions[pair] * scaledHeight
             const h = rowH * scaledHeight
+            xOffset += w
             
             ctx.strokeStyle = '#3B82F6'
             ctx.lineWidth = 2
-            ctx.strokeRect(x, y, cellWidth, h)
+            ctx.strokeRect(x, y, w, h)
             
-            // Número de fila
+            // Número de fila y columna
             ctx.fillStyle = '#3B82F6'
             ctx.font = 'bold 10px Arial'
             ctx.fillText(`F${pair + 1}`, x + 2, y + 12)
@@ -203,9 +230,11 @@ export default function Wisc5ClaConfigPage() {
     )
   }
 
+  const COLS = activeTemplate === 'A' ? 8 : 15
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-xl shadow-lg p-6">
           
           {/* Header */}
@@ -250,11 +279,11 @@ export default function Wisc5ClaConfigPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* Columna izquierda: Vista previa y subida de imagen */}
+            {/* Columna izquierda: Vista previa */}
             <div>
               {/* Plantilla PNG */}
               <div className="mb-4">
-                <h2 className="text-sm font-semibold text-gray-700 mb-2">Plantilla PNG:</h2>
+                <h2 className="text-sm font-semibold text-gray-700 mb-2">Plantilla PNG actual:</h2>
                 <div className="bg-gray-100 rounded-lg p-3 flex items-center justify-center min-h-[120px]">
                   <img 
                     src={`/wisc5/cla/plantilla-claves-${activeTemplate.toLowerCase()}.png`}
@@ -287,10 +316,7 @@ export default function Wisc5ClaConfigPage() {
               {/* Canvas de previsualización */}
               {testImage && (
                 <div className="border border-gray-200 rounded-lg overflow-auto bg-gray-100" style={{ maxHeight: '400px' }}>
-                  <canvas
-                    ref={canvasRef}
-                    className="w-full h-auto"
-                  />
+                  <canvas ref={canvasRef} className="w-full h-auto" />
                 </div>
               )}
               
@@ -319,53 +345,37 @@ export default function Wisc5ClaConfigPage() {
             </div>
 
             {/* Columna derecha: Controles de ajuste */}
-            <div>
-              <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 mb-4">
+            <div className="space-y-4">
+              
+              {/* Ajuste de posición de filas */}
+              <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                 <h2 className="text-md font-semibold text-yellow-800 mb-3">
-                  ⚙️ Ajuste de Rejilla - Plantilla {activeTemplate}
+                  📍 Posición de filas - Plantilla {activeTemplate}
                 </h2>
                 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {getActivePositions().map((pos, index) => (
                     <div key={index}>
                       <div className="flex justify-between text-sm mb-1">
-                        <label className="text-gray-700 font-medium">
-                          📍 Fila {index + 1} (ventanas transparentes)
-                        </label>
+                        <label className="text-gray-700 font-medium">Fila {index + 1}</label>
                         <span className="text-blue-600 font-mono">{(pos * 100).toFixed(1)}%</span>
                       </div>
-                      <input
-                        type="range"
-                        min="0.01"
-                        max="0.95"
-                        step="0.001"
-                        value={pos}
+                      <input type="range" min="0.01" max="0.95" step="0.001" value={pos}
                         onChange={(e) => {
                           const newPositions = getActivePositions()
                           newPositions[index] = parseFloat(e.target.value)
                           updatePositions(newPositions)
-                        }}
-                        className="w-full"
-                      />
+                        }} className="w-full" />
                     </div>
                   ))}
                   
                   <div className="pt-3 border-t border-yellow-300">
                     <div className="flex justify-between text-sm mb-1">
-                      <label className="text-gray-700 font-medium">
-                        📏 Altura de ventanas
-                      </label>
+                      <label className="text-gray-700 font-medium">Altura de ventanas</label>
                       <span className="text-blue-600 font-mono">{(getActiveHeight() * 100).toFixed(1)}%</span>
                     </div>
-                    <input
-                      type="range"
-                      min="0.02"
-                      max="0.30"
-                      step="0.001"
-                      value={getActiveHeight()}
-                      onChange={(e) => updateHeight(parseFloat(e.target.value))}
-                      className="w-full"
-                    />
+                    <input type="range" min="0.02" max="0.30" step="0.001" value={getActiveHeight()}
+                      onChange={(e) => updateHeight(parseFloat(e.target.value))} className="w-full" />
                   </div>
 
                   <button 
@@ -380,8 +390,63 @@ export default function Wisc5ClaConfigPage() {
                 </div>
               </div>
 
+              {/* Ajuste de ancho de columnas */}
+              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-md font-semibold text-green-800">
+                    📏 Ancho de columnas
+                  </h2>
+                  <button
+                    onClick={() => setShowColumnAdjust(!showColumnAdjust)}
+                    className="text-xs text-green-700 hover:underline"
+                  >
+                    {showColumnAdjust ? '▲ Ocultar' : '▼ Mostrar'}
+                  </button>
+                </div>
+                
+                {showColumnAdjust && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-green-700 mb-2">
+                      Ajusta cada columna individualmente. La suma ideal es 100%.
+                    </p>
+                    
+                    <div className="max-h-64 overflow-y-auto space-y-2">
+                      {getActiveCellWidths().map((width, index) => (
+                        <div key={`col-${index}`} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600 w-6">C{index + 1}</span>
+                          <input type="range" min="0.02" max="0.25" step="0.001" value={width}
+                            onChange={(e) => {
+                              const newWidths = getActiveCellWidths()
+                              newWidths[index] = parseFloat(e.target.value)
+                              updateCellWidths(newWidths)
+                            }} className="flex-1" />
+                          <span className="text-xs text-blue-600 font-mono w-10 text-right">{(width * 100).toFixed(1)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-2 border-t border-green-300">
+                      <span className={`text-xs font-medium ${
+                        Math.abs(getActiveCellWidths().reduce((a, b) => a + b, 0) - 1) > 0.01 
+                          ? 'text-red-600' 
+                          : 'text-green-600'
+                      }`}>
+                        Suma: {(getActiveCellWidths().reduce((a, b) => a + b, 0) * 100).toFixed(1)}%
+                        {Math.abs(getActiveCellWidths().reduce((a, b) => a + b, 0) - 1) > 0.01 && ' ⚠️'}
+                      </span>
+                      <button
+                        onClick={() => updateCellWidths(Array(COLS).fill(1/COLS))}
+                        className="text-xs text-green-700 hover:underline"
+                      >
+                        Distribuir uniformemente
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Resumen de configuración */}
-              <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <div className="bg-blue-50 rounded-lg p-4">
                 <h2 className="text-sm font-semibold text-blue-800 mb-3">📋 Configuración actual</h2>
                 
                 <div className="space-y-3 text-sm">
@@ -393,6 +458,9 @@ export default function Wisc5ClaConfigPage() {
                     <p className="text-gray-600 text-xs">
                       Altura: {(config.template_a_row_height * 100).toFixed(1)}%
                     </p>
+                    <p className="text-gray-600 text-xs">
+                      Columnas: {config.template_a_cell_widths.length} cols
+                    </p>
                   </div>
                   <div className="pt-2 border-t border-blue-200">
                     <h3 className="font-medium text-gray-700">Plantilla B (8-16 años)</h3>
@@ -401,6 +469,9 @@ export default function Wisc5ClaConfigPage() {
                     </p>
                     <p className="text-gray-600 text-xs">
                       Altura: {(config.template_b_row_height * 100).toFixed(1)}%
+                    </p>
+                    <p className="text-gray-600 text-xs">
+                      Columnas: {config.template_b_cell_widths.length} cols
                     </p>
                   </div>
                 </div>
@@ -419,7 +490,7 @@ export default function Wisc5ClaConfigPage() {
               </button>
               
               {saved && (
-                <p className="text-green-600 text-xs text-center mt-2">
+                <p className="text-green-600 text-xs text-center">
                   La configuración se aplicará a todas las nuevas evaluaciones
                 </p>
               )}
@@ -436,6 +507,7 @@ export default function Wisc5ClaConfigPage() {
               <li>Ajusta Zoom X/Y para que la plantilla coincida en tamaño con la hoja</li>
               <li>Usa los sliders de "Fila 1-4" para mover cada fila de ventanas a su posición correcta</li>
               <li>Ajusta "Altura de ventanas" para que coincida con la altura de las ventanas transparentes</li>
+              <li>Expande "Ancho de columnas" para ajustar cada columna individualmente si es necesario</li>
               <li>Cuando la rejilla azul coincida perfectamente con las ventanas, guarda la configuración</li>
             </ol>
           </div>
