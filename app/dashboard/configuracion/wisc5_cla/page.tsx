@@ -77,13 +77,22 @@ export default function Wisc5ClaConfigPage() {
   // Cargar configuración guardada desde Supabase
   useEffect(() => {
     const loadConfig = async () => {
-      const { data } = await supabase
+      console.log('📥 Cargando configuración desde Supabase...')
+      const { data, error } = await supabase
         .from('wisc5_cla_grid_config')
         .select('*')
         .eq('id', 1)
         .single()
       
+      console.log('📦 Datos recibidos:', data)
+      console.log('📦 Error (si hay):', error)
+      
       if (data) {
+        console.log('🅰️ template_a_row_positions:', data.template_a_row_positions)
+        console.log('🅰️ template_a_cell_widths:', data.template_a_cell_widths, '→ longitud:', (data.template_a_cell_widths as number[])?.length)
+        console.log('🅱️ template_b_row_positions:', data.template_b_row_positions)
+        console.log('🅱️ template_b_cell_widths:', data.template_b_cell_widths, '→ longitud:', (data.template_b_cell_widths as number[])?.length)
+        
         setConfig({
           template_a_row_positions: (data.template_a_row_positions as number[]) || PLANTILLA_CONFIG.A.defaultPositions,
           template_a_row_height: data.template_a_row_height || PLANTILLA_CONFIG.A.defaultHeight,
@@ -141,23 +150,37 @@ export default function Wisc5ClaConfigPage() {
   }
 
   const saveConfig = async () => {
-    const { error } = await supabase
+    const payload = {
+      id: 1,
+      template_a_row_positions: config.template_a_row_positions,
+      template_a_row_height: config.template_a_row_height,
+      template_a_cell_widths: config.template_a_cell_widths,
+      template_b_row_positions: config.template_b_row_positions,
+      template_b_row_height: config.template_b_row_height,
+      template_b_cell_widths: config.template_b_cell_widths,
+      updated_at: new Date().toISOString(),
+    }
+    
+    console.log('💾 Guardando configuración...')
+    console.log('📤 Payload:', JSON.stringify(payload, null, 2))
+    console.log('  - A positions length:', config.template_a_row_positions.length)
+    console.log('  - A widths length:', config.template_a_cell_widths.length)
+    console.log('  - B positions length:', config.template_b_row_positions.length)
+    console.log('  - B widths length:', config.template_b_cell_widths.length)
+    
+    const { data, error } = await supabase
       .from('wisc5_cla_grid_config')
-      .upsert({
-        id: 1,
-        template_a_row_positions: config.template_a_row_positions,
-        template_a_row_height: config.template_a_row_height,
-        template_a_cell_widths: config.template_a_cell_widths,
-        template_b_row_positions: config.template_b_row_positions,
-        template_b_row_height: config.template_b_row_height,
-        template_b_cell_widths: config.template_b_cell_widths,
-        updated_at: new Date().toISOString(),
-      })
+      .upsert(payload)
+      .select()
+
+    console.log('📦 Respuesta de Supabase:', { data, error })
 
     if (error) {
       alert('Error al guardar: ' + error.message)
+      console.error('❌ Error completo:', error)
     } else {
       setSaved(true)
+      console.log('✅ Configuración guardada exitosamente:', data)
       setTimeout(() => setSaved(false), 3000)
     }
   }
@@ -221,6 +244,14 @@ export default function Wisc5ClaConfigPage() {
         const colWidths = getActiveCellWidths()
         const totalCols = CONFIG.cols
         
+        console.log('🖼️ Dibujando rejilla:', {
+          pairs: CONFIG.pairs,
+          positions: positions.map(p => (p * 100).toFixed(1) + '%'),
+          rowH: (rowH * 100).toFixed(1) + '%',
+          totalCols,
+          gridOffset,
+        })
+        
         for (let pair = 0; pair < CONFIG.pairs; pair++) {
           const colsInPair = getColsForPair(pair)
           const colOffset = getColOffset(pair)
@@ -238,7 +269,6 @@ export default function Wisc5ClaConfigPage() {
             const y = gridOffset.y + positions[pair] * scaledHeight
             const h = rowH * scaledHeight
             
-            // Color diferente para el primer par (columnas reducidas)
             if (pair === 0) {
               ctx.strokeStyle = '#F59E0B'
               ctx.lineWidth = 2.5
@@ -248,7 +278,6 @@ export default function Wisc5ClaConfigPage() {
             }
             ctx.strokeRect(x, y, w, h)
             
-            // Etiqueta
             ctx.fillStyle = pair === 0 ? '#F59E0B' : '#3B82F6'
             ctx.font = 'bold 10px Arial'
             ctx.fillText(`F${pair + 1}`, x + 2, y + 12)

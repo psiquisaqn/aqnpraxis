@@ -3,29 +3,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
-// ============================================================
-// CONFIGURACIÓN DE PLANTILLAS
-// ============================================================
-
 const PLANTILLA_CONFIG = {
-  A: {
-    cols: 10,
-    pairs: 8,
-    firstPairCols: 5,
-    maxScore: 75,
-  },
-  B: {
-    cols: 18,
-    pairs: 7,
-    firstPairCols: 9,
-    maxScore: 117,
-  }
+  A: { cols: 10, pairs: 8, firstPairCols: 5, maxScore: 75 },
+  B: { cols: 18, pairs: 7, firstPairCols: 9, maxScore: 117 }
 }
 
 // ============================================================
-// COMPONENTE DE CRONÓMETRO (120 SEGUNDOS)
+// CRONÓMETRO
 // ============================================================
-
 interface StopwatchProps {
   timeLimit: number
   onTimeUpdate: (seconds: number) => void
@@ -45,222 +30,142 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onT
         setSeconds(prev => {
           const newSeconds = prev + 1
           onTimeUpdate(newSeconds)
-          if (newSeconds >= timeLimit) {
-            onToggleRunning()
-            onTimeEnd()
-            return timeLimit
-          }
+          if (newSeconds >= timeLimit) { onToggleRunning(); onTimeEnd(); return timeLimit }
           return newSeconds
         })
       }, 1000)
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
+    } else if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [isRunning, timeLimit, onTimeUpdate, onTimeEnd, onToggleRunning])
 
   const startTimer = () => { setSeconds(0); onToggleRunning(); onStart?.() }
-
-  const formatTime = (totalSeconds: number): string => {
-    const mins = Math.floor(totalSeconds / 60)
-    const secs = totalSeconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const getProgressPercent = (): number => Math.min((seconds / timeLimit) * 100, 100)
-  const isTimeCritical = seconds >= timeLimit - 10
+  const formatTime = (t: number) => `${Math.floor(t/60).toString().padStart(2,'0')}:${(t%60).toString().padStart(2,'0')}`
+  const pct = Math.min((seconds / timeLimit) * 100, 100)
+  const critical = seconds >= timeLimit - 10
 
   if (!isRunning && seconds === 0) {
     return (
       <div className="text-center">
         <div className="text-4xl font-mono font-bold mb-2 text-gray-800">{formatTime(0)}</div>
-        <button onClick={startTimer} className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base font-medium">
-          Iniciar prueba (120 segundos)
-        </button>
-        <div className="text-xs text-gray-400 mt-2">Tiempo límite: 2 minutos</div>
+        <button onClick={startTimer} className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base font-medium">Iniciar prueba (120 segundos)</button>
+        <div className="text-xs text-gray-400 mt-2">Tiempo limite: 2 minutos</div>
       </div>
     )
   }
 
   return (
     <div className="text-center">
-      <div className={`text-5xl font-mono font-bold mb-2 transition-colors ${isTimeCritical ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>
-        {formatTime(seconds)}
-      </div>
-      <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
-        <div className={`h-full transition-all duration-1000 ${isTimeCritical ? 'bg-red-500' : 'bg-blue-500'}`}
-          style={{ width: `${getProgressPercent()}%` }} />
-      </div>
+      <div className={`text-5xl font-mono font-bold mb-2 transition-colors ${critical ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>{formatTime(seconds)}</div>
+      <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-2"><div className={`h-full transition-all duration-1000 ${critical ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} /></div>
       <div className="flex gap-2 justify-center">
-        {isRunning ? (
-          <button onClick={onToggleRunning} className="px-4 py-1.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm">Pausar</button>
-        ) : (
-          <button onClick={onToggleRunning} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Reanudar</button>
-        )}
+        {isRunning ? <button onClick={onToggleRunning} className="px-4 py-1.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm">Pausar</button> : <button onClick={onToggleRunning} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Reanudar</button>}
         <button onClick={() => { setSeconds(0); onTimeUpdate(0) }} className="px-4 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm">Reiniciar</button>
       </div>
-      <div className="text-xs text-gray-400 mt-2">
-        {seconds >= timeLimit ? '⏰ ¡Tiempo finalizado!' : `Restan ${formatTime(timeLimit - seconds)}`}
+      <div className="text-xs text-gray-400 mt-2">{seconds >= timeLimit ? 'Tiempo finalizado' : `Restan ${formatTime(timeLimit - seconds)}`}</div>
+    </div>
+  )
+}
+
+// ============================================================
+// MODAL ESCANEO
+// ============================================================
+function ScanModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl p-6 max-w-md w-full">
+        <h3 className="text-lg font-semibold mb-4">Escanear hoja de respuestas</h3>
+        <div className="bg-blue-50 rounded-lg p-4 mb-4">
+          <ol className="text-xs text-blue-600 space-y-2 list-decimal list-inside">
+            <li>Usa el software de tu escaner para escanear la hoja</li>
+            <li>Guarda la imagen como JPG o PNG en tu equipo</li>
+            <li>Luego usa la opcion Subir desde el equipo para cargarla</li>
+          </ol>
+        </div>
+        <button onClick={onClose} className="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Entendido</button>
       </div>
     </div>
   )
 }
 
 // ============================================================
-// COMPONENTE DE CÁMARA (ESPEJO AUTOMÁTICO PARA LAPTOP)
+// CÁMARA (con detección correcta)
 // ============================================================
-
-interface CameraCaptureProps {
-  onCapture: (imageData: string) => void
-  onClose: () => void
-}
+interface CameraCaptureProps { onCapture: (data: string) => void; onClose: () => void }
 
 function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isFrontCamera, setIsFrontCamera] = useState(false)
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
-  const [cameraReady, setCameraReady] = useState(false)
+  const [isFront, setIsFront] = useState(false)
+  const [label, setLabel] = useState('')
+  const [img, setImg] = useState<string | null>(null)
+  const [preview, setPreview] = useState(false)
+  const [ready, setReady] = useState(false)
   const [capturing, setCapturing] = useState(false)
 
   useEffect(() => {
-    const initCamera = async () => {
+    (async () => {
       try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Tu navegador no soporta acceso a la cámara')
-        }
-        let mediaStream: MediaStream
-        try {
-          mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
-          })
-          setIsFrontCamera(false)
-        } catch {
-          mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } } 
-          })
-          setIsFrontCamera(true)
-        }
-        setStream(mediaStream)
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream
-          videoRef.current.onloadedmetadata = () => setCameraReady(true)
-        }
-      } catch (err: any) {
-        setError(`No se pudo acceder a la cámara: ${err.message}`)
-      }
-    }
-    initCamera()
-    return () => { if (stream) stream.getTracks().forEach(track => track.stop()) }
+        let ms: MediaStream
+        try { ms = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } }) }
+        catch { ms = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } } }) }
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const vdevs = devices.filter(d => d.kind === 'videoinput')
+        const track = ms.getVideoTracks()[0]
+        const dev = vdevs.find(d => d.deviceId === track.getSettings().deviceId)
+        const lab = (dev?.label || track.label || '').toLowerCase()
+        console.log('📷 Camara detectada:', { label: dev?.label || track.label, isFront: lab.includes('front') || lab.includes('user') })
+        setIsFront(lab.includes('front') || lab.includes('user'))
+        setLabel(dev?.label || track.label || 'Camara')
+        setStream(ms)
+        if (videoRef.current) { videoRef.current.srcObject = ms; videoRef.current.onloadedmetadata = () => setReady(true) }
+      } catch (e: any) { setError(e.message) }
+    })()
+    return () => { if (stream) stream.getTracks().forEach(t => t.stop()) }
   }, [])
 
-  const capturePhoto = () => {
+  const capture = () => {
     setCapturing(true)
     setTimeout(() => {
       try {
-        if (!videoRef.current || !canvasRef.current) throw new Error('Referencias no disponibles')
-        const video = videoRef.current
-        const canvas = canvasRef.current
-        
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        
-        const context = canvas.getContext('2d')
-        if (!context) throw new Error('No se pudo obtener contexto')
-        
-        if (isFrontCamera) { context.translate(canvas.width, 0); context.scale(-1, 1) }
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        if (isFrontCamera) context.setTransform(1, 0, 0, 1, 0, 0)
-        
-        const imageData = canvas.toDataURL('image/jpeg', 0.85)
-        setCapturedImage(imageData)
-        setShowPreview(true)
+        const v = videoRef.current; const c = canvasRef.current
+        if (!v || !c) throw new Error('Refs no disponibles')
+        c.width = v.videoWidth; c.height = v.videoHeight
+        const ctx = c.getContext('2d')
+        if (!ctx) throw new Error('Sin contexto')
+        if (isFront) { ctx.translate(c.width, 0); ctx.scale(-1, 1) }
+        ctx.drawImage(v, 0, 0)
+        if (isFront) ctx.setTransform(1, 0, 0, 1, 0, 0)
+        setImg(c.toDataURL('image/jpeg', 0.85))
+        setPreview(true)
         setCapturing(false)
-      } catch (err: any) {
-        setError(`Error al capturar: ${err.message}`)
-        setCapturing(false)
-      }
+      } catch (e: any) { setError(e.message); setCapturing(false) }
     }, 100)
   }
 
-  const confirmCapture = () => {
-    if (capturedImage) {
-      onCapture(capturedImage)
-      if (stream) stream.getTracks().forEach(track => track.stop())
-    }
-  }
-
-  if (error) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl p-6 max-w-md w-full">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button onClick={onClose} className="w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cerrar</button>
-        </div>
-      </div>
-    )
-  }
+  if (error) return <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl p-6 max-w-md w-full"><p className="text-red-600 mb-4">{error}</p><button onClick={onClose} className="w-full py-2 bg-gray-200 rounded-lg">Cerrar</button></div></div>
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl p-4 max-w-lg w-full">
-        <h3 className="text-lg font-semibold mb-3">
-          Capturar hoja de respuestas
-          {isFrontCamera && <span className="ml-2 text-sm font-normal text-orange-600">🖥️ Cámara frontal</span>}
-        </h3>
-        
-        {!showPreview ? (
+        <h3 className="text-lg font-semibold mb-3">Capturar hoja ({label}) {isFront ? 'Frontal' : 'Trasera'}</h3>
+        {!preview ? (
           <>
             <div className="relative bg-black rounded-lg overflow-hidden mb-4">
-              <video ref={videoRef} autoPlay playsInline className="w-full h-auto"
-                style={{ transform: isFrontCamera ? 'scaleX(-1)' : 'none' }} />
-              {!cameraReady && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="text-white text-sm">Iniciando cámara...</div>
-                </div>
-              )}
+              <video ref={videoRef} autoPlay playsInline className="w-full h-auto" style={{ transform: isFront ? 'scaleX(-1)' : 'none' }} />
             </div>
-            
             <canvas ref={canvasRef} style={{ display: 'none' }} width="640" height="480" />
-            
-            {isFrontCamera ? (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-700"><strong>🖥️ Cámara frontal detectada</strong></p>
-                <p className="text-xs text-blue-600 mt-1">La vista previa se muestra en espejo, pero la foto se guardará con orientación correcta.</p>
-              </div>
-            ) : (
-              <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-sm text-green-700"><strong>📱 Cámara trasera detectada</strong></p>
-                <p className="text-xs text-green-600 mt-1">La imagen se capturará tal como se ve en pantalla.</p>
-              </div>
-            )}
-            
-            <div className="text-xs text-gray-500 mb-3">Estado: {cameraReady ? '✅ Cámara lista' : '⏳ Iniciando...'}</div>
-            
-            <div className="flex flex-col gap-2">
-              <button onClick={capturePhoto} disabled={!cameraReady || capturing}
-                className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                  !cameraReady || capturing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}>
-                {capturing ? '⏳ Capturando...' : '📸 Capturar foto'}
-              </button>
-              <button onClick={onClose} className="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Cancelar</button>
-            </div>
+            <div className="text-xs text-gray-500 mb-3">{ready ? 'Lista' : 'Iniciando...'}</div>
+            <button onClick={capture} disabled={!ready || capturing} className={`w-full py-3 rounded-lg font-medium ${!ready||capturing ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{capturing ? 'Capturando...' : 'Capturar foto'}</button>
+            <button onClick={onClose} className="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-medium mt-2">Cancelar</button>
           </>
         ) : (
           <>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">Vista previa {isFrontCamera && '(ya corregida, sin espejo)'}:</p>
-              <img src={capturedImage!} alt="Vista previa" className="max-h-64 mx-auto rounded-lg border border-gray-200" />
-              {isFrontCamera && <p className="text-xs text-green-600 mt-2 text-center">✅ La imagen está en orientación normal (legible)</p>}
-            </div>
+            <img src={img!} alt="Preview" className="max-h-64 mx-auto rounded-lg border mb-4" />
             <div className="flex gap-3">
-              <button onClick={confirmCapture} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">✓ Usar esta foto</button>
-              <button onClick={() => { setCapturedImage(null); setShowPreview(false) }} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Volver a capturar</button>
+              <button onClick={() => { onCapture(img!); if (stream) stream.getTracks().forEach(t => t.stop()) }} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium">Usar esta foto</button>
+              <button onClick={() => { setImg(null); setPreview(false) }} className="flex-1 py-3 bg-gray-200 rounded-lg">Volver</button>
             </div>
           </>
         )}
@@ -270,291 +175,172 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
 }
 
 // ============================================================
-// PLANTILLA DE CORRECCIÓN (VERSIÓN USUARIO FINAL - SIMPLIFICADA)
+// PLANTILLA DE CORRECCIÓN (CON LOGS)
 // ============================================================
-
-interface ScoringGridProps {
-  imageData: string
-  patientAge: number
-  onScoreCalculated: (score: number, markedCells: boolean[]) => void
-  onClose: () => void
-}
+interface ScoringGridProps { imageData: string; patientAge: number; onScoreCalculated: (s: number, m: boolean[]) => void; onClose: () => void }
 
 function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: ScoringGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [baseImage, setBaseImage] = useState<HTMLImageElement | null>(null)
-  const [overlayImage, setOverlayImage] = useState<HTMLImageElement | null>(null)
-  const [overlayPosition, setOverlayPosition] = useState({ x: 0, y: 0 })
-  const [overlayScale, setOverlayScale] = useState({ x: 1, y: 1 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  const [markedCells, setMarkedCells] = useState<boolean[]>([])
-  const [showGrid, setShowGrid] = useState(true)
+  const [base, setBase] = useState<HTMLImageElement | null>(null)
+  const [overlay, setOverlay] = useState<HTMLImageElement | null>(null)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [scale, setScale] = useState({ x: 1, y: 1 })
+  const [drag, setDrag] = useState(false)
+  const [start, setStart] = useState({ x: 0, y: 0 })
+  const [marks, setMarks] = useState<boolean[]>([])
+  const [show, setShow] = useState(true)
 
-  const useTemplateA = patientAge <= 7
-  const templatePath = useTemplateA ? '/wisc5/cla/plantilla-claves-a.png' : '/wisc5/cla/plantilla-claves-b.png'
-  const CONFIG = useTemplateA ? PLANTILLA_CONFIG.A : PLANTILLA_CONFIG.B
-  const TOTAL_PAIRS = CONFIG.pairs
-  const TOTAL_COLS = CONFIG.cols
+  const isA = patientAge <= 7
+  const tpl = isA ? '/wisc5/cla/plantilla-claves-a.png' : '/wisc5/cla/plantilla-claves-b.png'
+  const CFG = isA ? PLANTILLA_CONFIG.A : PLANTILLA_CONFIG.B
+  const PAIRS = CFG.pairs; const COLS = CFG.cols
+  const total = CFG.firstPairCols + (PAIRS - 1) * COLS
 
-  const getTotalScorable = (): number => {
-    let total = 0
-    for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
-      total += pair === 0 ? CONFIG.firstPairCols : TOTAL_COLS
-    }
-    return total
-  }
-  const TOTAL_SCORABLE = getTotalScorable()
+  const colsFor = (p: number) => p === 0 ? CFG.firstPairCols : COLS
+  const offFor = (p: number) => p === 0 ? COLS - CFG.firstPairCols : 0
 
-  const getColsForPair = (pairIndex: number): number => pairIndex === 0 ? CONFIG.firstPairCols : TOTAL_COLS
-  const getColOffset = (pairIndex: number): number => pairIndex === 0 ? TOTAL_COLS - CONFIG.firstPairCols : 0
+  const [rows, setRows] = useState<number[]>(Array(PAIRS).fill(0.1).map((_,i) => 0.06 + i * 0.12))
+  const [rh, setRh] = useState(0.10)
+  const [cws, setCws] = useState<number[]>(Array(COLS).fill(1/COLS))
+  const [loaded, setLoaded] = useState(false)
 
-  const [rowPositions, setRowPositions] = useState<number[]>(
-    Array.from({ length: TOTAL_PAIRS }, (_, i) => 0.06 + i * 0.12)
-  )
-  const [rowHeight, setRowHeight] = useState<number>(0.10)
-  const [cellWidths, setCellWidths] = useState<number[]>(Array(TOTAL_COLS).fill(1/TOTAL_COLS))
-  const [configLoaded, setConfigLoaded] = useState(false)
-
+  // Cargar configuración desde Supabase CON LOGS
   useEffect(() => {
+    console.log(`📥 [SCORING GRID] Cargando configuración para plantilla ${isA ? 'A' : 'B'}...`)
+    
     const loadGridConfig = async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data } = await supabase.from('wisc5_cla_grid_config').select('*').eq('id', 1).single()
+      const sb = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+      
+      console.log('🔍 Consultando wisc5_cla_grid_config...')
+      const { data, error } = await sb.from('wisc5_cla_grid_config').select('*').eq('id', 1).single()
+      
+      console.log('📦 Respuesta de Supabase:', { data, error })
+      
+      if (error) {
+        console.error('❌ Error al cargar configuración:', error)
+      }
       
       if (data) {
-        if (useTemplateA) {
-          setRowPositions((data.template_a_row_positions as number[]) || rowPositions)
-          setRowHeight(data.template_a_row_height || 0.10)
-          setCellWidths((data.template_a_cell_widths as number[]) || cellWidths)
+        console.log('✅ Datos recibidos correctamente')
+        console.log('  - template_a_row_positions:', data.template_a_row_positions)
+        console.log('  - template_a_cell_widths:', data.template_a_cell_widths)
+        console.log('  - template_b_row_positions:', data.template_b_row_positions)
+        console.log('  - template_b_cell_widths:', data.template_b_cell_widths)
+        
+        if (isA) {
+          const newRows = (data.template_a_row_positions as number[]) || rows
+          const newRh = data.template_a_row_height || 0.10
+          const newCws = (data.template_a_cell_widths as number[]) || cws
+          console.log('🅰️ Aplicando Plantilla A:', { rows: newRows.length, rh: newRh, cws: newCws.length })
+          setRows(newRows)
+          setRh(newRh)
+          setCws(newCws)
         } else {
-          setRowPositions((data.template_b_row_positions as number[]) || rowPositions)
-          setRowHeight(data.template_b_row_height || 0.10)
-          setCellWidths((data.template_b_cell_widths as number[]) || cellWidths)
+          const newRows = (data.template_b_row_positions as number[]) || rows
+          const newRh = data.template_b_row_height || 0.10
+          const newCws = (data.template_b_cell_widths as number[]) || cws
+          console.log('🅱️ Aplicando Plantilla B:', { rows: newRows.length, rh: newRh, cws: newCws.length })
+          setRows(newRows)
+          setRh(newRh)
+          setCws(newCws)
         }
+      } else {
+        console.warn('⚠️ No se encontró configuración en Supabase, usando valores por defecto')
       }
-      setConfigLoaded(true)
+      setLoaded(true)
     }
+    
     loadGridConfig()
-  }, [useTemplateA])
+  }, [isA])
 
   useEffect(() => {
-    setMarkedCells(new Array(TOTAL_SCORABLE).fill(false))
-    const base = new Image()
-    base.src = imageData
-    base.onload = () => {
-      setBaseImage(base)
-      setOverlayPosition({ x: base.width * 0.1, y: base.height * 0.1 })
-    }
-    const overlay = new Image()
-    overlay.src = templatePath
-    overlay.onload = () => setOverlayImage(overlay)
-  }, [imageData, templatePath])
+    setMarks(new Array(total).fill(false))
+    const b = new Image(); b.src = imageData; b.onload = () => { setBase(b); setPos({ x: b.width * 0.1, y: b.height * 0.1 }) }
+    const o = new Image(); o.src = tpl; o.onload = () => setOverlay(o)
+  }, [imageData, tpl])
 
   useEffect(() => {
-    if (!baseImage || !overlayImage || !canvasRef.current || !configLoaded) return
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+    if (!base || !overlay || !canvasRef.current || !loaded) return
+    const c = canvasRef.current; const ctx = c.getContext('2d')
     if (!ctx) return
-
-    canvas.width = baseImage.width
-    canvas.height = baseImage.height
-    ctx.drawImage(baseImage, 0, 0)
-    
-    ctx.save()
-    ctx.translate(overlayPosition.x, overlayPosition.y)
-    ctx.scale(overlayScale.x, overlayScale.y)
-    ctx.globalAlpha = 0.85
-    ctx.drawImage(overlayImage, 0, 0)
-    ctx.globalAlpha = 1.0
-    ctx.restore()
-    
-    if (showGrid && overlayImage) {
-      const scaledWidth = overlayImage.width * overlayScale.x
-      const scaledHeight = overlayImage.height * overlayScale.y
-      
-      let cellIndex = 0
-      
-      for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
-        const colsInPair = getColsForPair(pair)
-        const colOffset = getColOffset(pair)
-        
-        for (let col = 0; col < colsInPair; col++) {
-          const actualCol = col + colOffset
-          const w = cellWidths[actualCol] * scaledWidth
-          
-          let xAccum = 0
-          for (let c = 0; c < actualCol; c++) {
-            xAccum += cellWidths[c] * scaledWidth
-          }
-          
-          const x = overlayPosition.x + xAccum
-          const y = overlayPosition.y + rowPositions[pair] * scaledHeight
-          const h = rowHeight * scaledHeight
-          
-          if (markedCells[cellIndex]) {
-            ctx.fillStyle = 'rgba(34, 197, 94, 0.35)'
-            ctx.fillRect(x, y, w, h)
-            ctx.strokeStyle = '#22C55E'
-            ctx.lineWidth = 2.5
-          } else {
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'
-            ctx.lineWidth = 2
-          }
+    c.width = base.width; c.height = base.height
+    ctx.drawImage(base, 0, 0)
+    ctx.save(); ctx.translate(pos.x, pos.y); ctx.scale(scale.x, scale.y); ctx.globalAlpha = 0.85; ctx.drawImage(overlay, 0, 0); ctx.globalAlpha = 1; ctx.restore()
+    if (show && overlay) {
+      const sw = overlay.width * scale.x; const sh = overlay.height * scale.y
+      let idx = 0
+      for (let p = 0; p < PAIRS; p++) {
+        const cp = colsFor(p); const off = offFor(p)
+        for (let col = 0; col < cp; col++) {
+          const ac = col + off; const w = cws[ac] * sw
+          let ax = 0; for (let cc = 0; cc < ac; cc++) ax += cws[cc] * sw
+          const x = pos.x + ax; const y = pos.y + rows[p] * sh; const h = rh * sh
+          if (marks[idx]) { ctx.fillStyle = 'rgba(34,197,94,0.35)'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#22C55E'; ctx.lineWidth = 2.5 }
+          else { ctx.strokeStyle = 'rgba(59,130,246,0.8)'; ctx.lineWidth = 2 }
           ctx.strokeRect(x, y, w, h)
-          
-          if (markedCells[cellIndex]) {
-            ctx.font = 'bold 12px Arial'
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillStyle = '#16A34A'
-            ctx.fillText('✓', x + w / 2, y + h / 2)
-          }
-          cellIndex++
+          if (marks[idx]) { ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#16A34A'; ctx.fillText('✓', x + w/2, y + h/2) }
+          idx++
         }
       }
     }
-  }, [baseImage, overlayImage, overlayPosition, overlayScale, markedCells, showGrid, rowPositions, rowHeight, cellWidths, configLoaded])
+  }, [base, overlay, pos, scale, marks, show, rows, rh, cws, loaded])
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !overlayImage) return
-    const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const canvasX = (e.clientX - rect.left) * scaleX
-    const canvasY = (e.clientY - rect.top) * scaleY
-    const scaledWidth = overlayImage.width * overlayScale.x
-    const scaledHeight = overlayImage.height * overlayScale.y
-    
-    let cellIndex = 0
-    
-    for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
-      const colsInPair = getColsForPair(pair)
-      const colOffset = getColOffset(pair)
-      
-      for (let col = 0; col < colsInPair; col++) {
-        const actualCol = col + colOffset
-        const w = cellWidths[actualCol] * scaledWidth
-        
-        let xAccum = 0
-        for (let c = 0; c < actualCol; c++) {
-          xAccum += cellWidths[c] * scaledWidth
-        }
-        
-        const cellX = overlayPosition.x + xAccum
-        const cellY = overlayPosition.y + rowPositions[pair] * scaledHeight
-        const cellH = rowHeight * scaledHeight
-        
-        if (canvasX >= cellX && canvasX <= cellX + w && canvasY >= cellY && canvasY <= cellY + cellH) {
-          const newMarkedCells = [...markedCells]
-          newMarkedCells[cellIndex] = !newMarkedCells[cellIndex]
-          setMarkedCells(newMarkedCells)
-          return
-        }
-        cellIndex++
+  const click = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || !overlay) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    const sx = canvasRef.current.width / rect.width; const sy = canvasRef.current.height / rect.height
+    const cx = (e.clientX - rect.left) * sx; const cy = (e.clientY - rect.top) * sy
+    const sw = overlay.width * scale.x; const sh = overlay.height * scale.y
+    let idx = 0
+    for (let p = 0; p < PAIRS; p++) {
+      const cp = colsFor(p); const off = offFor(p)
+      for (let col = 0; col < cp; col++) {
+        const ac = col + off; const w = cws[ac] * sw
+        let ax = 0; for (let cc = 0; cc < ac; cc++) ax += cws[cc] * sw
+        const x = pos.x + ax; const y = pos.y + rows[p] * sh; const h = rh * sh
+        if (cx >= x && cx <= x + w && cy >= y && cy <= y + h) { const nm = [...marks]; nm[idx] = !nm[idx]; setMarks(nm); return }
+        idx++
       }
     }
   }
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.shiftKey) {
-      setIsDragging(true)
-      setDragStart({ x: e.clientX - overlayPosition.x, y: e.clientY - overlayPosition.y })
-    }
-  }
+  const down = (e: React.MouseEvent) => { if (e.shiftKey) { setDrag(true); setStart({ x: e.clientX - pos.x, y: e.clientY - pos.y }) } }
+  const move = (e: React.MouseEvent) => { if (drag) setPos({ x: e.clientX - start.x, y: e.clientY - start.y }) }
+  const up = () => setDrag(false)
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isDragging) {
-      setOverlayPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })
-    }
-  }
+  if (!loaded) return <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6">Cargando configuracion...</div></div>
 
-  const handleMouseUp = () => setIsDragging(false)
-
-  const calculateScore = () => { onScoreCalculated(markedCells.filter(m => m).length, markedCells) }
-  const toggleAll = () => setMarkedCells(new Array(markedCells.length).fill(!markedCells.every(m => m)))
-  const clearAll = () => setMarkedCells(new Array(markedCells.length).fill(false))
-  const markedCount = markedCells.filter(m => m).length
-
-  if (!configLoaded) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl p-6 text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500">Cargando configuración de rejilla...</p>
-        </div>
-      </div>
-    )
-  }
+  const cnt = marks.filter(m => m).length
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl p-4 max-w-6xl w-full max-h-screen overflow-auto">
-        <h3 className="text-lg font-semibold mb-3">
-          Plantilla de corrección - Claves {useTemplateA ? 'A' : 'B'} 
-          <span className="text-sm text-gray-500 ml-2">({useTemplateA ? '6-7' : '8-16'} años)</span>
-          <span className="text-sm text-gray-400 ml-2">| Máx: {CONFIG.maxScore} pts</span>
-        </h3>
-        
-        <div className="bg-blue-50 rounded-lg p-3 mb-3">
-          <p className="text-xs text-blue-700">
-            <strong>Instrucciones:</strong> Haz clic en cada ventana azul para marcarla ✓.<br />
-            <strong>Shift + Arrastrar</strong> para mover la plantilla y la rejilla juntas.
-          </p>
+        <h3 className="text-lg font-semibold mb-3">Plantilla Claves {isA ? 'A' : 'B'} ({isA ? '6-7' : '8-16'} anos) | Max: {CFG.maxScore}</h3>
+        <div className="bg-blue-50 rounded-lg p-3 mb-3"><p className="text-xs text-blue-700">Clic en ventana azul = marcar ✓. Shift+Arrastrar = mover todo.</p></div>
+        <div className="overflow-auto border rounded-lg mb-3 bg-gray-100" style={{ maxHeight: '55vh' }}>
+          <canvas ref={canvasRef} onClick={click} onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up} className="cursor-crosshair" style={{ width: '100%', height: 'auto' }} />
         </div>
-        
-        <div className="overflow-auto border border-gray-200 rounded-lg mb-3 bg-gray-100" style={{ maxHeight: '55vh' }}>
-          <canvas ref={canvasRef} onClick={handleCanvasClick} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} className="cursor-crosshair" style={{ width: '100%', height: 'auto' }} />
-        </div>
-        
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-600 block mb-1">Zoom X: {overlayScale.x.toFixed(2)}</label>
-              <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.x}
-                onChange={(e) => setOverlayScale({ ...overlayScale, x: parseFloat(e.target.value) })} className="w-full" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-600 block mb-1">Zoom Y: {overlayScale.y.toFixed(2)}</label>
-              <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.y}
-                onChange={(e) => setOverlayScale({ ...overlayScale, y: parseFloat(e.target.value) })} className="w-full" />
-            </div>
+            <div><label className="text-xs">Zoom X: {scale.x.toFixed(2)}</label><input type="range" min="0.3" max="3" step="0.01" value={scale.x} onChange={e => setScale({...scale, x: +e.target.value})} className="w-full" /></div>
+            <div><label className="text-xs">Zoom Y: {scale.y.toFixed(2)}</label><input type="range" min="0.3" max="3" step="0.01" value={scale.y} onChange={e => setScale({...scale, y: +e.target.value})} className="w-full" /></div>
           </div>
-
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => setOverlayScale({ x: 1, y: 1 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Zoom</button>
-            <button onClick={() => setOverlayPosition({ x: 50, y: 50 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Posición</button>
-            <button onClick={() => setShowGrid(!showGrid)} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
-              {showGrid ? '👁 Ocultar rejilla' : '👁 Mostrar rejilla'}
-            </button>
+            <button onClick={() => setScale({x:1,y:1})} className="px-3 py-1.5 bg-gray-100 rounded text-sm">Reset Zoom</button>
+            <button onClick={() => setPos({x:50,y:50})} className="px-3 py-1.5 bg-gray-100 rounded text-sm">Reset Pos</button>
+            <button onClick={() => setShow(!show)} className="px-3 py-1.5 bg-gray-100 rounded text-sm">{show ? 'Ocultar' : 'Mostrar'} rejilla</button>
           </div>
-
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={toggleAll} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
-              {markedCells.every(m => m) ? '◻ Desmarcar todas' : '☑ Marcar todas'}
-            </button>
-            <button onClick={clearAll} className="px-3 py-1.5 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100">✕ Limpiar todas</button>
+          <div className="flex gap-2">
+            <button onClick={() => setMarks(new Array(total).fill(!marks.every(m=>m)))} className="px-3 py-1.5 bg-gray-100 rounded text-sm">{marks.every(m=>m) ? 'Desmarcar' : 'Marcar'} todas</button>
+            <button onClick={() => setMarks(new Array(total).fill(false))} className="px-3 py-1.5 bg-red-50 text-red-600 rounded text-sm">Limpiar</button>
           </div>
-          
           <div className="bg-blue-50 rounded-lg p-3">
-            <div className="flex justify-between items-center">
-              <p className="text-sm"><strong>Progreso:</strong> {markedCount} de {TOTAL_SCORABLE} ventanas</p>
-              <p className="text-lg font-bold text-blue-700">Puntaje: {markedCount}</p>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${(markedCount / TOTAL_SCORABLE) * 100}%` }} />
-            </div>
+            <div className="flex justify-between"><span>Progreso: {cnt} de {total}</span><span className="text-lg font-bold text-blue-700">{cnt}</span></div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2"><div className="bg-blue-600 h-2 rounded-full" style={{ width: `${(cnt/total)*100}%` }} /></div>
           </div>
-          
           <div className="flex gap-3">
-            <button onClick={calculateScore} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">
-              Aplicar puntaje ({markedCount})
-            </button>
-            <button onClick={onClose} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Cancelar</button>
+            <button onClick={() => onScoreCalculated(cnt, marks)} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium">Aplicar puntaje ({cnt})</button>
+            <button onClick={onClose} className="flex-1 py-3 bg-gray-200 rounded-lg">Cancelar</button>
           </div>
         </div>
       </div>
@@ -563,96 +349,67 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
 }
 
 // ============================================================
-// COMPONENTE PRINCIPAL CLAVES (CLA)
+// COMPONENTE PRINCIPAL CLA
 // ============================================================
-
-interface CLAInterfaceProps {
-  onComplete: (scores: Record<string, number>, rawTotal: number) => void
-  onUpdatePatient: (content: any) => void
-  patientAge: number
-}
+interface CLAInterfaceProps { onComplete: (s: Record<string,number>, t: number) => void; onUpdatePatient: (c: any) => void; patientAge: number }
 
 export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpdatePatient, patientAge }: CLAInterfaceProps) {
-  const [rawScore, setRawScore] = useState<string>('')
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [elapsedTime, setElapsedTime] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
-  const [timeEnded, setTimeEnded] = useState(false)
-  const [showCamera, setShowCamera] = useState(false)
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const [manualCount, setManualCount] = useState<string>('')
-  const [showScoringGrid, setShowScoringGrid] = useState(false)
-  const [reviewLater, setReviewLater] = useState(false)
+  const [raw, setRaw] = useState('')
+  const [done, setDone] = useState(false)
+  const [secs, setSecs] = useState(0)
+  const [run, setRun] = useState(false)
+  const [ended, setEnded] = useState(false)
+  const [cam, setCam] = useState(false)
+  const [scan, setScan] = useState(false)
+  const [img, setImg] = useState<string | null>(null)
+  const [mcnt, setMcnt] = useState('')
+  const [grid, setGrid] = useState(false)
+  const [later, setLater] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  const CONFIG = patientAge <= 7 ? PLANTILLA_CONFIG.A : PLANTILLA_CONFIG.B
-  const maxScore = CONFIG.maxScore
+  const CFG = patientAge <= 7 ? PLANTILLA_CONFIG.A : PLANTILLA_CONFIG.B
+  const max = CFG.maxScore
+  const oc = useRef(onComplete); const op = useRef(onUpdatePatient)
+  useEffect(() => { oc.current = onComplete; op.current = onUpdatePatient }, [onComplete, onUpdatePatient])
+  useEffect(() => { op.current({ type: 'wisc5_cla', instruction: 'Copia los simbolos. Tienes 2 minutos.', isRunning: run, timeRemaining: run ? 120 - secs : 120 }) }, [run, secs])
 
-  const onCompleteRef = useRef(onComplete)
-  const onUpdatePatientRef = useRef(onUpdatePatient)
+  const tu = useCallback((s: number) => setSecs(s), [])
+  const te = useCallback(() => { setEnded(true); setRun(false) }, [])
+  const tog = useCallback(() => setRun(p => !p), [])
 
-  useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
+  const fileUp = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return
+    const r = new FileReader(); r.onload = ev => setImg(ev.target?.result as string); r.readAsDataURL(f)
+  }
 
-  useEffect(() => {
-    onUpdatePatientRef.current({
-      type: 'wisc5_cla',
-      instruction: 'Copia los símbolos en las casillas correspondientes. Trabaja lo más rápido que puedas. Tienes 2 minutos.',
-      isRunning, timeRemaining: isRunning ? 120 - elapsedTime : 120
-    })
-  }, [isRunning, elapsedTime])
-
-  const handleTimeUpdate = useCallback((seconds: number) => setElapsedTime(seconds), [])
-  const handleTimeEnd = useCallback(() => { setTimeEnded(true); setIsRunning(false) }, [])
-  const toggleRunning = useCallback(() => setIsRunning(prev => !prev), [])
-
-  const handleCapture = (imageData: string) => { setCapturedImage(imageData); setShowCamera(false) }
-
-  const flipImageHorizontally = () => {
-    if (!capturedImage) return
-    const img = new Image(); img.src = capturedImage
-    img.onload = () => {
-      const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      if (ctx) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0) }
-      setCapturedImage(canvas.toDataURL('image/jpeg', 0.85))
+  const flip = () => {
+    if (!img) return
+    const i = new Image(); i.src = img
+    i.onload = () => {
+      const c = document.createElement('canvas'); c.width = i.width; c.height = i.height
+      const x = c.getContext('2d'); if (x) { x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(i, 0, 0) }
+      setImg(c.toDataURL('image/jpeg', 0.85))
     }
   }
 
-  const handleScoreCalculated = (score: number) => { setRawScore(score.toString()); setShowScoringGrid(false) }
-
-  const handleComplete = () => {
-    const score = parseInt(rawScore, 10)
-    if (isNaN(score) || score < 0) { alert('Por favor, ingresa un puntaje válido'); return }
-    if (score > maxScore) { alert(`El puntaje máximo es ${maxScore}`); return }
-    setIsCompleted(true)
-    onCompleteRef.current({ CLA: score }, score)
+  const complete = () => {
+    const s = parseInt(raw, 10)
+    if (isNaN(s) || s < 0) { alert('Puntaje invalido'); return }
+    if (s > max) { alert(`Maximo es ${max}`); return }
+    setDone(true); oc.current({ CLA: s }, s)
   }
 
-  const handleReviewLater = () => {
-    setReviewLater(true)
-    setIsCompleted(true)
-    onCompleteRef.current({ CLA: -1 }, -1)
-  }
+  const reviewLater = () => { setLater(true); setDone(true); oc.current({ CLA: -1 }, -1) }
+  const applyManual = () => { const c = parseInt(mcnt, 10); if (!isNaN(c) && c >= 0 && c <= max) setRaw(c.toString()) }
 
-  const applyManualCount = () => {
-    const count = parseInt(manualCount, 10)
-    if (!isNaN(count) && count >= 0 && count <= maxScore) setRawScore(count.toString())
-  }
-
-  if (isCompleted) {
-    const isPending = reviewLater
+  if (done) {
+    const pend = later
     return (
-      <div className={`rounded-lg p-4 text-center ${isPending ? 'bg-orange-50' : 'bg-green-50'}`}>
-        <p className={`font-medium ${isPending ? 'text-orange-700' : 'text-green-700'}`}>
-          {isPending ? '⏳ Pendiente de revisión' : 'Subprueba completada'}
-        </p>
-        {!isPending && <p className="text-sm text-green-600 mt-1">Puntaje total: {rawScore} / {maxScore}</p>}
-        {isPending && <p className="text-sm text-orange-600 mt-1">Podrás completar la revisión desde el panel de WISC-V</p>}
-        {capturedImage && (
-          <div className="mt-4">
-            <p className="text-xs text-gray-500 mb-2">Foto de respaldo guardada</p>
-            <img src={capturedImage} alt="Hoja" className="mx-auto max-h-32 rounded border" />
-          </div>
-        )}
+      <div className={`rounded-lg p-4 text-center ${pend ? 'bg-orange-50' : 'bg-green-50'}`}>
+        <p className={`font-medium ${pend ? 'text-orange-700' : 'text-green-700'}`}>{pend ? 'Pendiente de revision' : 'Completada'}</p>
+        {!pend && <p className="text-sm text-green-600 mt-1">Puntaje: {raw} / {max}</p>}
+        {pend && <p className="text-sm text-orange-600 mt-1">Podras revisar desde el panel WISC-V</p>}
+        {img && <div className="mt-4"><img src={img} alt="Hoja" className="mx-auto max-h-32 rounded border" /></div>}
       </div>
     )
   }
@@ -660,96 +417,65 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
   return (
     <div className="space-y-4">
       <div className="bg-gray-50 rounded-lg p-3">
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-600">Claves {patientAge <= 7 ? 'A' : 'B'}</span>
-          <span className="text-gray-800 font-medium">Tiempo límite: 2 minutos</span>
-        </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(elapsedTime / 120) * 100}%` }} />
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          {CONFIG.pairs} pares × {CONFIG.cols} columnas | Puntaje máx: {maxScore}
-        </p>
+        <div className="flex justify-between text-sm mb-1"><span className="text-gray-600">Claves {patientAge <= 7 ? 'A' : 'B'}</span><span className="text-gray-800 font-medium">Tiempo limite: 2 min</span></div>
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(secs/120)*100}%` }} /></div>
+        <p className="text-xs text-gray-500 mt-2">{CFG.pairs} pares x {CFG.cols} cols | Max: {max}</p>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <Stopwatch timeLimit={120} onTimeUpdate={handleTimeUpdate} onTimeEnd={handleTimeEnd} isRunning={isRunning} onToggleRunning={toggleRunning} />
-      </div>
-
-      {timeEnded && (
-        <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
-          <p className="text-yellow-700 text-sm">⏰ ¡Tiempo finalizado! Ingresa el puntaje obtenido.</p>
-        </div>
-      )}
+      <div className="bg-white rounded-lg border border-gray-200 p-6"><Stopwatch timeLimit={120} onTimeUpdate={tu} onTimeEnd={te} isRunning={run} onToggleRunning={tog} /></div>
+      {ended && <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200"><p className="text-yellow-700 text-sm">Tiempo finalizado. Ingresa el puntaje.</p></div>}
 
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Puntaje bruto total (símbolos correctos)</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Puntaje bruto total</label>
         <div className="flex gap-3">
-          <input type="number" value={rawScore} onChange={(e) => setRawScore(e.target.value)} min="0" max={maxScore} placeholder={`0-${maxScore}`}
-            className="flex-1 px-4 py-2 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={reviewLater} />
-          <button onClick={handleComplete} disabled={!rawScore || reviewLater}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${rawScore && !reviewLater ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
-            Completar
-          </button>
+          <input type="number" value={raw} onChange={e => setRaw(e.target.value)} min="0" max={max} placeholder={`0-${max}`} className="flex-1 px-4 py-2 text-lg border rounded-lg" disabled={later} />
+          <button onClick={complete} disabled={!raw || later} className={`px-6 py-2 rounded-lg font-medium ${raw && !later ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 cursor-not-allowed'}`}>Completar</button>
         </div>
-        
-        <div className="mt-4 pt-3 border-t border-gray-200">
-          {!reviewLater ? (
-            <button onClick={handleReviewLater}
-              className="w-full py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium border border-orange-200">
-              ⏳ Dejar para revisar después
-            </button>
+        <div className="mt-4 pt-3 border-t">
+          {!later ? (
+            <button onClick={reviewLater} className="w-full py-2 bg-orange-50 text-orange-700 rounded-lg text-sm border border-orange-200">Dejar para revisar despues</button>
           ) : (
             <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700">⏳ Pendiente de revisión</p>
-                  <p className="text-xs text-orange-600 mt-1">Podrás completar esta evaluación desde el panel de WISC-V</p>
-                </div>
-                <button onClick={() => setReviewLater(false)}
-                  className="px-3 py-1.5 bg-white text-orange-700 rounded-lg text-xs hover:bg-orange-50 border border-orange-300">
-                  Revisar ahora
-                </button>
-              </div>
+              <div className="flex justify-between items-center"><div><p className="text-sm font-medium text-orange-700">Pendiente</p><p className="text-xs text-orange-600">Revisable desde el panel</p></div><button onClick={() => setLater(false)} className="px-3 py-1.5 bg-white text-orange-700 rounded text-xs border">Revisar ahora</button></div>
             </div>
           )}
         </div>
-        
-        {!timeEnded && !reviewLater && <p className="text-xs text-gray-400 mt-2">Debes esperar a que termine el tiempo para completar</p>}
+        {!ended && !later && <p className="text-xs text-gray-400 mt-2">Espera a que termine el tiempo</p>}
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <p className="text-sm font-medium text-gray-700 mb-3">📸 Verificación por foto (opcional)</p>
-        {!capturedImage ? (
-          <button onClick={() => setShowCamera(true)} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">📷 Capturar foto de la hoja</button>
+        <p className="text-sm font-medium text-gray-700 mb-3">Verificacion por foto (opcional)</p>
+        {!img ? (
+          <div className="space-y-2">
+            <button onClick={() => setCam(true)} className="w-full py-2 bg-gray-100 rounded-lg text-sm">📷 Usar camara</button>
+            <input ref={fileRef} type="file" accept="image/*" onChange={fileUp} className="hidden" />
+            <button onClick={() => fileRef.current?.click()} className="w-full py-2 bg-gray-100 rounded-lg text-sm">📁 Subir desde el equipo</button>
+            <button onClick={() => setScan(true)} className="w-full py-2 bg-gray-100 rounded-lg text-sm">🖨️ Escanear hoja</button>
+          </div>
         ) : (
           <div>
-            <div className="mb-3"><img src={capturedImage} alt="Hoja" className="max-h-48 mx-auto rounded-lg border border-gray-200" /></div>
+            <div className="mb-3"><img src={img} alt="Hoja" className="max-h-48 mx-auto rounded border" /></div>
             <div className="flex gap-2 mb-2">
-              <button onClick={() => setShowCamera(true)} className="flex-1 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs">Volver a capturar</button>
-              <button onClick={() => setCapturedImage(null)} className="flex-1 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-xs">Eliminar</button>
+              <button onClick={() => setCam(true)} className="flex-1 py-1.5 bg-gray-100 rounded text-xs">Camara</button>
+              <button onClick={() => fileRef.current?.click()} className="flex-1 py-1.5 bg-gray-100 rounded text-xs">Subir</button>
+              <button onClick={() => setImg(null)} className="flex-1 py-1.5 bg-red-50 text-red-600 rounded text-xs">Eliminar</button>
             </div>
-            <button onClick={flipImageHorizontally} className="w-full py-1.5 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 text-xs mb-2">🔄 Invertir horizontalmente</button>
-            <button onClick={() => setShowScoringGrid(true)} className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">🔲 Usar plantilla de corrección</button>
-            <div className="mt-4 pt-3 border-t border-gray-200">
-              <p className="text-xs text-gray-600 mb-2">O ingresa el conteo manualmente:</p>
-              <div className="flex gap-2">
-                <input type="number" value={manualCount} onChange={(e) => setManualCount(e.target.value)} min="0" max={maxScore} placeholder="Cantidad" className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded" />
-                <button onClick={applyManualCount} className="px-4 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700">Aplicar</button>
-              </div>
+            <button onClick={flip} className="w-full py-1.5 bg-yellow-50 text-yellow-700 rounded text-xs mb-2">Invertir horizontalmente</button>
+            <button onClick={() => setGrid(true)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm">Usar plantilla de correccion</button>
+            <div className="mt-4 pt-3 border-t">
+              <p className="text-xs text-gray-600 mb-2">Conteo manual:</p>
+              <div className="flex gap-2"><input type="number" value={mcnt} onChange={e => setMcnt(e.target.value)} min="0" max={max} placeholder="Cantidad" className="flex-1 px-3 py-1.5 text-sm border rounded" /><button onClick={applyManual} className="px-4 py-1.5 bg-gray-600 text-white text-sm rounded">Aplicar</button></div>
             </div>
           </div>
         )}
       </div>
 
-      {showCamera && <CameraCapture onCapture={handleCapture} onClose={() => setShowCamera(false)} />}
-      {showScoringGrid && capturedImage && <ScoringGrid imageData={capturedImage} patientAge={patientAge} onScoreCalculated={handleScoreCalculated} onClose={() => setShowScoringGrid(false)} />}
+      {cam && <CameraCapture onCapture={d => { setImg(d); setCam(false) }} onClose={() => setCam(false)} />}
+      {scan && <ScanModal onClose={() => setScan(false)} />}
+      {grid && img && <ScoringGrid imageData={img} patientAge={patientAge} onScoreCalculated={s => { setRaw(s.toString()); setGrid(false) }} onClose={() => setGrid(false)} />}
 
       <div className="bg-blue-50 rounded-lg p-3">
-        <p className="text-xs text-blue-700">
-          <strong>Instrucciones:</strong> Entrega la hoja de respuestas al paciente. 
-          Di: {`'Copia los símbolos en las casillas. Trabaja lo más rápido que puedas. Tienes 2 minutos.'`}
-        </p>
+        <p className="text-xs text-blue-700">Entrega la hoja al paciente. Di: Copia los simbolos en las casillas. Tienes 2 minutos.</p>
       </div>
     </div>
   )
