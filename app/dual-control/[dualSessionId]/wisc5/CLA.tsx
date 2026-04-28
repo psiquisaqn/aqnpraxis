@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 
 // ============================================================
 // COMPONENTE DE CRONÓMETRO (120 SEGUNDOS)
@@ -116,7 +117,7 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onT
 }
 
 // ============================================================
-// COMPONENTE DE CÁMARA - CORREGIDO (CANVAS SIEMPRE EN DOM)
+// COMPONENTE DE CÁMARA
 // ============================================================
 
 interface CameraCaptureProps {
@@ -139,8 +140,6 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   useEffect(() => {
     const initCamera = async () => {
       try {
-        console.log('📷 Iniciando cámara...')
-        
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error('Tu navegador no soporta acceso a la cámara')
         }
@@ -155,9 +154,7 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
             } 
           })
           setIsFrontCamera(false)
-          console.log('✅ Cámara trasera iniciada')
-        } catch (backErr) {
-          console.log('⚠️ Cámara trasera no disponible, usando frontal')
+        } catch {
           mediaStream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
               facingMode: 'user',
@@ -166,76 +163,45 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
             } 
           })
           setIsFrontCamera(true)
-          console.log('✅ Cámara frontal iniciada')
         }
         
         setStream(mediaStream)
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream
-          
-          videoRef.current.onloadedmetadata = () => {
-            setCameraReady(true)
-            console.log('✅ Video listo para capturar')
-          }
+          videoRef.current.onloadedmetadata = () => setCameraReady(true)
         }
       } catch (err: any) {
-        console.error('❌ Error accediendo a la cámara:', err)
         setError(`No se pudo acceder a la cámara: ${err.message}`)
       }
     }
 
     initCamera()
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop())
-      }
-    }
+    return () => { if (stream) stream.getTracks().forEach(track => track.stop()) }
   }, [])
 
   const capturePhoto = (applyMirror: boolean) => {
-    console.log('📸 Intentando capturar foto... applyMirror:', applyMirror)
-    
     setCapturing(true)
-    
     setTimeout(() => {
       try {
-        if (!videoRef.current) throw new Error('Video no disponible')
-        if (!canvasRef.current) throw new Error('Canvas no disponible')
-        
+        if (!videoRef.current || !canvasRef.current) throw new Error('Referencias no disponibles')
         const video = videoRef.current
         const canvas = canvasRef.current
-        
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-          throw new Error('El video no tiene dimensiones válidas')
-        }
         
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
         
         const context = canvas.getContext('2d')
-        if (!context) throw new Error('No se pudo obtener contexto del canvas')
+        if (!context) throw new Error('No se pudo obtener contexto')
         
-        if (applyMirror) {
-          context.translate(canvas.width, 0)
-          context.scale(-1, 1)
-        }
-        
+        if (applyMirror) { context.translate(canvas.width, 0); context.scale(-1, 1) }
         context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        
-        if (applyMirror) {
-          context.setTransform(1, 0, 0, 1, 0, 0)
-        }
+        if (applyMirror) context.setTransform(1, 0, 0, 1, 0, 0)
         
         const imageData = canvas.toDataURL('image/jpeg', 0.85)
-        console.log('✅ Foto capturada, tamaño:', Math.round(imageData.length / 1024), 'KB')
-        
         setCapturedImage(imageData)
         setShowPreview(true)
         setCapturing(false)
-        
       } catch (err: any) {
-        console.error('❌ Error al capturar foto:', err)
         setError(`Error al capturar: ${err.message}`)
         setCapturing(false)
       }
@@ -247,11 +213,6 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
       onCapture(capturedImage)
       if (stream) stream.getTracks().forEach(track => track.stop())
     }
-  }
-
-  const retakePhoto = () => {
-    setCapturedImage(null)
-    setShowPreview(false)
   }
 
   if (error) {
@@ -273,13 +234,8 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
         {!showPreview ? (
           <>
             <div className="relative bg-black rounded-lg overflow-hidden mb-4">
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                className="w-full h-auto"
-                style={{ transform: mirrorPreview && isFrontCamera ? 'scaleX(-1)' : 'none' }}
-              />
+              <video ref={videoRef} autoPlay playsInline className="w-full h-auto"
+                style={{ transform: mirrorPreview && isFrontCamera ? 'scaleX(-1)' : 'none' }} />
               {!cameraReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
                   <div className="text-white text-sm">Iniciando cámara...</div>
@@ -305,7 +261,7 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
                   className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
                     !cameraReady || capturing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}>
-                  {capturing ? 'Capturando...' : '📸 Capturar (orientación normal)'}
+                  {capturing ? 'Capturando...' : '📸 Capturar'}
                 </button>
                 {isFrontCamera && (
                   <button onClick={() => capturePhoto(true)} disabled={!cameraReady || capturing}
@@ -320,18 +276,18 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
             </div>
             
             <p className="text-xs text-gray-500 mt-3 text-center">
-              {isFrontCamera ? 'Cámara frontal. Si el texto se ve al revés, usa "Capturar (orientación normal)".' : 'Asegúrate de que la hoja esté bien iluminada y enfocada.'}
+              {isFrontCamera ? 'Cámara frontal. Si el texto se ve al revés, usa "Capturar con espejo".' : 'Asegúrate de que la hoja esté bien iluminada y enfocada.'}
             </p>
           </>
         ) : (
           <>
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">Vista previa de la foto:</p>
+              <p className="text-sm text-gray-600 mb-2">Vista previa:</p>
               <img src={capturedImage!} alt="Vista previa" className="max-h-64 mx-auto rounded-lg border border-gray-200" />
             </div>
             <div className="flex gap-3">
               <button onClick={confirmCapture} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">✓ Usar esta foto</button>
-              <button onClick={retakePhoto} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Volver a capturar</button>
+              <button onClick={() => { setCapturedImage(null); setShowPreview(false) }} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Volver a capturar</button>
             </div>
           </>
         )}
@@ -341,7 +297,7 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
 }
 
 // ============================================================
-// COMPONENTE DE PLANTILLA DE CORRECCIÓN (CON PROPORCIONES REALES)
+// COMPONENTE DE PLANTILLA DE CORRECCIÓN (CARGA CONFIG DESDE SUPABASE)
 // ============================================================
 
 interface ScoringGridProps {
@@ -368,41 +324,48 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
     ? '/wisc5/cla/plantilla-claves-a.png'
     : '/wisc5/cla/plantilla-claves-b.png'
   
-  // Proporciones reales de las plantillas (CORREGIDO)
-  const RATIO = useTemplateA 
-    ? { transparent: 18, opaque: 7 }   // Plantilla A: ventana 18, opaco 7
-    : { transparent: 14, opaque: 10 }  // Plantilla B: ventana 14, opaco 10
-  
-  const PAIR_HEIGHT = RATIO.transparent + RATIO.opaque
-  
-  // Configuración de columnas (distribución uniforme horizontal)
   const COLS = useTemplateA ? 8 : 15
-  
-  // Pares de filas (cada par = 1 fila opaca + 1 fila transparente)
   const TOTAL_PAIRS = 4
   const TOTAL_SCORABLE = TOTAL_PAIRS * COLS
 
-  // Calcular la posición Y relativa de cada fila evaluable dentro del PNG (0 a 1)
-  const getScorableRowPositions = (): number[] => {
-    const positions: number[] = []
-    for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
-      const yStart = pair * PAIR_HEIGHT + RATIO.opaque
-      const yCenter = yStart / (TOTAL_PAIRS * PAIR_HEIGHT)
-      positions.push(yCenter)
-    }
-    return positions
-  }
+  // Posiciones Y y altura - se cargan desde Supabase
+  const [rowPositions, setRowPositions] = useState<number[]>([0.15, 0.38, 0.62, 0.85])
+  const [rowHeight, setRowHeight] = useState<number>(0.15)
+  const [configLoaded, setConfigLoaded] = useState(false)
 
-  // Altura relativa de cada fila evaluable
-  const getScorableRowHeight = (): number => {
-    return RATIO.transparent / (TOTAL_PAIRS * PAIR_HEIGHT)
-  }
+  // Cargar configuración de rejilla desde Supabase
+  useEffect(() => {
+    const loadGridConfig = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      
+      const { data } = await supabase
+        .from('wisc5_cla_grid_config')
+        .select('*')
+        .eq('id', 1)
+        .single()
+      
+      if (data) {
+        if (useTemplateA) {
+          setRowPositions(data.template_a_row_positions as number[])
+          setRowHeight(data.template_a_row_height as number)
+          console.log('✅ Configuración cargada para Plantilla A desde Supabase')
+        } else {
+          setRowPositions(data.template_b_row_positions as number[])
+          setRowHeight(data.template_b_row_height as number)
+          console.log('✅ Configuración cargada para Plantilla B desde Supabase')
+        }
+      }
+      setConfigLoaded(true)
+    }
+    
+    loadGridConfig()
+  }, [useTemplateA])
 
   // Cargar ambas imágenes
   useEffect(() => {
-    console.log('📐 Cargando plantilla:', templatePath)
-    console.log('📐 Proporciones:', `${RATIO.transparent}:${RATIO.opaque}`)
-    
     setMarkedCells(new Array(TOTAL_SCORABLE).fill(false))
 
     const base = new Image()
@@ -417,15 +380,12 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
 
     const overlay = new Image()
     overlay.src = templatePath
-    overlay.onload = () => {
-      console.log('✅ Plantilla cargada:', overlay.width, 'x', overlay.height)
-      setOverlayImage(overlay)
-    }
+    overlay.onload = () => setOverlayImage(overlay)
   }, [imageData, templatePath])
 
   // Dibujar canvas
   useEffect(() => {
-    if (!baseImage || !overlayImage || !canvasRef.current) return
+    if (!baseImage || !overlayImage || !canvasRef.current || !configLoaded) return
     
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
@@ -434,10 +394,10 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
     canvas.width = baseImage.width
     canvas.height = baseImage.height
     
-    // 1. Dibujar imagen base (foto de la hoja)
+    // 1. Imagen base
     ctx.drawImage(baseImage, 0, 0)
     
-    // 2. Dibujar overlay (plantilla PNG) con transformaciones
+    // 2. Overlay (plantilla PNG)
     ctx.save()
     ctx.translate(overlayPosition.x, overlayPosition.y)
     ctx.scale(overlayScale.x, overlayScale.y)
@@ -446,19 +406,17 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
     ctx.globalAlpha = 1.0
     ctx.restore()
     
-    // 3. Dibujar rejilla de marcado con proporciones correctas
+    // 3. Rejilla de marcado
     if (showGrid && overlayImage) {
       const scaledWidth = overlayImage.width * overlayScale.x
       const scaledHeight = overlayImage.height * overlayScale.y
       const cellWidth = scaledWidth / COLS
-      const rowPositions = getScorableRowPositions()
-      const rowHeight = getScorableRowHeight()
       
       let cellIndex = 0
-      for (const rowY of rowPositions) {
+      for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
         for (let col = 0; col < COLS; col++) {
           const x = overlayPosition.x + col * cellWidth
-          const y = overlayPosition.y + rowY * scaledHeight
+          const y = overlayPosition.y + rowPositions[pair] * scaledHeight
           const h = rowHeight * scaledHeight
           
           if (markedCells[cellIndex]) {
@@ -467,13 +425,13 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
             ctx.strokeStyle = '#22C55E'
             ctx.lineWidth = 2.5
           } else {
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.7)'
-            ctx.lineWidth = 1.5
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'
+            ctx.lineWidth = 2
           }
           ctx.strokeRect(x, y, cellWidth, h)
           
           if (markedCells[cellIndex]) {
-            ctx.font = 'bold 14px Arial'
+            ctx.font = 'bold 12px Arial'
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
             ctx.fillStyle = '#16A34A'
@@ -484,7 +442,7 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
         }
       }
     }
-  }, [baseImage, overlayImage, overlayPosition, overlayScale, markedCells, showGrid])
+  }, [baseImage, overlayImage, overlayPosition, overlayScale, markedCells, showGrid, rowPositions, rowHeight, configLoaded])
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !overlayImage) return
@@ -500,14 +458,12 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
     const scaledWidth = overlayImage.width * overlayScale.x
     const scaledHeight = overlayImage.height * overlayScale.y
     const cellWidth = scaledWidth / COLS
-    const rowPositions = getScorableRowPositions()
-    const rowHeight = getScorableRowHeight()
     
     let cellIndex = 0
-    for (const rowY of rowPositions) {
+    for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
       for (let col = 0; col < COLS; col++) {
         const cellX = overlayPosition.x + col * cellWidth
-        const cellY = overlayPosition.y + rowY * scaledHeight
+        const cellY = overlayPosition.y + rowPositions[pair] * scaledHeight
         const cellH = rowHeight * scaledHeight
         
         if (canvasX >= cellX && canvasX <= cellX + cellWidth &&
@@ -516,9 +472,6 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
           const newMarkedCells = [...markedCells]
           newMarkedCells[cellIndex] = !newMarkedCells[cellIndex]
           setMarkedCells(newMarkedCells)
-          
-          const pairIndex = rowPositions.indexOf(rowY)
-          console.log(`✅ Ventana [Par ${pairIndex + 1}, Col ${col + 1}] → ${newMarkedCells[cellIndex] ? 'CORRECTA' : 'INCORRECTA'}`)
           return
         }
         cellIndex++
@@ -555,6 +508,17 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
 
   const markedCount = markedCells.filter(m => m).length
 
+  if (!configLoaded) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl p-6 text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500">Cargando configuración de rejilla...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl p-4 max-w-6xl w-full max-h-screen overflow-auto">
@@ -565,8 +529,8 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
         
         <div className="bg-blue-50 rounded-lg p-3 mb-3">
           <p className="text-xs text-blue-700">
-            <strong>Instrucciones:</strong> Haz clic en cada ventana de la rejilla azul para marcarla como correcta ✓.<br />
-            <strong>Shift + Arrastrar</strong> para mover la plantilla. Ajusta Zoom X/Y hasta alinear perfectamente.
+            <strong>Instrucciones:</strong> Haz clic en cada ventana azul para marcarla como correcta ✓.<br />
+            <strong>Shift + Arrastrar</strong> para mover la plantilla. Ajusta el zoom para alinear.
           </p>
         </div>
         
@@ -584,26 +548,19 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
         </div>
         
         <div className="space-y-3">
-          <div className="bg-yellow-50 rounded-lg p-3 mb-2">
-            <p className="text-xs text-yellow-700">
-              <strong>💡 Tip:</strong> Ajusta primero el Zoom Y para que la altura de las ventanas coincida. 
-              Luego ajusta el Zoom X para el ancho. Arrastra con Shift para posicionar.
-            </p>
-          </div>
-          
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-600 block mb-1">Zoom Horizontal: {overlayScale.x.toFixed(2)}x</label>
+              <label className="text-xs text-gray-600 block mb-1">Zoom X: {overlayScale.x.toFixed(2)}</label>
               <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.x}
                 onChange={(e) => setOverlayScale({ ...overlayScale, x: parseFloat(e.target.value) })} className="w-full" />
             </div>
             <div>
-              <label className="text-xs text-gray-600 block mb-1">Zoom Vertical: {overlayScale.y.toFixed(2)}x</label>
+              <label className="text-xs text-gray-600 block mb-1">Zoom Y: {overlayScale.y.toFixed(2)}</label>
               <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.y}
                 onChange={(e) => setOverlayScale({ ...overlayScale, y: parseFloat(e.target.value) })} className="w-full" />
             </div>
           </div>
-          
+
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setOverlayScale({ x: 1, y: 1 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Zoom</button>
             <button onClick={() => setOverlayPosition({ x: 50, y: 50 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Posición</button>
@@ -611,7 +568,7 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
               {showGrid ? '👁 Ocultar rejilla' : '👁 Mostrar rejilla'}
             </button>
           </div>
-          
+
           <div className="flex gap-2 flex-wrap">
             <button onClick={toggleAll} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
               {markedCells.every(m => m) ? '◻ Desmarcar todas' : '☑ Marcar todas'}
@@ -682,7 +639,6 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
   const toggleRunning = useCallback(() => setIsRunning(prev => !prev), [])
 
   const handleCapture = (imageData: string) => {
-    console.log('📸 Imagen capturada y guardada')
     setCapturedImage(imageData)
     setShowCamera(false)
   }
@@ -697,14 +653,12 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
       const ctx = canvas.getContext('2d')
       if (ctx) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0) }
       setCapturedImage(canvas.toDataURL('image/jpeg', 0.85))
-      console.log('🔄 Imagen invertida horizontalmente')
     }
   }
 
   const handleScoreCalculated = (score: number, markedCells: boolean[]) => {
     setRawScore(score.toString())
     setShowScoringGrid(false)
-    console.log('✅ Puntaje calculado con plantilla:', score)
   }
 
   const handleComplete = () => {
@@ -712,9 +666,8 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
     if (isNaN(score) || score < 0) { alert('Por favor, ingresa un puntaje válido'); return }
     const maxScore = patientAge <= 7 ? 64 : 120
     if (score > maxScore) { alert(`El puntaje máximo es ${maxScore}`); return }
-    const scores = { CLA: score }
     setIsCompleted(true)
-    onCompleteRef.current(scores, score)
+    onCompleteRef.current({ CLA: score }, score)
   }
 
   const applyManualCount = () => {
@@ -772,7 +725,7 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
             Completar
           </button>
         </div>
-        {!timeEnded && <p className="text-xs text-gray-400 mt-2">Debes esperar a que termine el tiempo (o pausar el cronómetro) para completar</p>}
+        {!timeEnded && <p className="text-xs text-gray-400 mt-2">Debes esperar a que termine el tiempo para completar</p>}
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-4">
