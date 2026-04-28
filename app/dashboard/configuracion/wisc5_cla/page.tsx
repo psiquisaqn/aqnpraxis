@@ -5,9 +5,32 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 
 // ============================================================
+// CONFIGURACIÓN DE PLANTILLAS
+// ============================================================
+
+const PLANTILLA_CONFIG = {
+  A: {
+    name: 'Plantilla A (6-7 años)',
+    cols: 10,
+    pairs: 8,
+    firstPairCols: 5,
+    maxScore: 75,
+    defaultPositions: [0.06, 0.18, 0.30, 0.42, 0.54, 0.66, 0.78, 0.90],
+    defaultHeight: 0.10,
+  },
+  B: {
+    name: 'Plantilla B (8-16 años)',
+    cols: 18,
+    pairs: 7,
+    firstPairCols: 9,
+    maxScore: 117,
+    defaultPositions: [0.06, 0.20, 0.34, 0.48, 0.62, 0.76, 0.90],
+    defaultHeight: 0.12,
+  }
+}
+
+// ============================================================
 // PÁGINA DE CONFIGURACIÓN DE REJILLA PARA CLAVES WISC-V
-// URL: /dashboard/configuracion/wisc5-cla
-// Sin enlace en la UI - solo accesible por URL directa
 // ============================================================
 
 interface GridConfig {
@@ -32,18 +55,21 @@ export default function Wisc5ClaConfigPage() {
   )
 
   const [activeTemplate, setActiveTemplate] = useState<'A' | 'B'>('A')
+  const CONFIG = PLANTILLA_CONFIG[activeTemplate]
+  
   const [config, setConfig] = useState<GridConfig>({
-    template_a_row_positions: [0.15, 0.38, 0.62, 0.85],
-    template_a_row_height: 0.15,
-    template_a_cell_widths: Array(8).fill(1/8),
-    template_b_row_positions: [0.15, 0.38, 0.62, 0.85],
-    template_b_row_height: 0.15,
-    template_b_cell_widths: Array(15).fill(1/15),
+    template_a_row_positions: PLANTILLA_CONFIG.A.defaultPositions,
+    template_a_row_height: PLANTILLA_CONFIG.A.defaultHeight,
+    template_a_cell_widths: Array(PLANTILLA_CONFIG.A.cols).fill(1/PLANTILLA_CONFIG.A.cols),
+    template_b_row_positions: PLANTILLA_CONFIG.B.defaultPositions,
+    template_b_row_height: PLANTILLA_CONFIG.B.defaultHeight,
+    template_b_cell_widths: Array(PLANTILLA_CONFIG.B.cols).fill(1/PLANTILLA_CONFIG.B.cols),
   })
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [testImage, setTestImage] = useState<string | null>(null)
   const [overlayPosition, setOverlayPosition] = useState({ x: 50, y: 50 })
+  const [gridOffset, setGridOffset] = useState({ x: 0, y: 0 })
   const [overlayScale, setOverlayScale] = useState({ x: 1, y: 1 })
   const [showOverlay, setShowOverlay] = useState(true)
   const [showColumnAdjust, setShowColumnAdjust] = useState(false)
@@ -59,12 +85,12 @@ export default function Wisc5ClaConfigPage() {
       
       if (data) {
         setConfig({
-          template_a_row_positions: (data.template_a_row_positions as number[]) || [0.15, 0.38, 0.62, 0.85],
-          template_a_row_height: data.template_a_row_height || 0.15,
-          template_a_cell_widths: (data.template_a_cell_widths as number[]) || Array(8).fill(1/8),
-          template_b_row_positions: (data.template_b_row_positions as number[]) || [0.15, 0.38, 0.62, 0.85],
-          template_b_row_height: data.template_b_row_height || 0.15,
-          template_b_cell_widths: (data.template_b_cell_widths as number[]) || Array(15).fill(1/15),
+          template_a_row_positions: (data.template_a_row_positions as number[]) || PLANTILLA_CONFIG.A.defaultPositions,
+          template_a_row_height: data.template_a_row_height || PLANTILLA_CONFIG.A.defaultHeight,
+          template_a_cell_widths: (data.template_a_cell_widths as number[]) || Array(PLANTILLA_CONFIG.A.cols).fill(1/PLANTILLA_CONFIG.A.cols),
+          template_b_row_positions: (data.template_b_row_positions as number[]) || PLANTILLA_CONFIG.B.defaultPositions,
+          template_b_row_height: data.template_b_row_height || PLANTILLA_CONFIG.B.defaultHeight,
+          template_b_cell_widths: (data.template_b_cell_widths as number[]) || Array(PLANTILLA_CONFIG.B.cols).fill(1/PLANTILLA_CONFIG.B.cols),
         })
       }
       setLoading(false)
@@ -147,6 +173,15 @@ export default function Wisc5ClaConfigPage() {
     reader.readAsDataURL(file)
   }
 
+  // Obtener columnas para un par específico (1er par es más corto)
+  const getColsForPair = (pairIndex: number): number => {
+    return pairIndex === 0 ? CONFIG.firstPairCols : CONFIG.cols
+  }
+
+  const getColOffset = (pairIndex: number): number => {
+    return pairIndex === 0 ? CONFIG.cols - CONFIG.firstPairCols : 0
+  }
+
   // Dibujar previsualización en canvas
   useEffect(() => {
     if (!testImage || !canvasRef.current) return
@@ -178,30 +213,43 @@ export default function Wisc5ClaConfigPage() {
         ctx.drawImage(overlayImg, 0, 0)
         ctx.globalAlpha = 1.0
         
-        // Dibujar rejilla de previsualización
+        // Dibujar rejilla de previsualización con offset independiente
         const scaledWidth = overlayImg.width * overlayScale.x
         const scaledHeight = overlayImg.height * overlayScale.y
-        const cellsPerRow = activeTemplate === 'A' ? 8 : 15
         const positions = getActivePositions()
         const rowH = getActiveHeight()
         const colWidths = getActiveCellWidths()
+        const totalCols = CONFIG.cols
         
-        let xOffset = 0
-        for (let pair = 0; pair < 4; pair++) {
-          xOffset = 0
-          for (let col = 0; col < cellsPerRow; col++) {
-            const w = colWidths[col] * scaledWidth
-            const x = xOffset
-            const y = positions[pair] * scaledHeight
-            const h = rowH * scaledHeight
-            xOffset += w
+        for (let pair = 0; pair < CONFIG.pairs; pair++) {
+          const colsInPair = getColsForPair(pair)
+          const colOffset = getColOffset(pair)
+          
+          for (let col = 0; col < colsInPair; col++) {
+            const actualCol = col + colOffset
             
-            ctx.strokeStyle = '#3B82F6'
-            ctx.lineWidth = 2
+            let xAccum = 0
+            for (let c = 0; c < actualCol; c++) {
+              xAccum += colWidths[c] * scaledWidth
+            }
+            
+            const w = colWidths[actualCol] * scaledWidth
+            const x = gridOffset.x + xAccum
+            const y = gridOffset.y + positions[pair] * scaledHeight
+            const h = rowH * scaledHeight
+            
+            // Color diferente para el primer par (columnas reducidas)
+            if (pair === 0) {
+              ctx.strokeStyle = '#F59E0B' // Naranja para indicar que es especial
+              ctx.lineWidth = 2.5
+            } else {
+              ctx.strokeStyle = '#3B82F6'
+              ctx.lineWidth = 2
+            }
             ctx.strokeRect(x, y, w, h)
             
-            // Número de fila y columna
-            ctx.fillStyle = '#3B82F6'
+            // Etiqueta
+            ctx.fillStyle = pair === 0 ? '#F59E0B' : '#3B82F6'
             ctx.font = 'bold 10px Arial'
             ctx.fillText(`F${pair + 1}`, x + 2, y + 12)
           }
@@ -217,7 +265,7 @@ export default function Wisc5ClaConfigPage() {
     baseImg.src = testImage
     overlayImg.src = `/wisc5/cla/plantilla-claves-${activeTemplate.toLowerCase()}.png`
 
-  }, [testImage, activeTemplate, showOverlay, overlayPosition, overlayScale, config])
+  }, [testImage, activeTemplate, showOverlay, overlayPosition, gridOffset, overlayScale, config])
 
   if (loading) {
     return (
@@ -229,8 +277,6 @@ export default function Wisc5ClaConfigPage() {
       </div>
     )
   }
-
-  const COLS = activeTemplate === 'A' ? 8 : 15
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -263,7 +309,7 @@ export default function Wisc5ClaConfigPage() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              📋 Plantilla A (6-7 años)
+              📋 Plantilla A (6-7 años) — {PLANTILLA_CONFIG.A.cols} cols × {PLANTILLA_CONFIG.A.pairs} pares
             </button>
             <button
               onClick={() => setActiveTemplate('B')}
@@ -273,8 +319,22 @@ export default function Wisc5ClaConfigPage() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              📋 Plantilla B (8-16 años)
+              📋 Plantilla B (8-16 años) — {PLANTILLA_CONFIG.B.cols} cols × {PLANTILLA_CONFIG.B.pairs} pares
             </button>
+          </div>
+
+          {/* Info de la plantilla activa */}
+          <div className="bg-blue-50 rounded-lg p-3 mb-6">
+            <div className="flex gap-6 text-sm">
+              <span><strong>Columnas totales:</strong> {CONFIG.cols}</span>
+              <span><strong>Pares de filas:</strong> {CONFIG.pairs}</span>
+              <span><strong>1er par:</strong> {CONFIG.firstPairCols} columnas (derecha)</span>
+              <span><strong>Puntaje máx:</strong> {CONFIG.maxScore}</span>
+              <span><strong>Ventanas evaluables:</strong> {CONFIG.firstPairCols + (CONFIG.pairs - 1) * CONFIG.cols}</span>
+            </div>
+            <p className="text-xs text-blue-600 mt-1">
+              ⚠️ Las primeras {CONFIG.firstPairCols} columnas del 1er par se muestran en <strong>naranja</strong> en la previsualización.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -323,22 +383,51 @@ export default function Wisc5ClaConfigPage() {
               {!testImage && (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
                   <p className="text-sm">Sube una imagen de prueba para previsualizar la rejilla</p>
-                  <p className="text-xs mt-1">Foto de una hoja de respuestas de Claves</p>
+                  <p className="text-xs mt-1">Foto de una hoja de respuestas de Claves {activeTemplate}</p>
                 </div>
               )}
 
               {/* Controles de overlay */}
               {testImage && showOverlay && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-gray-500">Zoom X: {overlayScale.x.toFixed(2)}</label>
-                    <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.x}
-                      onChange={(e) => setOverlayScale({ ...overlayScale, x: parseFloat(e.target.value) })} className="w-full" />
+                <div className="mt-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500">Zoom X: {overlayScale.x.toFixed(2)}</label>
+                      <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.x}
+                        onChange={(e) => setOverlayScale({ ...overlayScale, x: parseFloat(e.target.value) })} className="w-full" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Zoom Y: {overlayScale.y.toFixed(2)}</label>
+                      <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.y}
+                        onChange={(e) => setOverlayScale({ ...overlayScale, y: parseFloat(e.target.value) })} className="w-full" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Zoom Y: {overlayScale.y.toFixed(2)}</label>
-                    <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.y}
-                      onChange={(e) => setOverlayScale({ ...overlayScale, y: parseFloat(e.target.value) })} className="w-full" />
+                  
+                  {/* Desplazamiento independiente */}
+                  <div className="bg-gray-50 rounded-lg p-2">
+                    <p className="text-xs font-medium text-gray-700 mb-1">Desplazamiento:</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      <div>
+                        <label className="text-xs text-gray-500">Plantilla X: {overlayPosition.x.toFixed(0)}</label>
+                        <input type="range" min="-500" max="500" step="1" value={overlayPosition.x}
+                          onChange={(e) => setOverlayPosition({ ...overlayPosition, x: parseFloat(e.target.value) })} className="w-full" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Plantilla Y: {overlayPosition.y.toFixed(0)}</label>
+                        <input type="range" min="-500" max="500" step="1" value={overlayPosition.y}
+                          onChange={(e) => setOverlayPosition({ ...overlayPosition, y: parseFloat(e.target.value) })} className="w-full" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Rejilla X: {gridOffset.x.toFixed(0)}</label>
+                        <input type="range" min="-200" max="200" step="1" value={gridOffset.x}
+                          onChange={(e) => setGridOffset({ ...gridOffset, x: parseFloat(e.target.value) })} className="w-full" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Rejilla Y: {gridOffset.y.toFixed(0)}</label>
+                        <input type="range" min="-200" max="200" step="1" value={gridOffset.y}
+                          onChange={(e) => setGridOffset({ ...gridOffset, y: parseFloat(e.target.value) })} className="w-full" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -350,14 +439,18 @@ export default function Wisc5ClaConfigPage() {
               {/* Ajuste de posición de filas */}
               <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                 <h2 className="text-md font-semibold text-yellow-800 mb-3">
-                  📍 Posición de filas - Plantilla {activeTemplate}
+                  📍 Posición de filas — {CONFIG.pairs} pares
                 </h2>
                 
                 <div className="space-y-3">
                   {getActivePositions().map((pos, index) => (
                     <div key={index}>
                       <div className="flex justify-between text-sm mb-1">
-                        <label className="text-gray-700 font-medium">Fila {index + 1}</label>
+                        <label className="text-gray-700 font-medium">
+                          {index === 0 ? '🟠 ' : '🔵 '}
+                          Par {index + 1} 
+                          {index === 0 && <span className="text-orange-600 text-xs ml-1">({CONFIG.firstPairCols} cols)</span>}
+                        </label>
                         <span className="text-blue-600 font-mono">{(pos * 100).toFixed(1)}%</span>
                       </div>
                       <input type="range" min="0.01" max="0.95" step="0.001" value={pos}
@@ -374,14 +467,14 @@ export default function Wisc5ClaConfigPage() {
                       <label className="text-gray-700 font-medium">Altura de ventanas</label>
                       <span className="text-blue-600 font-mono">{(getActiveHeight() * 100).toFixed(1)}%</span>
                     </div>
-                    <input type="range" min="0.02" max="0.30" step="0.001" value={getActiveHeight()}
+                    <input type="range" min="0.02" max="0.25" step="0.001" value={getActiveHeight()}
                       onChange={(e) => updateHeight(parseFloat(e.target.value))} className="w-full" />
                   </div>
 
                   <button 
                     onClick={() => {
-                      updatePositions([0.15, 0.38, 0.62, 0.85])
-                      updateHeight(0.15)
+                      updatePositions(CONFIG.defaultPositions)
+                      updateHeight(CONFIG.defaultHeight)
                     }}
                     className="w-full py-2 bg-white text-yellow-700 rounded-lg text-sm hover:bg-yellow-100 border border-yellow-300 transition-colors"
                   >
@@ -394,7 +487,7 @@ export default function Wisc5ClaConfigPage() {
               <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="text-md font-semibold text-green-800">
-                    📏 Ancho de columnas
+                    📏 Ancho de columnas — {CONFIG.cols} columnas
                   </h2>
                   <button
                     onClick={() => setShowColumnAdjust(!showColumnAdjust)}
@@ -408,21 +501,31 @@ export default function Wisc5ClaConfigPage() {
                   <div className="space-y-2">
                     <p className="text-xs text-green-700 mb-2">
                       Ajusta cada columna individualmente. La suma ideal es 100%.
+                      {CONFIG.firstPairCols < CONFIG.cols && (
+                        <span className="text-orange-600 ml-1">
+                          Columnas {CONFIG.firstPairCols + 1}-{CONFIG.cols} no se usan en el 1er par.
+                        </span>
+                      )}
                     </p>
                     
                     <div className="max-h-64 overflow-y-auto space-y-2">
-                      {getActiveCellWidths().map((width, index) => (
-                        <div key={`col-${index}`} className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600 w-6">C{index + 1}</span>
-                          <input type="range" min="0.02" max="0.25" step="0.001" value={width}
-                            onChange={(e) => {
-                              const newWidths = getActiveCellWidths()
-                              newWidths[index] = parseFloat(e.target.value)
-                              updateCellWidths(newWidths)
-                            }} className="flex-1" />
-                          <span className="text-xs text-blue-600 font-mono w-10 text-right">{(width * 100).toFixed(1)}%</span>
-                        </div>
-                      ))}
+                      {getActiveCellWidths().map((width, index) => {
+                        const isInFirstPair = index >= (CONFIG.cols - CONFIG.firstPairCols)
+                        return (
+                          <div key={`col-${index}`} className="flex items-center gap-2">
+                            <span className={`text-xs w-6 ${isInFirstPair ? 'text-orange-600 font-medium' : 'text-gray-600'}`}>
+                              {isInFirstPair ? '🟠' : ''}C{index + 1}
+                            </span>
+                            <input type="range" min="0.01" max="0.25" step="0.001" value={width}
+                              onChange={(e) => {
+                                const newWidths = getActiveCellWidths()
+                                newWidths[index] = parseFloat(e.target.value)
+                                updateCellWidths(newWidths)
+                              }} className="flex-1" />
+                            <span className="text-xs text-blue-600 font-mono w-10 text-right">{(width * 100).toFixed(1)}%</span>
+                          </div>
+                        )
+                      })}
                     </div>
                     
                     <div className="flex justify-between items-center pt-2 border-t border-green-300">
@@ -435,7 +538,7 @@ export default function Wisc5ClaConfigPage() {
                         {Math.abs(getActiveCellWidths().reduce((a, b) => a + b, 0) - 1) > 0.01 && ' ⚠️'}
                       </span>
                       <button
-                        onClick={() => updateCellWidths(Array(COLS).fill(1/COLS))}
+                        onClick={() => updateCellWidths(Array(CONFIG.cols).fill(1/CONFIG.cols))}
                         className="text-xs text-green-700 hover:underline"
                       >
                         Distribuir uniformemente
@@ -453,25 +556,23 @@ export default function Wisc5ClaConfigPage() {
                   <div>
                     <h3 className="font-medium text-gray-700">Plantilla A (6-7 años)</h3>
                     <p className="text-gray-600 text-xs mt-1">
-                      Filas: {config.template_a_row_positions.map(p => (p * 100).toFixed(1) + '%').join(', ')}
+                      Pares: {config.template_a_row_positions.length} | 
+                      Columnas: {config.template_a_cell_widths.length} | 
+                      1er par: {PLANTILLA_CONFIG.A.firstPairCols} cols
                     </p>
                     <p className="text-gray-600 text-xs">
                       Altura: {(config.template_a_row_height * 100).toFixed(1)}%
-                    </p>
-                    <p className="text-gray-600 text-xs">
-                      Columnas: {config.template_a_cell_widths.length} cols
                     </p>
                   </div>
                   <div className="pt-2 border-t border-blue-200">
                     <h3 className="font-medium text-gray-700">Plantilla B (8-16 años)</h3>
                     <p className="text-gray-600 text-xs mt-1">
-                      Filas: {config.template_b_row_positions.map(p => (p * 100).toFixed(1) + '%').join(', ')}
+                      Pares: {config.template_b_row_positions.length} | 
+                      Columnas: {config.template_b_cell_widths.length} | 
+                      1er par: {PLANTILLA_CONFIG.B.firstPairCols} cols
                     </p>
                     <p className="text-gray-600 text-xs">
                       Altura: {(config.template_b_row_height * 100).toFixed(1)}%
-                    </p>
-                    <p className="text-gray-600 text-xs">
-                      Columnas: {config.template_b_cell_widths.length} cols
                     </p>
                   </div>
                 </div>
@@ -502,13 +603,15 @@ export default function Wisc5ClaConfigPage() {
             <h2 className="text-sm font-semibold text-gray-700 mb-2">📖 Instrucciones de calibración</h2>
             <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
               <li>Selecciona la plantilla a calibrar (A o B)</li>
-              <li>Sube una foto de ejemplo de una hoja de respuestas de Claves</li>
+              <li>Sube una foto de ejemplo de una hoja de respuestas de Claves {activeTemplate}</li>
               <li>Activa "Mostrar plantilla superpuesta" para ver el PNG sobre la foto</li>
               <li>Ajusta Zoom X/Y para que la plantilla coincida en tamaño con la hoja</li>
-              <li>Usa los sliders de "Fila 1-4" para mover cada fila de ventanas a su posición correcta</li>
-              <li>Ajusta "Altura de ventanas" para que coincida con la altura de las ventanas transparentes</li>
-              <li>Expande "Ancho de columnas" para ajustar cada columna individualmente si es necesario</li>
-              <li>Cuando la rejilla azul coincida perfectamente con las ventanas, guarda la configuración</li>
+              <li>Usa los sliders de "Plantilla X/Y" y "Rejilla X/Y" para alinear independientemente</li>
+              <li>Usa los sliders de "Par 1-{CONFIG.pairs}" para mover cada fila de ventanas</li>
+              <li>Ajusta "Altura de ventanas" para que coincida con la altura real</li>
+              <li>Expande "Ancho de columnas" para ajustar cada columna (🟠 = columnas del 1er par)</li>
+              <li>Las celdas naranjas del 1er par son las {CONFIG.firstPairCols} columnas de la derecha</li>
+              <li>Cuando la rejilla coincida perfectamente, guarda la configuración</li>
             </ol>
           </div>
         </div>

@@ -4,6 +4,25 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
 // ============================================================
+// CONFIGURACIÓN DE PLANTILLAS
+// ============================================================
+
+const PLANTILLA_CONFIG = {
+  A: {
+    cols: 10,
+    pairs: 8,
+    firstPairCols: 5,
+    maxScore: 75,
+  },
+  B: {
+    cols: 18,
+    pairs: 7,
+    firstPairCols: 9,
+    maxScore: 117,
+  }
+}
+
+// ============================================================
 // COMPONENTE DE CRONÓMETRO (120 SEGUNDOS)
 // ============================================================
 
@@ -38,16 +57,10 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onT
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [isRunning, timeLimit, onTimeUpdate, onTimeEnd, onToggleRunning])
 
-  const startTimer = () => {
-    setSeconds(0)
-    onToggleRunning()
-    onStart?.()
-  }
+  const startTimer = () => { setSeconds(0); onToggleRunning(); onStart?.() }
 
   const formatTime = (totalSeconds: number): string => {
     const mins = Math.floor(totalSeconds / 60)
@@ -120,7 +133,6 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error('Tu navegador no soporta acceso a la cámara')
         }
-
         let mediaStream: MediaStream
         try {
           mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -133,7 +145,6 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
           })
           setIsFrontCamera(true)
         }
-        
         setStream(mediaStream)
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream
@@ -143,7 +154,6 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
         setError(`No se pudo acceder a la cámara: ${err.message}`)
       }
     }
-
     initCamera()
     return () => { if (stream) stream.getTracks().forEach(track => track.stop()) }
   }, [])
@@ -156,24 +166,14 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
         const video = videoRef.current
         const canvas = canvasRef.current
         
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-          throw new Error('El video no tiene dimensiones válidas')
-        }
-        
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
         
         const context = canvas.getContext('2d')
         if (!context) throw new Error('No se pudo obtener contexto')
         
-        // Aplicar espejo para cámara frontal (laptop) automáticamente
-        if (isFrontCamera) {
-          context.translate(canvas.width, 0)
-          context.scale(-1, 1)
-        }
-        
+        if (isFrontCamera) { context.translate(canvas.width, 0); context.scale(-1, 1) }
         context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        
         if (isFrontCamera) context.setTransform(1, 0, 0, 1, 0, 0)
         
         const imageData = canvas.toDataURL('image/jpeg', 0.85)
@@ -230,17 +230,12 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
             {isFrontCamera ? (
               <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-sm text-blue-700"><strong>🖥️ Cámara frontal detectada</strong></p>
-                <p className="text-xs text-blue-600 mt-1">
-                  La vista previa se muestra en espejo para tu comodidad, pero la foto se guardará 
-                  con la orientación correcta para que la hoja sea legible.
-                </p>
+                <p className="text-xs text-blue-600 mt-1">La vista previa se muestra en espejo, pero la foto se guardará con orientación correcta.</p>
               </div>
             ) : (
               <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
                 <p className="text-sm text-green-700"><strong>📱 Cámara trasera detectada</strong></p>
-                <p className="text-xs text-green-600 mt-1">
-                  La imagen se capturará tal como se ve en pantalla.
-                </p>
+                <p className="text-xs text-green-600 mt-1">La imagen se capturará tal como se ve en pantalla.</p>
               </div>
             )}
             
@@ -275,7 +270,7 @@ function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
 }
 
 // ============================================================
-// PLANTILLA DE CORRECCIÓN (CARGA CONFIG DESDE SUPABASE)
+// PLANTILLA DE CORRECCIÓN (VERSIÓN USUARIO FINAL - SIMPLIFICADA)
 // ============================================================
 
 interface ScoringGridProps {
@@ -298,13 +293,27 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
 
   const useTemplateA = patientAge <= 7
   const templatePath = useTemplateA ? '/wisc5/cla/plantilla-claves-a.png' : '/wisc5/cla/plantilla-claves-b.png'
-  const COLS = useTemplateA ? 8 : 15
-  const TOTAL_PAIRS = 4
-  const TOTAL_SCORABLE = TOTAL_PAIRS * COLS
+  const CONFIG = useTemplateA ? PLANTILLA_CONFIG.A : PLANTILLA_CONFIG.B
+  const TOTAL_PAIRS = CONFIG.pairs
+  const TOTAL_COLS = CONFIG.cols
 
-  const [rowPositions, setRowPositions] = useState<number[]>([0.15, 0.38, 0.62, 0.85])
-  const [rowHeight, setRowHeight] = useState<number>(0.15)
-  const [cellWidths, setCellWidths] = useState<number[]>(Array(COLS).fill(1/COLS))
+  const getTotalScorable = (): number => {
+    let total = 0
+    for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
+      total += pair === 0 ? CONFIG.firstPairCols : TOTAL_COLS
+    }
+    return total
+  }
+  const TOTAL_SCORABLE = getTotalScorable()
+
+  const getColsForPair = (pairIndex: number): number => pairIndex === 0 ? CONFIG.firstPairCols : TOTAL_COLS
+  const getColOffset = (pairIndex: number): number => pairIndex === 0 ? TOTAL_COLS - CONFIG.firstPairCols : 0
+
+  const [rowPositions, setRowPositions] = useState<number[]>(
+    Array.from({ length: TOTAL_PAIRS }, (_, i) => 0.06 + i * 0.12)
+  )
+  const [rowHeight, setRowHeight] = useState<number>(0.10)
+  const [cellWidths, setCellWidths] = useState<number[]>(Array(TOTAL_COLS).fill(1/TOTAL_COLS))
   const [configLoaded, setConfigLoaded] = useState(false)
 
   useEffect(() => {
@@ -317,13 +326,13 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
       
       if (data) {
         if (useTemplateA) {
-          setRowPositions(data.template_a_row_positions as number[])
-          setRowHeight(data.template_a_row_height as number)
-          setCellWidths((data.template_a_cell_widths as number[]) || Array(8).fill(1/8))
+          setRowPositions((data.template_a_row_positions as number[]) || rowPositions)
+          setRowHeight(data.template_a_row_height || 0.10)
+          setCellWidths((data.template_a_cell_widths as number[]) || cellWidths)
         } else {
-          setRowPositions(data.template_b_row_positions as number[])
-          setRowHeight(data.template_b_row_height as number)
-          setCellWidths((data.template_b_cell_widths as number[]) || Array(15).fill(1/15))
+          setRowPositions((data.template_b_row_positions as number[]) || rowPositions)
+          setRowHeight(data.template_b_row_height || 0.10)
+          setCellWidths((data.template_b_cell_widths as number[]) || cellWidths)
         }
       }
       setConfigLoaded(true)
@@ -337,7 +346,7 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
     base.src = imageData
     base.onload = () => {
       setBaseImage(base)
-      setOverlayPosition({ x: (base.width * 0.15), y: (base.height * 0.15) })
+      setOverlayPosition({ x: base.width * 0.1, y: base.height * 0.1 })
     }
     const overlay = new Image()
     overlay.src = templatePath
@@ -367,16 +376,23 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
       const scaledHeight = overlayImage.height * overlayScale.y
       
       let cellIndex = 0
-      let xOffset = 0
       
       for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
-        xOffset = 0
-        for (let col = 0; col < COLS; col++) {
-          const w = cellWidths[col] * scaledWidth
-          const x = overlayPosition.x + xOffset
+        const colsInPair = getColsForPair(pair)
+        const colOffset = getColOffset(pair)
+        
+        for (let col = 0; col < colsInPair; col++) {
+          const actualCol = col + colOffset
+          const w = cellWidths[actualCol] * scaledWidth
+          
+          let xAccum = 0
+          for (let c = 0; c < actualCol; c++) {
+            xAccum += cellWidths[c] * scaledWidth
+          }
+          
+          const x = overlayPosition.x + xAccum
           const y = overlayPosition.y + rowPositions[pair] * scaledHeight
           const h = rowHeight * scaledHeight
-          xOffset += w
           
           if (markedCells[cellIndex]) {
             ctx.fillStyle = 'rgba(34, 197, 94, 0.35)'
@@ -414,16 +430,23 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
     const scaledHeight = overlayImage.height * overlayScale.y
     
     let cellIndex = 0
-    let xOffset = 0
     
     for (let pair = 0; pair < TOTAL_PAIRS; pair++) {
-      xOffset = 0
-      for (let col = 0; col < COLS; col++) {
-        const w = cellWidths[col] * scaledWidth
-        const cellX = overlayPosition.x + xOffset
+      const colsInPair = getColsForPair(pair)
+      const colOffset = getColOffset(pair)
+      
+      for (let col = 0; col < colsInPair; col++) {
+        const actualCol = col + colOffset
+        const w = cellWidths[actualCol] * scaledWidth
+        
+        let xAccum = 0
+        for (let c = 0; c < actualCol; c++) {
+          xAccum += cellWidths[c] * scaledWidth
+        }
+        
+        const cellX = overlayPosition.x + xAccum
         const cellY = overlayPosition.y + rowPositions[pair] * scaledHeight
         const cellH = rowHeight * scaledHeight
-        xOffset += w
         
         if (canvasX >= cellX && canvasX <= cellX + w && canvasY >= cellY && canvasY <= cellY + cellH) {
           const newMarkedCells = [...markedCells]
@@ -437,11 +460,18 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
   }
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.shiftKey) { setIsDragging(true); setDragStart({ x: e.clientX - overlayPosition.x, y: e.clientY - overlayPosition.y }) }
+    if (e.shiftKey) {
+      setIsDragging(true)
+      setDragStart({ x: e.clientX - overlayPosition.x, y: e.clientY - overlayPosition.y })
+    }
   }
+
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isDragging) setOverlayPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })
+    if (isDragging) {
+      setOverlayPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })
+    }
   }
+
   const handleMouseUp = () => setIsDragging(false)
 
   const calculateScore = () => { onScoreCalculated(markedCells.filter(m => m).length, markedCells) }
@@ -463,10 +493,17 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl p-4 max-w-6xl w-full max-h-screen overflow-auto">
-        <h3 className="text-lg font-semibold mb-3">Plantilla de corrección - Claves {useTemplateA ? 'A' : 'B'} <span className="text-sm text-gray-500 ml-2">({useTemplateA ? '6-7' : '8-16'} años)</span></h3>
+        <h3 className="text-lg font-semibold mb-3">
+          Plantilla de corrección - Claves {useTemplateA ? 'A' : 'B'} 
+          <span className="text-sm text-gray-500 ml-2">({useTemplateA ? '6-7' : '8-16'} años)</span>
+          <span className="text-sm text-gray-400 ml-2">| Máx: {CONFIG.maxScore} pts</span>
+        </h3>
         
         <div className="bg-blue-50 rounded-lg p-3 mb-3">
-          <p className="text-xs text-blue-700"><strong>Instrucciones:</strong> Haz clic en cada ventana azul para marcarla ✓.<br /><strong>Shift + Arrastrar</strong> para mover la plantilla. Ajusta el zoom para alinear.</p>
+          <p className="text-xs text-blue-700">
+            <strong>Instrucciones:</strong> Haz clic en cada ventana azul para marcarla ✓.<br />
+            <strong>Shift + Arrastrar</strong> para mover la plantilla y la rejilla juntas.
+          </p>
         </div>
         
         <div className="overflow-auto border border-gray-200 rounded-lg mb-3 bg-gray-100" style={{ maxHeight: '55vh' }}>
@@ -476,24 +513,47 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
         
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-xs text-gray-600 block mb-1">Zoom X: {overlayScale.x.toFixed(2)}</label><input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.x} onChange={(e) => setOverlayScale({ ...overlayScale, x: parseFloat(e.target.value) })} className="w-full" /></div>
-            <div><label className="text-xs text-gray-600 block mb-1">Zoom Y: {overlayScale.y.toFixed(2)}</label><input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.y} onChange={(e) => setOverlayScale({ ...overlayScale, y: parseFloat(e.target.value) })} className="w-full" /></div>
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">Zoom X: {overlayScale.x.toFixed(2)}</label>
+              <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.x}
+                onChange={(e) => setOverlayScale({ ...overlayScale, x: parseFloat(e.target.value) })} className="w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">Zoom Y: {overlayScale.y.toFixed(2)}</label>
+              <input type="range" min="0.3" max="3.0" step="0.01" value={overlayScale.y}
+                onChange={(e) => setOverlayScale({ ...overlayScale, y: parseFloat(e.target.value) })} className="w-full" />
+            </div>
           </div>
+
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setOverlayScale({ x: 1, y: 1 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Zoom</button>
             <button onClick={() => setOverlayPosition({ x: 50, y: 50 })} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">↻ Reset Posición</button>
-            <button onClick={() => setShowGrid(!showGrid)} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">{showGrid ? '👁 Ocultar rejilla' : '👁 Mostrar rejilla'}</button>
+            <button onClick={() => setShowGrid(!showGrid)} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
+              {showGrid ? '👁 Ocultar rejilla' : '👁 Mostrar rejilla'}
+            </button>
           </div>
+
           <div className="flex gap-2 flex-wrap">
-            <button onClick={toggleAll} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">{markedCells.every(m => m) ? '◻ Desmarcar todas' : '☑ Marcar todas'}</button>
+            <button onClick={toggleAll} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
+              {markedCells.every(m => m) ? '◻ Desmarcar todas' : '☑ Marcar todas'}
+            </button>
             <button onClick={clearAll} className="px-3 py-1.5 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100">✕ Limpiar todas</button>
           </div>
+          
           <div className="bg-blue-50 rounded-lg p-3">
-            <div className="flex justify-between items-center"><p className="text-sm"><strong>Progreso:</strong> {markedCount} de {TOTAL_SCORABLE} ventanas</p><p className="text-lg font-bold text-blue-700">Puntaje: {markedCount}</p></div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-2"><div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${(markedCount / TOTAL_SCORABLE) * 100}%` }} /></div>
+            <div className="flex justify-between items-center">
+              <p className="text-sm"><strong>Progreso:</strong> {markedCount} de {TOTAL_SCORABLE} ventanas</p>
+              <p className="text-lg font-bold text-blue-700">Puntaje: {markedCount}</p>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${(markedCount / TOTAL_SCORABLE) * 100}%` }} />
+            </div>
           </div>
+          
           <div className="flex gap-3">
-            <button onClick={calculateScore} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Aplicar puntaje ({markedCount})</button>
+            <button onClick={calculateScore} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">
+              Aplicar puntaje ({markedCount})
+            </button>
             <button onClick={onClose} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Cancelar</button>
           </div>
         </div>
@@ -523,6 +583,9 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
   const [manualCount, setManualCount] = useState<string>('')
   const [showScoringGrid, setShowScoringGrid] = useState(false)
   const [reviewLater, setReviewLater] = useState(false)
+
+  const CONFIG = patientAge <= 7 ? PLANTILLA_CONFIG.A : PLANTILLA_CONFIG.B
+  const maxScore = CONFIG.maxScore
 
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
@@ -559,7 +622,6 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
   const handleComplete = () => {
     const score = parseInt(rawScore, 10)
     if (isNaN(score) || score < 0) { alert('Por favor, ingresa un puntaje válido'); return }
-    const maxScore = patientAge <= 7 ? 64 : 120
     if (score > maxScore) { alert(`El puntaje máximo es ${maxScore}`); return }
     setIsCompleted(true)
     onCompleteRef.current({ CLA: score }, score)
@@ -573,17 +635,17 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
 
   const applyManualCount = () => {
     const count = parseInt(manualCount, 10)
-    if (!isNaN(count) && count >= 0) setRawScore(count.toString())
+    if (!isNaN(count) && count >= 0 && count <= maxScore) setRawScore(count.toString())
   }
 
   if (isCompleted) {
-    const isPending = reviewLater || rawScore === '' || parseInt(rawScore) === -1
+    const isPending = reviewLater
     return (
       <div className={`rounded-lg p-4 text-center ${isPending ? 'bg-orange-50' : 'bg-green-50'}`}>
         <p className={`font-medium ${isPending ? 'text-orange-700' : 'text-green-700'}`}>
           {isPending ? '⏳ Pendiente de revisión' : 'Subprueba completada'}
         </p>
-        {!isPending && <p className="text-sm text-green-600 mt-1">Puntaje total: {rawScore} / {patientAge <= 7 ? 64 : 120}</p>}
+        {!isPending && <p className="text-sm text-green-600 mt-1">Puntaje total: {rawScore} / {maxScore}</p>}
         {isPending && <p className="text-sm text-orange-600 mt-1">Podrás completar la revisión desde el panel de WISC-V</p>}
         {capturedImage && (
           <div className="mt-4">
@@ -595,8 +657,6 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
     )
   }
 
-  const maxScore = patientAge <= 7 ? 64 : 120
-
   return (
     <div className="space-y-4">
       <div className="bg-gray-50 rounded-lg p-3">
@@ -607,7 +667,9 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
           <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(elapsedTime / 120) * 100}%` }} />
         </div>
-        <p className="text-xs text-gray-500 mt-2">El paciente debe copiar los símbolos en las casillas correspondientes</p>
+        <p className="text-xs text-gray-500 mt-2">
+          {CONFIG.pairs} pares × {CONFIG.cols} columnas | Puntaje máx: {maxScore}
+        </p>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -620,7 +682,6 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
         </div>
       )}
 
-      {/* Ingreso de puntaje */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Puntaje bruto total (símbolos correctos)</label>
         <div className="flex gap-3">
@@ -632,7 +693,6 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
           </button>
         </div>
         
-        {/* Opción revisar después */}
         <div className="mt-4 pt-3 border-t border-gray-200">
           {!reviewLater ? (
             <button onClick={handleReviewLater}
@@ -658,7 +718,6 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
         {!timeEnded && !reviewLater && <p className="text-xs text-gray-400 mt-2">Debes esperar a que termine el tiempo para completar</p>}
       </div>
 
-      {/* Verificación por foto */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <p className="text-sm font-medium text-gray-700 mb-3">📸 Verificación por foto (opcional)</p>
         {!capturedImage ? (
@@ -689,7 +748,7 @@ export const CLAInterface = React.memo(function CLAInterface({ onComplete, onUpd
       <div className="bg-blue-50 rounded-lg p-3">
         <p className="text-xs text-blue-700">
           <strong>Instrucciones:</strong> Entrega la hoja de respuestas al paciente. 
-          Di: &quot;Copia los símbolos en las casillas. Trabaja lo más rápido que puedas. Tienes 2 minutos.&quot;
+          Di: {`'Copia los símbolos en las casillas. Trabaja lo más rápido que puedas. Tienes 2 minutos.'`}
         </p>
       </div>
     </div>
