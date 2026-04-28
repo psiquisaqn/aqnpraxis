@@ -240,7 +240,7 @@ export default function Wisc5ClaConfigPage() {
             
             // Color diferente para el primer par (columnas reducidas)
             if (pair === 0) {
-              ctx.strokeStyle = '#F59E0B' // Naranja para indicar que es especial
+              ctx.strokeStyle = '#F59E0B'
               ctx.lineWidth = 2.5
             } else {
               ctx.strokeStyle = '#3B82F6'
@@ -453,7 +453,7 @@ export default function Wisc5ClaConfigPage() {
                         </label>
                         <span className="text-blue-600 font-mono">{(pos * 100).toFixed(1)}%</span>
                       </div>
-                      <input type="range" min="0.01" max="0.95" step="0.001" value={pos}
+                      <input type="range" min="-0.10" max="1.20" step="0.001" value={pos}
                         onChange={(e) => {
                           const newPositions = getActivePositions()
                           newPositions[index] = parseFloat(e.target.value)
@@ -467,7 +467,7 @@ export default function Wisc5ClaConfigPage() {
                       <label className="text-gray-700 font-medium">Altura de ventanas</label>
                       <span className="text-blue-600 font-mono">{(getActiveHeight() * 100).toFixed(1)}%</span>
                     </div>
-                    <input type="range" min="0.02" max="0.25" step="0.001" value={getActiveHeight()}
+                    <input type="range" min="0.01" max="0.40" step="0.001" value={getActiveHeight()}
                       onChange={(e) => updateHeight(parseFloat(e.target.value))} className="w-full" />
                   </div>
 
@@ -516,7 +516,7 @@ export default function Wisc5ClaConfigPage() {
                             <span className={`text-xs w-6 ${isInFirstPair ? 'text-orange-600 font-medium' : 'text-gray-600'}`}>
                               {isInFirstPair ? '🟠' : ''}C{index + 1}
                             </span>
-                            <input type="range" min="0.01" max="0.25" step="0.001" value={width}
+                            <input type="range" min="0.005" max="0.40" step="0.001" value={width}
                               onChange={(e) => {
                                 const newWidths = getActiveCellWidths()
                                 newWidths[index] = parseFloat(e.target.value)
@@ -607,7 +607,7 @@ export default function Wisc5ClaConfigPage() {
               <li>Activa "Mostrar plantilla superpuesta" para ver el PNG sobre la foto</li>
               <li>Ajusta Zoom X/Y para que la plantilla coincida en tamaño con la hoja</li>
               <li>Usa los sliders de "Plantilla X/Y" y "Rejilla X/Y" para alinear independientemente</li>
-              <li>Usa los sliders de "Par 1-{CONFIG.pairs}" para mover cada fila de ventanas</li>
+              <li>Usa los sliders de "Par 1-{CONFIG.pairs}" para mover cada fila de ventanas (rango: -10% a 120%)</li>
               <li>Ajusta "Altura de ventanas" para que coincida con la altura real</li>
               <li>Expande "Ancho de columnas" para ajustar cada columna (🟠 = columnas del 1er par)</li>
               <li>Las celdas naranjas del 1er par son las {CONFIG.firstPairCols} columnas de la derecha</li>
