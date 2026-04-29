@@ -204,9 +204,8 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
   const [cws, setCws] = useState<number[]>(Array(COLS).fill(1/COLS))
   const [loaded, setLoaded] = useState(false)
 
-  // Cargar configuración desde Supabase CON LOGS
   useEffect(() => {
-    console.log(`📥 [SCORING GRID] Cargando configuración para plantilla ${isA ? 'A' : 'B'}...`)
+    console.log(`📥 [SCORING GRID] Cargando configuracion para plantilla ${isA ? 'A' : 'B'}...`)
     
     const loadGridConfig = async () => {
       const sb = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -217,16 +216,11 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
       console.log('📦 Respuesta de Supabase:', { data, error })
       
       if (error) {
-        console.error('❌ Error al cargar configuración:', error)
+        console.error('❌ Error al cargar configuracion:', error)
       }
       
       if (data) {
         console.log('✅ Datos recibidos correctamente')
-        console.log('  - template_a_row_positions:', data.template_a_row_positions)
-        console.log('  - template_a_cell_widths:', data.template_a_cell_widths)
-        console.log('  - template_b_row_positions:', data.template_b_row_positions)
-        console.log('  - template_b_cell_widths:', data.template_b_cell_widths)
-        
         if (isA) {
           const newRows = (data.template_a_row_positions as number[]) || rows
           const newRh = data.template_a_row_height || 0.10
@@ -245,7 +239,7 @@ function ScoringGrid({ imageData, patientAge, onScoreCalculated, onClose }: Scor
           setCws(newCws)
         }
       } else {
-        console.warn('⚠️ No se encontró configuración en Supabase, usando valores por defecto')
+        console.warn('⚠️ No se encontro configuracion en Supabase, usando valores por defecto')
       }
       setLoaded(true)
     }
