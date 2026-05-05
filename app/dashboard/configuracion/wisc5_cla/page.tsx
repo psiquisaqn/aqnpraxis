@@ -110,7 +110,7 @@ export default function Wisc5ClaConfigPage() {
         }
         setConfig(newConfig)
         
-        // También cargar gridOffset en los sliders
+        // Cargar gridOffset en los sliders
         if (activeTemplate === 'A') {
           setGridOffset({ x: newConfig.template_a_grid_offset_x, y: newConfig.template_a_grid_offset_y })
         } else {
@@ -129,7 +129,7 @@ export default function Wisc5ClaConfigPage() {
     } else {
       setGridOffset({ x: config.template_b_grid_offset_x, y: config.template_b_grid_offset_y })
     }
-  }, [activeTemplate])
+  }, [activeTemplate, config])
 
   const getActivePositions = (): number[] => {
     return activeTemplate === 'A' 
@@ -199,7 +199,9 @@ export default function Wisc5ClaConfigPage() {
     }
     
     console.log('💾 Guardando configuración...')
-    console.log('📤 Payload:', JSON.stringify(payload, null, 2))
+    console.log('📤 A grid_offset:', { x: config.template_a_grid_offset_x, y: config.template_a_grid_offset_y })
+    console.log('📤 B grid_offset:', { x: config.template_b_grid_offset_x, y: config.template_b_grid_offset_y })
+    console.log('📤 Payload completo:', JSON.stringify(payload, null, 2))
     
     const { data, error } = await supabase
       .from('wisc5_cla_grid_config')
@@ -300,7 +302,7 @@ export default function Wisc5ClaConfigPage() {
             
             ctx.fillStyle = pair === 0 ? '#F59E0B' : '#3B82F6'
             ctx.font = 'bold 10px Arial'
-            ctx.fillText(`F${pair + 1}`, x + 2, y + 12)
+            ctx.fillText('F' + (pair + 1), x + 2, y + 12)
           }
         }
         
@@ -312,7 +314,7 @@ export default function Wisc5ClaConfigPage() {
     overlayImg.onload = drawCanvas
     
     baseImg.src = testImage
-    overlayImg.src = `/wisc5/cla/plantilla-claves-${activeTemplate.toLowerCase()}.png`
+    overlayImg.src = '/wisc5/cla/plantilla-claves-' + activeTemplate.toLowerCase() + '.png'
 
   }, [testImage, activeTemplate, showOverlay, overlayPosition, gridOffset, overlayScale, config])
 
@@ -344,11 +346,11 @@ export default function Wisc5ClaConfigPage() {
 
           <div className="flex gap-4 mb-6">
             <button onClick={() => setActiveTemplate('A')}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${activeTemplate === 'A' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+              className={'px-6 py-3 rounded-lg font-medium transition-colors ' + (activeTemplate === 'A' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}>
               📋 {PLANTILLA_CONFIG.A.name} — {PLANTILLA_CONFIG.A.cols} cols × {PLANTILLA_CONFIG.A.pairs} pares
             </button>
             <button onClick={() => setActiveTemplate('B')}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${activeTemplate === 'B' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+              className={'px-6 py-3 rounded-lg font-medium transition-colors ' + (activeTemplate === 'B' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}>
               📋 {PLANTILLA_CONFIG.B.name} — {PLANTILLA_CONFIG.B.cols} cols × {PLANTILLA_CONFIG.B.pairs} pares
             </button>
           </div>
@@ -369,7 +371,7 @@ export default function Wisc5ClaConfigPage() {
               <div className="mb-4">
                 <h2 className="text-sm font-semibold text-gray-700 mb-2">Plantilla PNG:</h2>
                 <div className="bg-gray-100 rounded-lg p-3 flex items-center justify-center min-h-[120px]">
-                  <img src={`/wisc5/cla/plantilla-claves-${activeTemplate.toLowerCase()}.png`} alt={`Plantilla ${activeTemplate}`} className="max-h-48 object-contain" />
+                  <img src={'/wisc5/cla/plantilla-claves-' + activeTemplate.toLowerCase() + '.png'} alt={'Plantilla ' + activeTemplate} className="max-h-48 object-contain" />
                 </div>
               </div>
 
@@ -449,8 +451,8 @@ export default function Wisc5ClaConfigPage() {
                       {getActiveCellWidths().map((width, index) => {
                         const isInFirstPair = index >= (CONFIG.cols - CONFIG.firstPairCols)
                         return (
-                          <div key={`col-${index}`} className="flex items-center gap-2">
-                            <span className={`text-xs w-6 ${isInFirstPair ? 'text-orange-600 font-medium' : 'text-gray-600'}`}>{isInFirstPair ? '🟠' : ''}C{index + 1}</span>
+                          <div key={'col-' + index} className="flex items-center gap-2">
+                            <span className={'text-xs w-6 ' + (isInFirstPair ? 'text-orange-600 font-medium' : 'text-gray-600')}>{isInFirstPair ? '🟠' : ''}C{index + 1}</span>
                             <input type="range" min="0.005" max="0.40" step="0.001" value={width} onChange={(e) => { const nw = getActiveCellWidths(); nw[index] = parseFloat(e.target.value); updateCellWidths(nw) }} className="flex-1" />
                             <span className="text-xs text-blue-600 font-mono w-10 text-right">{(width * 100).toFixed(1)}%</span>
                           </div>
@@ -458,7 +460,7 @@ export default function Wisc5ClaConfigPage() {
                       })}
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-green-300">
-                      <span className={`text-xs font-medium ${Math.abs(getActiveCellWidths().reduce((a, b) => a + b, 0) - 1) > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
+                      <span className={'text-xs font-medium ' + (Math.abs(getActiveCellWidths().reduce((a, b) => a + b, 0) - 1) > 0.01 ? 'text-red-600' : 'text-green-600')}>
                         Suma: {(getActiveCellWidths().reduce((a, b) => a + b, 0) * 100).toFixed(1)}%
                       </span>
                       <button onClick={() => updateCellWidths(Array(CONFIG.cols).fill(1/CONFIG.cols))} className="text-xs text-green-700 hover:underline">Distribuir uniformemente</button>
@@ -484,7 +486,7 @@ export default function Wisc5ClaConfigPage() {
               </div>
 
               <button onClick={saveConfig}
-                className={`w-full py-4 rounded-lg font-bold text-white transition-all text-lg ${saved ? 'bg-green-600 scale-95' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'}`}>
+                className={'w-full py-4 rounded-lg font-bold text-white transition-all text-lg ' + (saved ? 'bg-green-600 scale-95' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg')}>
                 {saved ? '✅ ¡Configuración guardada!' : '💾 Guardar configuración'}
               </button>
               {saved && <p className="text-green-600 text-xs text-center">Se aplicará a todas las nuevas evaluaciones</p>}
