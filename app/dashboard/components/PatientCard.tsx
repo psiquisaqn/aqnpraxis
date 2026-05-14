@@ -67,6 +67,16 @@ export function PatientCard({ patient, onNewSession }: Props) {
   const statusColor = s ? STATUS_COLORS[s.status] : null
   const statusLabel = s ? (STATUS_LABELS[s.status] || s.status) : null
 
+  // Determinar link de continuación según tipo de test
+  const getContinueLink = (session: LocalSession): string => {
+    if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
+      // WISC-V redirige a ficha del paciente para retomar desde allí
+      return `/dashboard/paciente/${patient.id}`
+    }
+    // Otros tests redirigen directamente a la sesión
+    return `/session/${session.id}`
+  }
+
   return (
     <div className="group bg-white rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 overflow-hidden">
       {/* Cabecera */}
@@ -123,7 +133,7 @@ export function PatientCard({ patient, onNewSession }: Props) {
             </div>
             {s.status === 'in_progress' && (
               <Link
-                href={`/session/${s.id}`}
+                href={getContinueLink(s)}
                 className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
               >
                 Continuar →

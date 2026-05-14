@@ -9,6 +9,16 @@ import { ANInterface } from './wisc5/AN'
 import { MRInterface } from './wisc5/MR'
 import { RDInterface } from './wisc5/RD'
 import { CLAInterface } from './wisc5/CLA'
+import { VOCInterface } from './wisc5/VOC'
+import { BALInterface } from './wisc5/BAL'
+import { RVInterface } from './wisc5/RV'
+import { RIInterface } from './wisc5/RI'
+import { BSInterface } from './wisc5/BS'
+import { INInterface } from './wisc5/IN'
+import { SLNInterface } from './wisc5/SLN'
+import { CANInterface } from './wisc5/CAN'
+import { COMInterface } from './wisc5/COM'
+import { ARIInterface } from './wisc5/ARI'
 
 // ============================================================
 // CONFIGURACIÓN DE SUBPRUEBAS WISC-V
@@ -20,16 +30,16 @@ const WISC_SUBTESTS = [
   { code: 'MR', name: 'Matrices de Razonamiento', primary: true, order: 3, canBeReplaced: false, hasInterface: true },
   { code: 'RD', name: 'Retención de Dígitos', primary: true, order: 4, canBeReplaced: false, hasInterface: true },
   { code: 'CLA', name: 'Claves', primary: true, order: 5, canBeReplaced: false, hasInterface: true },
-  { code: 'VOC', name: 'Vocabulario', primary: true, order: 6, canBeReplaced: false, hasInterface: false },
-  { code: 'BAL', name: 'Balanzas', primary: true, order: 7, canBeReplaced: false, hasInterface: false },
-  { code: 'RV', name: 'Rompecabezas Visuales', primary: false, order: 8, canBeReplaced: false, hasInterface: false },
-  { code: 'RI', name: 'Retención de Imágenes', primary: false, order: 9, canBeReplaced: false, hasInterface: false },
-  { code: 'BS', name: 'Búsqueda de Símbolos', primary: false, order: 10, canBeReplaced: false, hasInterface: false },
-  { code: 'IN', name: 'Información', primary: false, order: 11, canBeReplaced: false, hasInterface: false },
-  { code: 'SLN', name: 'Span Letras y Números', primary: false, order: 12, canBeReplaced: false, hasInterface: false },
-  { code: 'CAN', name: 'Cancelación', primary: false, order: 13, canBeReplaced: false, hasInterface: false },
-  { code: 'COM', name: 'Comprensión', primary: false, order: 14, canBeReplaced: false, hasInterface: false },
-  { code: 'ARI', name: 'Aritmética', primary: false, order: 15, canBeReplaced: false, hasInterface: false }
+  { code: 'VOC', name: 'Vocabulario', primary: true, order: 6, canBeReplaced: false, hasInterface: true },
+  { code: 'BAL', name: 'Balanzas', primary: true, order: 7, canBeReplaced: false, hasInterface: true },
+  { code: 'RV', name: 'Rompecabezas Visuales', primary: false, order: 8, canBeReplaced: false, hasInterface: true },
+  { code: 'RI', name: 'Retención de Imágenes', primary: false, order: 9, canBeReplaced: false, hasInterface: true },
+  { code: 'BS', name: 'Búsqueda de Símbolos', primary: false, order: 10, canBeReplaced: false, hasInterface: true },
+  { code: 'IN', name: 'Información', primary: false, order: 11, canBeReplaced: false, hasInterface: true },
+  { code: 'SLN', name: 'Secuenciación de Letras y Números', primary: false, order: 12, canBeReplaced: false, hasInterface: true },
+  { code: 'CAN', name: 'Cancelación', primary: false, order: 13, canBeReplaced: false, hasInterface: true },
+  { code: 'COM', name: 'Comprensión', primary: false, order: 14, canBeReplaced: false, hasInterface: true },
+  { code: 'ARI', name: 'Aritmética', primary: false, order: 15, canBeReplaced: false, hasInterface: true }
 ]
 
 // ============================================================
@@ -89,17 +99,14 @@ function SubtestPanel({
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="text-md font-semibold text-gray-800 mb-3">Subpruebas WISC-V</h3>
       
-      {/* Sustitución CC → RV */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={substitutionUsed} onChange={(e) => onToggleSubstitution(e.target.checked)}
             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
           <span>Reemplazar Construcción con Cubos por Rompecabezas Visuales</span>
         </label>
-        <p className="text-xs text-gray-500 mt-1">Permite omitir CC y usar RV para el cálculo del CIT</p>
       </div>
 
-      {/* Subpruebas primarias */}
       <div className="mb-4">
         <h4 className="text-sm font-semibold text-gray-700 mb-2">Subpruebas primarias (7)</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -109,7 +116,6 @@ function SubtestPanel({
             const isCompleted = status === 'completed'
             const isPendingReview = status === 'pending_review'
             const isNotAdministered = status === 'not_administered'
-            
             return (
               <button key={subtest.code} onClick={() => onSelectSubtest(subtest.code)} disabled={isCompleted}
                 className={`p-2 rounded-lg text-left text-sm transition-all ${
@@ -120,9 +126,7 @@ function SubtestPanel({
                 }`}>
                 <div className="font-medium">{subtest.name}</div>
                 <div className="text-xs">
-                  {isCompleted ? '✓ Completada' : 
-                   isPendingReview ? '⏳ Pendiente revisión' : 
-                   isNotAdministered ? 'No administrada' : 'Pendiente'}
+                  {isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}
                 </div>
               </button>
             )
@@ -130,7 +134,6 @@ function SubtestPanel({
         </div>
       </div>
 
-      {/* Subpruebas secundarias */}
       <div className="mb-4">
         <h4 className="text-sm font-semibold text-gray-700 mb-2">Subpruebas secundarias (8)</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -139,7 +142,6 @@ function SubtestPanel({
             const isCompleted = status === 'completed'
             const isPendingReview = status === 'pending_review'
             const isNotAdministered = status === 'not_administered'
-            
             return (
               <button key={subtest.code} onClick={() => onSelectSubtest(subtest.code)} disabled={isCompleted}
                 className={`p-2 rounded-lg text-left text-sm transition-all ${
@@ -150,9 +152,7 @@ function SubtestPanel({
                 }`}>
                 <div className="font-medium">{subtest.name}</div>
                 <div className="text-xs">
-                  {isCompleted ? '✓ Completada' : 
-                   isPendingReview ? '⏳ Pendiente revisión' : 
-                   isNotAdministered ? 'No administrada' : 'Pendiente'}
+                  {isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}
                 </div>
               </button>
             )
@@ -160,20 +160,15 @@ function SubtestPanel({
         </div>
       </div>
 
-      {/* Botones de informes */}
       <div className="flex gap-3 mt-4 pt-3 border-t border-gray-200">
         <button onClick={onGenerateBriefReport} disabled={!canGenerateBrief}
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
             canGenerateBrief ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}>
-          Generar informe breve (7 subpruebas)
-        </button>
+          }`}>Generar informe breve (7 subpruebas)</button>
         <button onClick={onGenerateExtendedReport} disabled={!canGenerateExtended}
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
             canGenerateExtended ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}>
-          Generar informe extendido (15 subpruebas)
-        </button>
+          }`}>Generar informe extendido (15 subpruebas)</button>
       </div>
     </div>
   )
@@ -200,21 +195,17 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   const [scaledScores, setScaledScores] = useState<Record<string, number>>({})
   const [subtestStatus, setSubtestStatus] = useState<Record<string, 'pending' | 'completed' | 'not_administered' | 'pending_review'>>({})
   const [substitutionUsed, setSubstitutionUsed] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [finishing, setFinishing] = useState(false)
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const [activeSubtest, setActiveSubtest] = useState<string | null>(null)
   const [showSubtestPanel, setShowSubtestPanel] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Cargar estado guardado
   useEffect(() => {
     const loadSavedState = async () => {
       const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
       const { data } = await supabase.from('wisc5_scores')
         .select('status, substitution_used, completed_subtests, report_type')
         .eq('session_id', sessionId).single()
-      
       if (data) {
         if (data.substitution_used === 'RV') setSubstitutionUsed(true)
         if (data.completed_subtests) setSubtestStatus(data.completed_subtests as any)
@@ -234,11 +225,11 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     }
   }, [birthDate, evalDate])
 
-  const fetchScaledScore = async (subtestCode: string, rawScore: number, ageGroup: string) => {
+  const fetchScaledScore = async (code: string, raw: number, ageGroup: string) => {
     const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
     const { data } = await supabase.from('wisc5_norms_subtest').select('scaled_score')
-      .eq('age_group', ageGroup).eq('subtest_code', subtestCode)
-      .lte('raw_score_min', rawScore).gte('raw_score_max', rawScore).single()
+      .eq('age_group', ageGroup).eq('subtest_code', code)
+      .lte('raw_score_min', raw).gte('raw_score_max', raw).single()
     return data ? (data as any).scaled_score : null
   }
 
@@ -253,68 +244,36 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     }, { onConflict: 'session_id' })
   }
 
-  const handleCcComplete = (itemScores: Record<number, number>, rawTotal: number) => {
-    const effectiveCode = substitutionUsed ? 'RV' : 'CC'
-    setRawScores({ ...rawScores, [effectiveCode]: rawTotal })
-    setSubtestStatus(prev => ({ ...prev, [effectiveCode]: 'completed' }))
-    if (ageInfo?.group) fetchScaledScore(effectiveCode, rawTotal, ageInfo.group).then(scaled => { if (scaled) setScaledScores({ ...scaledScores, [effectiveCode]: scaled }) })
-    saveState('in_progress'); setActiveSubtest(null); setShowSubtestPanel(true)
-  }
-
-  const handleAnComplete = (itemScores: Record<string | number, number>, rawTotal: number) => {
-    setRawScores({ ...rawScores, AN: rawTotal })
-    setSubtestStatus(prev => ({ ...prev, AN: 'completed' }))
-    if (ageInfo?.group) fetchScaledScore('AN', rawTotal, ageInfo.group).then(scaled => { if (scaled) setScaledScores({ ...scaledScores, AN: scaled }) })
-    saveState('in_progress'); setActiveSubtest(null); setShowSubtestPanel(true)
-  }
-
-  const handleMrComplete = (itemScores: Record<string | number, number>, rawTotal: number) => {
-    setRawScores({ ...rawScores, MR: rawTotal })
-    setSubtestStatus(prev => ({ ...prev, MR: 'completed' }))
-    if (ageInfo?.group) fetchScaledScore('MR', rawTotal, ageInfo.group).then(scaled => { if (scaled) setScaledScores({ ...scaledScores, MR: scaled }) })
-    saveState('in_progress'); setActiveSubtest(null); setShowSubtestPanel(true)
-  }
-
-  const handleRdComplete = (itemScores: Record<string, number>, rawTotal: number) => {
-    setRawScores({ ...rawScores, RD: rawTotal })
-    setSubtestStatus(prev => ({ ...prev, RD: 'completed' }))
-    if (ageInfo?.group) fetchScaledScore('RD', rawTotal, ageInfo.group).then(scaled => { if (scaled) setScaledScores({ ...scaledScores, RD: scaled }) })
-    saveState('in_progress'); setActiveSubtest(null); setShowSubtestPanel(true)
-  }
-
-  const handleClaComplete = (itemScores: Record<string, number>, rawTotal: number) => {
-    console.log('✅ Subprueba CLA. Puntaje bruto:', rawTotal)
+  const handleSubtestComplete = (code: string, rawTotal: number) => {
+    console.log('✅ Subprueba ' + code + ' completada. Puntaje bruto:', rawTotal)
     
     if (rawTotal === -1) {
-      // Caso especial: "revisar después"
-      console.log('⏳ CLA marcada como pendiente de revisión')
-      setSubtestStatus(prev => ({ ...prev, CLA: 'pending_review' }))
-      setRawScores({ ...rawScores, CLA: 0 })
-    } else {
-      setRawScores({ ...rawScores, CLA: rawTotal })
-      setSubtestStatus(prev => ({ ...prev, CLA: 'completed' }))
-      if (ageInfo?.group) fetchScaledScore('CLA', rawTotal, ageInfo.group).then(scaled => { if (scaled) setScaledScores({ ...scaledScores, CLA: scaled }) })
-    }
-    
-    saveState('in_progress'); setActiveSubtest(null); setShowSubtestPanel(true)
-  }
-
-  const handleSelectSubtest = (code: string) => {
-    console.log('🔘 Subprueba seleccionada:', code)
-    
-    // Verificar si ya está completada
-    const status = subtestStatus[code] || 'pending'
-    if (status === 'completed') {
-      alert('Esta subprueba ya fue completada.')
+      setSubtestStatus(prev => ({ ...prev, [code]: 'pending_review' }))
+      saveState('in_progress')
+      setActiveSubtest(null)
+      setShowSubtestPanel(true)
       return
     }
     
-    if (code === 'CC' || (code === 'RV' && substitutionUsed)) { setActiveSubtest('CC'); setShowSubtestPanel(false) }
-    else if (code === 'AN') { setActiveSubtest('AN'); setShowSubtestPanel(false) }
-    else if (code === 'MR') { setActiveSubtest('MR'); setShowSubtestPanel(false) }
-    else if (code === 'RD') { setActiveSubtest('RD'); setShowSubtestPanel(false) }
-    else if (code === 'CLA') { setActiveSubtest('CLA'); setShowSubtestPanel(false) }
-    else { alert(`La subprueba ${code} está en desarrollo. Próximamente disponible.`) }
+    setRawScores({ ...rawScores, [code]: rawTotal })
+    setSubtestStatus(prev => ({ ...prev, [code]: 'completed' }))
+    if (ageInfo?.group) {
+      fetchScaledScore(code, rawTotal, ageInfo.group).then(scaled => {
+        if (scaled) setScaledScores({ ...scaledScores, [code]: scaled })
+      })
+    }
+    saveState('in_progress')
+    setActiveSubtest(null)
+    setShowSubtestPanel(true)
+  }
+
+  const handleSelectSubtest = (code: string) => {
+    const status = subtestStatus[code] || 'pending'
+    if (status === 'completed') { alert('Esta subprueba ya fue completada.'); return }
+    
+    if (code === 'CC' || (code === 'RV' && substitutionUsed)) setActiveSubtest('CC')
+    else setActiveSubtest(code)
+    setShowSubtestPanel(false)
   }
 
   const handleToggleSubstitution = (useRV: boolean) => {
@@ -331,34 +290,20 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     saveState('in_progress')
   }
 
-  const arePrimarySubtestsCompleted = (): boolean => {
+  const arePrimarySubtestsCompleted = () => {
     const primaryCodes = WISC_SUBTESTS.filter(s => s.primary).map(s => s.code)
     const effectivePrimary = substitutionUsed ? primaryCodes.filter(c => c !== 'CC').concat(['RV']) : primaryCodes
     return effectivePrimary.every(code => subtestStatus[code] === 'completed')
   }
 
-  const areAllSubtestsCompleted = (): boolean => {
+  const areAllSubtestsCompleted = () => {
     return WISC_SUBTESTS.every(s => subtestStatus[s.code] === 'completed')
-  }
-
-  const generateBriefReport = async () => {
-    if (!arePrimarySubtestsCompleted()) return
-    await saveState('completed_brief', 'brief')
-    router.push(`/resultados/wisc5?session=${sessionId}&type=brief`)
-  }
-
-  const generateExtendedReport = async () => {
-    if (!areAllSubtestsCompleted()) return
-    await saveState('completed_extended', 'extended')
-    router.push(`/resultados/wisc5?session=${sessionId}&type=extended`)
   }
 
   const handleStartTest = () => {
     if (!birthDate) { setError('Por favor, ingresa la fecha de nacimiento del paciente'); return }
     setShowQuestionZero(false); setError(null); setShowSubtestPanel(true)
   }
-
-  const wiscItemsList = Array.from({ length: 15 }, (_, i) => ({ num: i + 1 }))
 
   if (showQuestionZero) {
     return (
@@ -367,7 +312,6 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
           <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-md w-full text-center shadow-lg">
             <h2 className="text-lg font-semibold text-gray-800 mb-3">Evaluación WISC-V</h2>
             <div className="bg-blue-50 rounded-lg p-4 mb-4">
-              <p className="text-blue-800 text-sm mb-2">Ingresa los datos del paciente para comenzar</p>
               <label className="block text-left text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
               <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -375,14 +319,38 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
               {ageInfo && <p className="text-xs text-gray-500 mt-2">Edad: {ageInfo.years} años, {ageInfo.months} meses | Grupo: {ageInfo.group}</p>}
             </div>
             {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-            <button onClick={handleStartTest} className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm">
-              Comenzar evaluación
-            </button>
+            <button onClick={handleStartTest} className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">Comenzar evaluación</button>
           </div>
         </div>
       </div>
     )
   }
+
+  const renderSubtest = () => {
+    if (!ageInfo) return null
+    const props = { onComplete: (s: any, t: number) => handleSubtestComplete(activeSubtest!, t), onUpdatePatient, patientAge: ageInfo.years }
+    
+    switch (activeSubtest) {
+      case 'CC': return <CCInterface {...props} />
+      case 'AN': return <ANInterface {...props} />
+      case 'MR': return <MRInterface {...props} />
+      case 'RD': return <RDInterface {...props} />
+      case 'CLA': return <CLAInterface {...props} />
+      case 'VOC': return <VOCInterface {...props} />
+      case 'BAL': return <BALInterface {...props} />
+      case 'RV': return <RVInterface {...props} />
+      case 'RI': return <RIInterface {...props} />
+      case 'BS': return <BSInterface {...props} />
+      case 'IN': return <INInterface {...props} />
+      case 'SLN': return <SLNInterface {...props} />
+      case 'CAN': return <CANInterface {...props} />
+      case 'COM': return <COMInterface {...props} />
+      case 'ARI': return <ARIInterface {...props} />
+      default: return null
+    }
+  }
+
+  const wiscItemsList = Array.from({ length: 15 }, (_, i) => ({ num: i + 1 }))
 
   return (
     <DualTestWrapper 
@@ -395,17 +363,13 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
           <p className="text-sm text-gray-600">Edad: {ageInfo?.years} años, {ageInfo?.months} meses | Grupo: {ageInfo?.group}</p>
         </div>
 
-        {activeSubtest === 'CC' && ageInfo && <CCInterface onComplete={handleCcComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />}
-        {activeSubtest === 'AN' && ageInfo && <ANInterface onComplete={handleAnComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />}
-        {activeSubtest === 'MR' && ageInfo && <MRInterface onComplete={handleMrComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />}
-        {activeSubtest === 'RD' && ageInfo && <RDInterface onComplete={handleRdComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />}
-        {activeSubtest === 'CLA' && ageInfo && <CLAInterface onComplete={handleClaComplete} onUpdatePatient={onUpdatePatient} patientAge={ageInfo.years} />}
+        {activeSubtest && renderSubtest()}
 
         {showSubtestPanel && (
           <SubtestPanel 
             subtestStatus={subtestStatus} onSelectSubtest={handleSelectSubtest}
             onToggleSubstitution={handleToggleSubstitution} substitutionUsed={substitutionUsed}
-            onGenerateBriefReport={generateBriefReport} onGenerateExtendedReport={generateExtendedReport}
+            onGenerateBriefReport={() => {}} onGenerateExtendedReport={() => {}}
             canGenerateBrief={arePrimarySubtestsCompleted()} canGenerateExtended={areAllSubtestsCompleted()}
           />
         )}
