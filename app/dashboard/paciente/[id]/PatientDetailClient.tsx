@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
+import NewSessionModal from '@/app/dashboard/components/NewSessionModal'
 
 interface PatientDetailClientProps {
   patientId: string
@@ -139,7 +140,6 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
     return tests[testId] || testId
   }
 
-  // Determinar link de continuación según tipo de test
   const getContinueLink = (session: Session): string => {
     if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
       return `/dashboard/paciente/${patientId}`
@@ -147,7 +147,6 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
     return `/session/${session.id}`
   }
 
-  // Determinar link de informe según tipo de test
   const getReportLink = (session: Session): string => {
     if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
       return `/resultados/wisc5?session=${session.id}`
@@ -176,31 +175,16 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      {/* Datos del paciente */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
         <div className="flex justify-between items-start mb-6">
           <h1 className="text-2xl font-semibold text-gray-800">Datos del paciente</h1>
           <div className="flex gap-2">
             {!editing ? (
-              <button
-                onClick={() => setEditing(true)}
-                className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors"
-              >
-                Editar
-              </button>
+              <button onClick={() => setEditing(true)} className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors">Editar</button>
             ) : (
-              <button
-                onClick={handleUpdate}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-              >
-                Guardar
-              </button>
+              <button onClick={handleUpdate} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">Guardar</button>
             )}
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
-            >
+            <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50">
               {deleting ? 'Eliminando...' : 'Eliminar paciente'}
             </button>
           </div>
@@ -209,67 +193,16 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
         {editing ? (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
-                <input type="text" value={formData.full_name}
-                  onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">RUT</label>
-                <input type="text" value={formData.rut}
-                  onChange={(e) => setFormData({...formData, rut: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
-                <input type="date" value={formData.birth_date?.split('T')[0] || ''}
-                  onChange={(e) => setFormData({...formData, birth_date: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Género</label>
-                <select value={formData.gender}
-                  onChange={(e) => setFormData({...formData, gender: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                  <option value="">Seleccionar</option>
-                  <option value="M">Masculino</option>
-                  <option value="F">Femenino</option>
-                  <option value="NB">No binario</option>
-                  <option value="NS">No especifica</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Establecimiento</label>
-                <input type="text" value={formData.school}
-                  onChange={(e) => setFormData({...formData, school: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Curso/Grado</label>
-                <input type="text" value={formData.grade}
-                  onChange={(e) => setFormData({...formData, grade: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                <input type="tel" value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              </div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label><input type="text" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">RUT</label><input type="text" value={formData.rut} onChange={(e) => setFormData({...formData, rut: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label><input type="date" value={formData.birth_date?.split('T')[0] || ''} onChange={(e) => setFormData({...formData, birth_date: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Género</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="">Seleccionar</option><option value="M">Masculino</option><option value="F">Femenino</option><option value="NB">No binario</option><option value="NS">No especifica</option></select></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Establecimiento</label><input type="text" value={formData.school} onChange={(e) => setFormData({...formData, school: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Curso/Grado</label><input type="text" value={formData.grade} onChange={(e) => setFormData({...formData, grade: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label><input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notas adicionales</label>
-              <textarea value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-            </div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Notas adicionales</label><textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -285,18 +218,13 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
           </div>
         )}
 
-        {/* Botón Nueva evaluación */}
         <div className="mt-6 pt-4 border-t border-gray-100">
-          <Link
-            href={`/dashboard/paciente/${patientId}/nueva-sesion-dual`}
-            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          <button onClick={() => setShowNewSessionModal(true)} className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
             + Nueva evaluación
-          </Link>
+          </button>
         </div>
       </div>
 
-      {/* Evaluaciones */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Evaluaciones realizadas</h2>
         {sessions.length === 0 ? (
@@ -317,33 +245,22 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                 </div>
                 <div className="flex gap-2">
                   {(session.status === 'completed' || session.status === 'completed_brief' || session.status === 'completed_extended') && (
-                    <Link
-                      href={getReportLink(session)}
-                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                    >
-                      Ver informe
-                    </Link>
+                    <Link href={getReportLink(session)} className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors">Ver informe</Link>
                   )}
                   {session.status === 'in_progress' && (
-                    <Link
-                      href={getContinueLink(session)}
-                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                    >
-                      Continuar
-                    </Link>
+                    <Link href={getContinueLink(session)} className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors">Continuar</Link>
                   )}
-                  <button
-                    onClick={() => handleDeleteSession(session.id)}
-                    className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                  >
-                    Eliminar
-                  </button>
+                  <button onClick={() => handleDeleteSession(session.id)} className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors">Eliminar</button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {showNewSessionModal && (
+        <NewSessionModal patientId={patientId} onClose={() => setShowNewSessionModal(false)} />
+      )}
     </div>
   )
 }
