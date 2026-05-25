@@ -16,6 +16,7 @@ interface Session {
   status: string
   created_at: string
   completed_at: string | null
+  dual_session_id?: string | null
 }
 
 export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
@@ -71,7 +72,32 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
           .order('created_at', { ascending: false })
         
         if (!sessionsError && sessionsData) {
-          setSessions(sessionsData)
+          // Para sesiones WISC-V en progreso, buscar la sesión dual asociada
+          const wiscSessions = sessionsData.filter((s: any) => 
+            (s.test_id === 'wisc5' || s.test_id === 'wisc5_cl') && s.status === 'in_progress'
+          )
+          
+          if (wiscSessions.length > 0) {
+            const sessionIds = wiscSessions.map((s: any) => s.id)
+            const { data: dualData } = await supabase
+              .from('dual_sessions')
+              .select('id, session_id')
+              .in('session_id', sessionIds)
+              .eq('is_active', true)
+            
+            const dualMap = new Map()
+            if (dualData) {
+              dualData.forEach((d: any) => dualMap.set(d.session_id, d.id))
+            }
+            
+            const sessionsWithDual = sessionsData.map((s: any) => ({
+              ...s,
+              dual_session_id: dualMap.get(s.id) || null
+            }))
+            setSessions(sessionsWithDual)
+          } else {
+            setSessions(sessionsData.map((s: any) => ({ ...s, dual_session_id: null })))
+          }
         }
       }
       setLoading(false)
@@ -141,6 +167,9 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
   }
 
   const getContinueLink = (session: Session): string => {
+    if ((session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') && session.dual_session_id) {
+      return `/dual-control/${session.dual_session_id}`
+    }
     if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
       return `/dashboard/paciente/${patientId}`
     }

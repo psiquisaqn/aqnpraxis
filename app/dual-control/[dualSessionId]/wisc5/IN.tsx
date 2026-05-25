@@ -63,14 +63,11 @@ interface SuggestionResult {
 
 function suggestScore(response: string, itemNum: number): SuggestionResult {
   const disclaimer = '⚠️ Esta sugerencia es automática. Consulte el manual del WISC-V y aplique su criterio profesional.'
-
   if (!response || response.trim().length === 0) {
     return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta vacía', disclaimer }
   }
-
   const norm = normalizeText(response)
 
-  // Palabras clave para puntuación 1
   const score1Keywords: Record<number, string[]> = {
     1: ['nariz'],
     2: ['oreja'],
@@ -105,7 +102,6 @@ function suggestScore(response: string, itemNum: number): SuggestionResult {
     31: ['icaro', 'mitologia', 'griega', 'alas', 'sol', 'cera', 'escapar', 'laberinto']
   }
 
-  // Palabras clave para puntuación 0 (respuestas incorrectas típicas)
   const score0Keywords: Record<number, string[]> = {
     3: ['azul', 'rojo', 'negro', 'cafe', 'rosado', 'naranjo', 'dorado', 'verde', 'pato donald'],
     4: ['ayer', 'hoy', 'mañana', 'lunes', 'martes', 'miercoles', 'sabado', 'domingo'],
@@ -125,21 +121,11 @@ function suggestScore(response: string, itemNum: number): SuggestionResult {
     31: ['dios', 'fabula']
   }
 
-  // Verificar puntuación 1
   const kw1 = score1Keywords[itemNum] || []
-  for (const kw of kw1) {
-    if (norm.includes(normalizeText(kw))) {
-      return { suggestedScore: 1, confidence: 'high', reason: 'Palabra clave de puntuación 1 detectada: ' + kw, disclaimer }
-    }
-  }
+  for (const kw of kw1) { if (norm.includes(normalizeText(kw))) return { suggestedScore: 1, confidence: 'high', reason: 'Palabra clave de puntuación 1: ' + kw, disclaimer } }
 
-  // Verificar puntuación 0
   const kw0 = score0Keywords[itemNum] || []
-  for (const kw of kw0) {
-    if (norm.includes(normalizeText(kw))) {
-      return { suggestedScore: 0, confidence: 'medium', reason: 'Respuesta típica de 0 puntos detectada', disclaimer }
-    }
-  }
+  for (const kw of kw0) { if (norm.includes(normalizeText(kw))) return { suggestedScore: 0, confidence: 'medium', reason: 'Respuesta típica de 0 puntos', disclaimer } }
 
   return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta insuficiente o no reconocida', disclaimer }
 }
@@ -155,11 +141,8 @@ interface INInterfaceProps {
 }
 
 export const INInterface = React.memo(function INInterface({ onComplete, onUpdatePatient, patientAge }: INInterfaceProps) {
-  // Determinar ítems de inicio según edad
   const getStartItems = (): { first: number; second: number; jumpAfterBacktrack: number } => {
-    if (patientAge <= 8) {
-      return { first: 1, second: 2, jumpAfterBacktrack: 3 }
-    }
+    if (patientAge <= 8) return { first: 1, second: 2, jumpAfterBacktrack: 3 }
     return { first: 8, second: 9, jumpAfterBacktrack: 10 }
   }
 
@@ -197,46 +180,34 @@ export const INInterface = React.memo(function INInterface({ onComplete, onUpdat
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
 
-  useEffect(() => {
-    onCompleteRef.current = onComplete
-    onUpdatePatientRef.current = onUpdatePatient
-  }, [onComplete, onUpdatePatient])
+  useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
 
-  // Enviar pregunta al display
+  // Enviar pregunta al display (sin tips)
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
         type: 'wisc5_in',
         itemNum: currentItem.num,
-        question: currentItem.question,
-        tips: currentItem.tips || null
+        question: currentItem.question
       })
     }
   }, [currentItem, isCompleted])
 
-  // Sugerencia en tiempo real
   useEffect(() => {
     if (currentItem && response.trim().length > 0 && scores[currentItem.num] === undefined) {
-      const result = suggestScore(response, currentItem.num)
-      setSuggestion(result)
-    } else {
-      setSuggestion(null)
-    }
+      setSuggestion(suggestScore(response, currentItem.num))
+    } else { setSuggestion(null) }
   }, [response, currentItem])
 
-  // Verificar bonus
   useEffect(() => {
     if (!bonusApplied && checkBonusEligibility(scores)) {
       setBonusApplied(true)
-      const bonus = calculateBonusPoints()
-      console.log('🎉 Bonus de +' + bonus + ' puntos aplicado')
+      console.log('🎉 Bonus de +' + calculateBonusPoints() + ' puntos aplicado')
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
   const markSkippedItemsAsCorrect = (
-    newScores: Record<number, number>,
-    fromItem: number,
-    toItem: number
+    newScores: Record<number, number>, fromItem: number, toItem: number
   ): Record<number, number> => {
     const updatedScores = { ...newScores }
     for (let i = toItem + 1; i < fromItem; i++) {
@@ -254,18 +225,14 @@ export const INInterface = React.memo(function INInterface({ onComplete, onUpdat
 
     if (!hasBacktrack) {
       let nextIdx = currentIdx + 1
-      while (nextIdx < IN_ITEMS.length && updatedScores[IN_ITEMS[nextIdx].num] !== undefined) {
-        nextIdx++
-      }
+      while (nextIdx < IN_ITEMS.length && updatedScores[IN_ITEMS[nextIdx].num] !== undefined) nextIdx++
       return { nextIndex: nextIdx, updatedScores }
     }
 
-    // Modo retroceso activo
     if (backtrackMode) {
       if (currentScore === 1) {
         const newSuccesses = consecutiveSuccessesInBacktrack + 1
         setConsecutiveSuccessesInBacktrack(newSuccesses)
-
         if (newSuccesses >= 2) {
           setBacktrackMode(false)
           setConsecutiveSuccessesInBacktrack(0)
@@ -273,50 +240,31 @@ export const INInterface = React.memo(function INInterface({ onComplete, onUpdat
           const jumpIndex = IN_ITEMS.findIndex(i => i.num === jumpAfterBacktrack)
           return { nextIndex: jumpIndex >= 0 ? jumpIndex : currentIdx + 1, updatedScores }
         }
-
         let prevItem = currentItemNum - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          prevItem--
-        }
-        if (prevItem >= 1) {
-          return { nextIndex: IN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) prevItem--
+        if (prevItem >= 1) return { nextIndex: IN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       } else {
         setConsecutiveSuccessesInBacktrack(0)
         let prevItem = currentItemNum - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          prevItem--
-        }
-        if (prevItem >= 1) {
-          return { nextIndex: IN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) prevItem--
+        if (prevItem >= 1) return { nextIndex: IN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
       setBacktrackMode(false)
       setConsecutiveSuccessesInBacktrack(0)
     }
 
-    // Verificar si se debe activar secuencia inversa
     const isFirstTwo = currentItemNum === firstStartItem || currentItemNum === secondStartItem
-    const isFailure = currentScore === 0
-
-    if (isFirstTwo && isFailure) {
+    if (isFirstTwo && currentScore === 0) {
       setBacktrackMode(true)
       setFailedStartItem(currentItemNum)
       setConsecutiveSuccessesInBacktrack(0)
-
       let prevItem = currentItemNum - 1
-      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-        prevItem--
-      }
-      if (prevItem >= 1) {
-        return { nextIndex: IN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-      }
+      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) prevItem--
+      if (prevItem >= 1) return { nextIndex: IN_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
     }
 
     let nextIdx = currentIdx + 1
-    while (nextIdx < IN_ITEMS.length && updatedScores[IN_ITEMS[nextIdx].num] !== undefined) {
-      nextIdx++
-    }
+    while (nextIdx < IN_ITEMS.length && updatedScores[IN_ITEMS[nextIdx].num] !== undefined) nextIdx++
     return { nextIndex: nextIdx, updatedScores }
   }
 
@@ -338,9 +286,7 @@ export const INInterface = React.memo(function INInterface({ onComplete, onUpdat
         onCompleteRef.current(newScores, total)
         return
       }
-    } else {
-      setConsecutiveZeros(0)
-    }
+    } else { setConsecutiveZeros(0) }
 
     const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, score)
     newScores = updatedScores
@@ -369,16 +315,10 @@ export const INInterface = React.memo(function INInterface({ onComplete, onUpdat
     const bonus = bonusApplied ? calculateBonusPoints() : 0
     const total = Object.values(scores).reduce((a, b) => a + b, 0) + bonus
     const maxP = IN_ITEMS.length
-
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">
-          Puntaje total: {total} / {maxP}
-          {bonusApplied && (
-            <span className="ml-2 text-blue-600">(incluye +{bonus} puntos por bonus)</span>
-          )}
-        </p>
+        <p className="text-sm text-green-600 mt-1">Puntaje total: {total} / {maxP}{bonusApplied && <span className="ml-2 text-blue-600">(incluye +{bonus} bonus)</span>}</p>
       </div>
     )
   }
@@ -389,106 +329,72 @@ export const INInterface = React.memo(function INInterface({ onComplete, onUpdat
 
   return (
     <div className="space-y-4">
-      {/* Barra de progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Información</span>
-          <span className="text-gray-800 font-medium">
-            Ítem {currentItem.num} / {IN_ITEMS.length}
-          </span>
+          <span className="text-gray-800 font-medium">Ítem {currentItem.num} / {IN_ITEMS.length}</span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{
-            width: (Object.keys(scores).length / IN_ITEMS.length) * 100 + '%'
-          }} />
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: (Object.keys(scores).length / IN_ITEMS.length) * 100 + '%' }} />
         </div>
-        {isGoingBack && <p className="text-xs text-orange-600 mt-1">↩️ Retrocediendo para verificar nivel basal...</p>}
-        {backtrackMode && (
-          <p className="text-xs text-orange-600 mt-1">🔄 Modo retroceso activo - Éxitos consecutivos: {consecutiveSuccessesInBacktrack}/2</p>
-        )}
+        {isGoingBack && <p className="text-xs text-orange-600 mt-1">↩️ Retrocediendo...</p>}
+        {backtrackMode && <p className="text-xs text-orange-600 mt-1">🔄 Retroceso activo - Éxitos: {consecutiveSuccessesInBacktrack}/2</p>}
         {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{bonusPts} puntos aplicado</p>}
       </div>
 
-      {/* Pregunta */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
         <p className="text-sm text-blue-700 mb-3">Pregunta para el evaluado:</p>
-        <p className="text-2xl md:text-3xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
-          {currentItem.question}
-        </p>
+        <p className="text-2xl md:text-3xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>{currentItem.question}</p>
         {currentItem.tips && (
           <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200 text-left">
-            <p className="text-xs text-yellow-700">
-              <strong>💡 Recomendación:</strong> {currentItem.tips}
-            </p>
+            <p className="text-xs text-yellow-700"><strong>💡 Recomendación:</strong> {currentItem.tips}</p>
           </div>
         )}
       </div>
 
-      {/* Campo de respuesta */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Respuesta del evaluado</label>
-        <textarea
-          value={response}
-          onChange={(e) => setResponse(e.target.value)}
-          disabled={scores[currentItem.num] !== undefined}
+        <textarea value={response} onChange={(e) => setResponse(e.target.value)} disabled={scores[currentItem.num] !== undefined}
           placeholder="Escribe la respuesta del evaluado..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] disabled:bg-gray-100 disabled:text-gray-500"
-        />
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] disabled:bg-gray-100 disabled:text-gray-500" />
 
         {suggestion && scores[currentItem.num] === undefined && (
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex justify-between items-start gap-3">
               <div className="flex-1">
-                <p className="text-sm text-blue-700">
-                  <strong>Sugerencia de puntaje:</strong> {suggestion.suggestedScore}
-                  <span className="text-xs ml-2 text-blue-500">
-                    ({suggestion.confidence === 'high' ? 'Alta' : suggestion.confidence === 'medium' ? 'Media' : 'Baja'} confianza)
-                  </span>
+                <p className="text-sm text-blue-700"><strong>Sugerencia de puntaje:</strong> {suggestion.suggestedScore}
+                  <span className="text-xs ml-2 text-blue-500">({suggestion.confidence === 'high' ? 'Alta' : suggestion.confidence === 'medium' ? 'Media' : 'Baja'} confianza)</span>
                 </p>
                 {suggestion.reason && <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>}
                 <p className="text-xs text-orange-600 mt-2">{suggestion.disclaimer}</p>
               </div>
-              <button onClick={applySuggestion}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap">
-                Aplicar
-              </button>
+              <button onClick={applySuggestion} className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap">Aplicar</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Botones de puntaje */}
       {scores[currentItem.num] === undefined && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-600 mb-3">Puntaje para este ítem:</p>
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleScore(0)}
-              className="py-3 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
-              0 - Incorrecto
-            </button>
-            <button onClick={() => handleScore(1)}
-              className="py-3 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
-              1 - Correcto
-            </button>
+            <button onClick={() => handleScore(0)} className="py-3 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">0 - Incorrecto</button>
+            <button onClick={() => handleScore(1)} className="py-3 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">1 - Correcto</button>
           </div>
         </div>
       )}
 
-      {/* Confirmación */}
       {scores[currentItem.num] !== undefined && (
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">✓ Ítem respondido con puntaje {scores[currentItem.num]}</p>
         </div>
       )}
 
-      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
           Puntaje bruto acumulado: {displayScore} / {IN_ITEMS.length}
           {!bonusApplied && patientAge >= 9 && (
-            <span className="ml-2 text-xs text-gray-500">
-              (Bonus potencial: +{bonusPts} pts si acierta ítems {firstStartItem} y {secondStartItem})
-            </span>
+            <span className="ml-2 text-xs text-gray-500">(Bonus potencial: +{bonusPts} pts si acierta ítems {firstStartItem} y {secondStartItem})</span>
           )}
         </p>
       </div>

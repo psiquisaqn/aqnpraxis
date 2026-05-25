@@ -213,16 +213,16 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
           isRunning={!timeEnded && scores[currentItem.num] === undefined} onToggleRunning={() => {}} />
       </div>
 
-      {/* Imagen de estímulo (visible para el evaluador) */}
+      {/* Imagen de estímulo (miniatura) */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <p className="text-sm font-medium text-gray-700 mb-3 text-center">📷 Estímulo visual (misma imagen que ve el evaluado):</p>
+        <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Estímulo (miniatura):</p>
         <img 
           src={getCurrentImagePath()} 
           alt={`Balanza ${currentItem.num}`}
-          className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-sm"
+          className="mx-auto max-h-40 object-contain border border-gray-200 rounded-lg"
           onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
         />
-        <div className="mt-3 p-2 bg-blue-50 rounded text-center">
+        <div className="mt-2 p-2 bg-blue-50 rounded text-center">
           <p className="text-sm text-blue-700"><strong>Respuesta correcta: {currentItem.correctAnswer}</strong></p>
         </div>
       </div>

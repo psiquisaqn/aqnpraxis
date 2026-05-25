@@ -256,7 +256,6 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
 
   if (!currentItem) return null
 
-  // Pantalla de calificación (solo 6-7 años)
   if (showQualifying && currentItem.type === 'qualifying') {
     return (
       <div className="space-y-4">

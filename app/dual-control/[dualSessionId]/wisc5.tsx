@@ -78,7 +78,7 @@ const getAgeGroup = (totalMonths: number): string => {
 // ============================================================
 
 interface SubtestPanelProps {
-  subtestStatus: Record<string, 'pending' | 'completed' | 'not_administered' | 'pending_review'>
+  subtestStatus: Record<string, 'pending' | 'completed' | 'not_administered' | 'pending_review' | 'interrupted'>
   onSelectSubtest: (code: string) => void
   onToggleSubstitution: (useRV: boolean) => void
   substitutionUsed: boolean
@@ -115,17 +115,24 @@ function SubtestPanel({
             const status = subtestStatus[effectiveCode] || subtestStatus[subtest.code] || 'pending'
             const isCompleted = status === 'completed'
             const isPendingReview = status === 'pending_review'
+            const isInterrupted = status === 'interrupted'
             const isNotAdministered = status === 'not_administered'
             return (
               <button key={subtest.code} onClick={() => onSelectSubtest(subtest.code)} disabled={isCompleted}
                 className={`p-2 rounded-lg text-left text-sm transition-all ${
                   isCompleted ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' :
                   isPendingReview ? 'bg-orange-100 text-orange-700 border border-orange-300 cursor-pointer hover:bg-orange-200' :
+                  isInterrupted ? 'bg-purple-100 text-purple-700 border border-purple-300 cursor-pointer hover:bg-purple-200' :
                   isNotAdministered ? 'bg-gray-100 text-gray-400 line-through' :
                   'bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer'
                 }`}>
                 <div className="font-medium">{subtest.name}</div>
-                <div className="text-xs">{isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}</div>
+                <div className="text-xs">
+                  {isCompleted ? '✓ Completada' : 
+                   isPendingReview ? '⏳ Pendiente revisión' : 
+                   isInterrupted ? '⏸ Interrumpida' :
+                   isNotAdministered ? 'No administrada' : 'Pendiente'}
+                </div>
               </button>
             )
           })}
@@ -139,17 +146,24 @@ function SubtestPanel({
             const status = subtestStatus[subtest.code] || 'pending'
             const isCompleted = status === 'completed'
             const isPendingReview = status === 'pending_review'
+            const isInterrupted = status === 'interrupted'
             const isNotAdministered = status === 'not_administered'
             return (
               <button key={subtest.code} onClick={() => onSelectSubtest(subtest.code)} disabled={isCompleted}
                 className={`p-2 rounded-lg text-left text-sm transition-all ${
                   isCompleted ? 'bg-green-100 text-green-700 border border-green-300 cursor-default' :
                   isPendingReview ? 'bg-orange-100 text-orange-700 border border-orange-300 cursor-pointer hover:bg-orange-200' :
+                  isInterrupted ? 'bg-purple-100 text-purple-700 border border-purple-300 cursor-pointer hover:bg-purple-200' :
                   isNotAdministered ? 'bg-gray-100 text-gray-400 line-through' :
                   'bg-gray-50 text-gray-700 hover:bg-gray-100 cursor-pointer border border-gray-200'
                 }`}>
                 <div className="font-medium">{subtest.name}</div>
-                <div className="text-xs">{isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}</div>
+                <div className="text-xs">
+                  {isCompleted ? '✓ Completada' : 
+                   isPendingReview ? '⏳ Pendiente revisión' : 
+                   isInterrupted ? '⏸ Interrumpida' :
+                   isNotAdministered ? 'No administrada' : 'Pendiente'}
+                </div>
               </button>
             )
           })}
@@ -189,7 +203,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   const [ageInfo, setAgeInfo] = useState<{ years: number; months: number; group: string } | null>(null)
   const [rawScores, setRawScores] = useState<Record<string, number>>({})
   const [scaledScores, setScaledScores] = useState<Record<string, number>>({})
-  const [subtestStatus, setSubtestStatus] = useState<Record<string, 'pending' | 'completed' | 'not_administered' | 'pending_review'>>({})
+  const [subtestStatus, setSubtestStatus] = useState<Record<string, 'pending' | 'completed' | 'not_administered' | 'pending_review' | 'interrupted'>>({})
   const [substitutionUsed, setSubstitutionUsed] = useState(false)
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const [activeSubtest, setActiveSubtest] = useState<string | null>(null)
@@ -245,6 +259,13 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     
     if (rawTotal === -1) {
       setSubtestStatus(prev => ({ ...prev, [code]: 'pending_review' }))
+      saveState('in_progress')
+      setActiveSubtest(null)
+      setShowSubtestPanel(true)
+      return
+    }
+    if (rawTotal === -2) {
+      setSubtestStatus(prev => ({ ...prev, [code]: 'interrupted' }))
       saveState('in_progress')
       setActiveSubtest(null)
       setShowSubtestPanel(true)
@@ -380,6 +401,17 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
         </div>
 
         {activeSubtest && renderSubtest()}
+        
+        {activeSubtest && (
+          <div className="mt-2">
+            <button
+              onClick={() => handleSubtestComplete(activeSubtest, -2)}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              ← Volver al panel (dejar interrumpida)
+            </button>
+          </div>
+        )}
 
         {showSubtestPanel && (
           <SubtestPanel 
@@ -397,10 +429,11 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
               <span key={code} className={`text-xs px-2 py-1 rounded-full ${
                 status === 'completed' ? 'bg-green-100 text-green-700' : 
                 status === 'pending_review' ? 'bg-orange-100 text-orange-700' :
+                status === 'interrupted' ? 'bg-purple-100 text-purple-700' :
                 status === 'not_administered' ? 'bg-gray-100 text-gray-400' : 
                 'bg-yellow-100 text-yellow-700'
               }`}>
-                {code}: {status === 'completed' ? '✓' : status === 'pending_review' ? '⏳' : status === 'not_administered' ? '✗' : '○'}
+                {code}: {status === 'completed' ? '✓' : status === 'pending_review' ? '⏳' : status === 'interrupted' ? '⏸' : status === 'not_administered' ? '✗' : '○'}
               </span>
             ))}
           </div>
