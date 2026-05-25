@@ -46,26 +46,14 @@ const RI_ITEMS: RIItem[] = [
   { num: 26, correctAnswers: ['G', 'A', 'K', 'C', 'F', 'D', 'I', 'B'], totalOptions: 12, maxScore: 2, isPractice: false }
 ]
 
-// ============================================================
-// FUNCIONES AUXILIARES
-// ============================================================
-
-const getOptionLetters = (total: number): string[] => {
-  return 'ABCDEFGHIJKL'.slice(0, total).split('')
-}
-
+const getOptionLetters = (total: number): string[] => 'ABCDEFGHIJKL'.slice(0, total).split('')
 const getStimulusPath = (num: number | string): string => {
-  if (typeof num === 'string') {
-    return '/wisc5/ri/ri' + num.toLowerCase() + 'e.png'
-  }
-  return '/wisc5/ri/ri' + String(num).padStart(3, '0') + 'e.png'
+  if (typeof num === 'string') return `/wisc5/ri/ri${num.toLowerCase()}e.png`
+  return `/wisc5/ri/ri${String(num).padStart(3, '0')}e.png`
 }
-
 const getOptionsPath = (num: number | string): string => {
-  if (typeof num === 'string') {
-    return '/wisc5/ri/ri' + num.toLowerCase() + 'o.png'
-  }
-  return '/wisc5/ri/ri' + String(num).padStart(3, '0') + 'o.png'
+  if (typeof num === 'string') return `/wisc5/ri/ri${num.toLowerCase()}o.png`
+  return `/wisc5/ri/ri${String(num).padStart(3, '0')}o.png`
 }
 
 // ============================================================
@@ -96,91 +84,50 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
   const onUpdatePatientRef = useRef(onUpdatePatient)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    onCompleteRef.current = onComplete
-    onUpdatePatientRef.current = onUpdatePatient
-  }, [onComplete, onUpdatePatient])
+  useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
+  useEffect(() => { setSelectedAnswers([]); setPhase('ready'); setShowConfirmation(false) }, [currentIndex])
 
-  // Reiniciar selección al cambiar de ítem
-  useEffect(() => {
-    setSelectedAnswers([])
-    setPhase('ready')
-    setShowConfirmation(false)
-  }, [currentIndex])
-
-  // Enviar instrucciones al display según la fase
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
-        type: 'wisc5_ri',
-        itemNum: currentItem.num,
-        phase: phase,
+        type: 'wisc5_ri', itemNum: currentItem.num, phase: phase,
         stimulusImage: phase === 'showing' ? getStimulusPath(currentItem.num) : null,
         optionsImage: phase === 'answering' ? getOptionsPath(currentItem.num) : null,
-        isPractice: currentItem.isPractice,
-        totalOptions: currentItem.totalOptions,
+        isPractice: currentItem.isPractice, totalOptions: currentItem.totalOptions,
         timeRemaining: phase === 'showing' ? showTimer : 0
       })
     }
   }, [currentItem, phase, showTimer, isCompleted])
 
-  // Manejar cuenta regresiva de 5 segundos
   useEffect(() => {
     if (phase === 'showing' && showTimer > 0) {
-      timerRef.current = setTimeout(() => {
-        setShowTimer(prev => prev - 1)
-      }, 1000)
+      timerRef.current = setTimeout(() => setShowTimer(prev => prev - 1), 1000)
     } else if (phase === 'showing' && showTimer === 0) {
       setPhase('answering')
     }
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [phase, showTimer])
 
-  const handleStartShow = () => {
-    setShowTimer(5)
-    setPhase('showing')
-  }
+  const handleStartShow = () => { setShowTimer(5); setPhase('showing') }
 
   const toggleAnswer = (letter: string) => {
     if (phase !== 'answering' || showConfirmation) return
-
-    setSelectedAnswers(prev => {
-      if (prev.includes(letter)) {
-        return prev.filter(l => l !== letter)
-      }
-      return [...prev, letter]
-    })
+    setSelectedAnswers(prev => prev.includes(letter) ? prev.filter(l => l !== letter) : [...prev, letter])
   }
 
   const calculateScore = (item: RIItem, answers: string[]): number => {
-    if (item.maxScore === 1) {
-      // Ítems 1-3: 1 punto si selecciona la correcta
-      return answers.length === 1 && answers[0] === item.correctAnswers[0] ? 1 : 0
-    }
-
-    // Ítems 4-26: hasta 2 puntos
+    if (item.maxScore === 1) return answers.length === 1 && answers[0] === item.correctAnswers[0] ? 1 : 0
     const correctSet = [...item.correctAnswers].sort().join(',')
     const answerSet = [...answers].sort().join(',')
-
-    if (correctSet === answerSet) {
-      // Mismas respuestas, verificar orden
-      if (JSON.stringify(answers) === JSON.stringify(item.correctAnswers)) {
-        return 2 // Orden correcto
-      }
-      return 1 // Orden incorrecto
-    }
-    return 0 // Faltan o sobran respuestas
+    if (correctSet === answerSet) return JSON.stringify(answers) === JSON.stringify(item.correctAnswers) ? 2 : 1
+    return 0
   }
 
   const handleConfirm = () => {
     if (selectedAnswers.length === 0) return
-
     const score = calculateScore(currentItem, selectedAnswers)
     const effectiveScore = isPractice ? 0 : score
-    const itemNum = currentItem.num
-    const newScores = { ...scores, [itemNum]: effectiveScore }
+    const newScores = { ...scores, [currentItem.num]: effectiveScore }
     setScores(newScores)
     setShowConfirmation(true)
 
@@ -189,74 +136,47 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
         const newZeros = consecutiveZeros + 1
         setConsecutiveZeros(newZeros)
         if (newZeros >= 3) {
-          setTimeout(() => {
-            const total = Object.values(newScores).reduce((a, b) => a + b, 0)
-            setIsCompleted(true)
-            onCompleteRef.current(newScores, total)
-          }, 1500)
+          setTimeout(() => { setIsCompleted(true); onCompleteRef.current(newScores, Object.values(newScores).reduce((a, b) => a + b, 0)) }, 1000)
           return
         }
-      } else {
-        setConsecutiveZeros(0)
-      }
+      } else { setConsecutiveZeros(0) }
     }
   }
 
   const handleNext = () => {
     let nextIdx = currentIndex + 1
-    while (nextIdx < RI_ITEMS.length && scores[RI_ITEMS[nextIdx].num] !== undefined) {
-      nextIdx++
-    }
-
-    if (nextIdx >= RI_ITEMS.length) {
-      const total = Object.values(scores).reduce((a, b) => a + b, 0)
-      setIsCompleted(true)
-      onCompleteRef.current(scores, total)
-    } else {
-      setCurrentIndex(nextIdx)
-    }
+    while (nextIdx < RI_ITEMS.length && scores[RI_ITEMS[nextIdx].num] !== undefined) nextIdx++
+    if (nextIdx >= RI_ITEMS.length) { setIsCompleted(true); onCompleteRef.current(scores, Object.values(scores).reduce((a, b) => a + b, 0)) }
+    else setCurrentIndex(nextIdx)
   }
 
   if (!currentItem) return null
 
   if (isCompleted) {
-    const totalScore = Object.values(scores).reduce((a, b) => a + b, 0)
-    const maxScore = 49
-
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">
-          Puntaje total: {totalScore} / {maxScore}
-        </p>
+        <p className="text-sm text-green-600 mt-1">Puntaje total: {Object.values(scores).reduce((a, b) => a + b, 0)} / 49</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {/* Barra de progreso */}
+      {/* Barra de progreso con número de ítem grande */}
       <div className="bg-gray-50 rounded-lg p-3">
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-600">Retención de Imágenes</span>
-          <span className="text-gray-800 font-medium">
-            {isPractice ? 'Práctica ' + currentItem.num : 'Ítem ' + currentItem.num} / {RI_ITEMS.filter(i => !i.isPractice).length}
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-gray-600 text-sm">Retención de Imágenes</span>
+          <span className="text-3xl font-bold text-gray-800">
+            {isPractice ? currentItem.num : currentItem.num}
           </span>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{
-            width: (Object.keys(scores).filter(k => k !== 'PA' && k !== 'PB' && k !== 'PC').length / RI_ITEMS.filter(i => !i.isPractice).length) * 100 + '%'
-          }} />
+        <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <span>{isPractice ? 'Práctica' : 'Ítem actual'}</span>
+          <span>de {RI_ITEMS.filter(i => !i.isPractice).length}</span>
         </div>
-        <div className="flex gap-2 mt-1">
-          {isPractice && <span className="text-xs text-gray-400">Ítem de práctica (no suma puntos)</span>}
-          {!isPractice && (
-            <span className="text-xs text-gray-500">
-              {currentItem.maxScore === 1
-                ? 'Selecciona la imagen correcta (1 punto)'
-                : 'Selecciona las ' + currentItem.correctAnswers.length + ' imágenes correctas (2 puntos si orden correcto, 1 punto si orden incorrecto)'}
-            </span>
-          )}
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(Object.keys(scores).filter(k => k !== 'PA' && k !== 'PB' && k !== 'PC').length / RI_ITEMS.filter(i => !i.isPractice).length) * 100}%` }} />
         </div>
       </div>
 
@@ -264,133 +184,87 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
       {phase === 'ready' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="bg-blue-50 rounded-lg p-4 mb-4">
-            <p className="text-sm text-blue-700 font-medium mb-2">
-              📋 Instrucciones para el evaluador:
-            </p>
-            <p className="text-sm text-blue-600">
-              Presiona el botón para mostrar los estímulos durante <strong>5 segundos</strong> al evaluado. 
-              La imagen aparecerá en el display del paciente. Cuando el tiempo termine, 
-              automáticamente se mostrarán las opciones de respuesta.
-            </p>
+            <p className="text-sm text-blue-700 font-medium mb-2">📋 Instrucciones:</p>
+            <p className="text-sm text-blue-600">Presiona el botón para mostrar los estímulos durante <strong>5 segundos</strong> al evaluado.</p>
           </div>
           <div className="text-center">
-            <button
-              onClick={handleStartShow}
-              className="px-8 py-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
-            >
+            <button onClick={handleStartShow} className="px-8 py-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors shadow-md">
               ▶ Mostrar estímulos al evaluado (5 segundos)
             </button>
-            <p className="text-xs text-gray-400 mt-3">
-              Imagen: {getStimulusPath(currentItem.num)}
-            </p>
+            <p className="text-xs text-gray-400 mt-3">Imagen: {getStimulusPath(currentItem.num)}</p>
           </div>
         </div>
       )}
 
       {/* Fase: Mostrando estímulos */}
       {phase === 'showing' && (
-        <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 text-center">
-          <p className="text-sm text-blue-600 mb-3">⏱ Mostrando estímulos en el display del evaluado...</p>
-          <div className="text-6xl font-mono font-bold text-blue-700 mb-3">{showTimer}</div>
-          <p className="text-blue-600 text-sm">segundos restantes</p>
-          <div className="h-2 bg-blue-200 rounded-full overflow-hidden mt-4">
-            <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: ((5 - showTimer) / 5) * 100 + '%' }} />
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <p className="text-sm font-medium text-gray-700 mb-3 text-center">📷 Estímulo mostrado al evaluado:</p>
+          <img 
+            src={getStimulusPath(currentItem.num)} 
+            alt="Estímulo"
+            className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-sm"
+            onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
+          />
+          <div className="mt-3 p-2 bg-blue-50 rounded text-center">
+            <p className="text-4xl font-bold text-blue-700">{showTimer}</p>
+            <p className="text-sm text-blue-600">segundos restantes</p>
           </div>
-          <p className="text-xs text-gray-500 mt-3">
-            Imagen: {getStimulusPath(currentItem.num)}
-          </p>
         </div>
       )}
 
       {/* Fase: Respondiendo */}
       {phase === 'answering' && !showConfirmation && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
+          {/* Mostrar opciones (imagen) */}
+          <p className="text-sm font-medium text-gray-700 mb-3 text-center">📷 Opciones mostradas al evaluado:</p>
+          <img 
+            src={getOptionsPath(currentItem.num)} 
+            alt="Opciones"
+            className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-sm mb-4"
+            onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
+          />
+          
           <div className="bg-green-50 rounded-lg p-3 mb-4">
-            <p className="text-sm text-green-700">
-              ✅ Los estímulos ya fueron mostrados. El display ahora muestra las opciones de respuesta.
-            </p>
+            <p className="text-sm text-green-700">✅ El display ahora muestra las opciones de respuesta.</p>
             <p className="text-xs text-green-600 mt-1">
-              El evaluado debe señalar {currentItem.correctAnswers.length === 1 ? 'la imagen correcta' : 'las ' + currentItem.correctAnswers.length + ' imágenes correctas'} 
-              {currentItem.maxScore === 2 ? ' en el orden en que aparecieron' : ''}.
+              Selecciona {currentItem.correctAnswers.length === 1 ? 'la imagen correcta' : `las ${currentItem.correctAnswers.length} imágenes correctas`}.
             </p>
           </div>
-          <p className="text-sm text-gray-600 mb-3">
-            Selecciona las respuestas del evaluado ({currentItem.correctAnswers.length} de {currentItem.totalOptions}):
-          </p>
+          <p className="text-sm text-gray-600 mb-3">Selecciona las respuestas ({currentItem.correctAnswers.length} de {currentItem.totalOptions}):</p>
           <div className="grid grid-cols-4 md:grid-cols-6 gap-2 mb-4">
             {options.map(letter => (
-              <button
-                key={letter}
-                onClick={() => toggleAnswer(letter)}
-                className={'py-3 rounded-lg text-lg font-bold transition-all ' + (
-                  selectedAnswers.includes(letter)
-                    ? 'bg-blue-600 text-white shadow-md scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                )}
-              >
+              <button key={letter} onClick={() => toggleAnswer(letter)}
+                className={`py-3 rounded-lg text-lg font-bold transition-all ${selectedAnswers.includes(letter) ? 'bg-blue-600 text-white shadow-md scale-105' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                 {letter}
               </button>
             ))}
           </div>
-          <button
-            onClick={handleConfirm}
-            disabled={selectedAnswers.length === 0}
-            className={'w-full py-3 rounded-lg font-medium transition-colors ' + (
-              selectedAnswers.length > 0
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            )}
-          >
-            {selectedAnswers.length === 0
-              ? 'Selecciona al menos una opción'
-              : 'Confirmar respuesta (' + selectedAnswers.length + ' seleccionada' + (selectedAnswers.length > 1 ? 's' : '') + ')'}
+          <button onClick={handleConfirm} disabled={selectedAnswers.length === 0}
+            className={`w-full py-3 rounded-lg font-medium transition-colors ${selectedAnswers.length > 0 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+            Confirmar respuesta ({selectedAnswers.length} seleccionada{selectedAnswers.length > 1 ? 's' : ''})
           </button>
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            Opciones: {getOptionsPath(currentItem.num)}
-          </p>
         </div>
       )}
 
-      {/* Confirmación de puntuación */}
+      {/* Confirmación */}
       {showConfirmation && (
-        <div className={'rounded-lg p-4 text-center border ' + (
-          scores[currentItem.num] === 2 ? 'bg-green-50 border-green-200' :
-          scores[currentItem.num] === 1 ? 'bg-yellow-50 border-yellow-200' :
-          'bg-red-50 border-red-200'
-        )}>
-          <p className={'text-lg font-medium ' + (
-            scores[currentItem.num] === 2 ? 'text-green-700' :
-            scores[currentItem.num] === 1 ? 'text-yellow-700' :
-            'text-red-700'
-          )}>
-            {scores[currentItem.num] === 2 ? '✓ 2 puntos (Orden correcto)' :
-             scores[currentItem.num] === 1 ? '1 punto (Orden incorrecto)' :
-             '✗ 0 puntos (Incorrecto)'}
-            {isPractice && <span className="ml-2 text-xs">(no suma al total)</span>}
+        <div className={`rounded-lg p-4 text-center border ${scores[currentItem.num] === 2 ? 'bg-green-50 border-green-200' : scores[currentItem.num] === 1 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
+          <p className={`text-lg font-medium ${scores[currentItem.num] === 2 ? 'text-green-700' : scores[currentItem.num] === 1 ? 'text-yellow-700' : 'text-red-700'}`}>
+            {scores[currentItem.num] === 2 ? '✓ 2 puntos (Orden correcto)' : scores[currentItem.num] === 1 ? '1 punto (Orden incorrecto)' : '✗ 0 puntos (Incorrecto)'}
+            {isPractice && <span className="ml-2 text-xs">(no suma)</span>}
           </p>
           {scores[currentItem.num] < 2 && (
-            <p className="text-sm text-gray-600 mt-2">
-              <strong>Respuestas correctas:</strong> {currentItem.correctAnswers.join(' → ')}
-            </p>
+            <p className="text-sm text-gray-600 mt-2"><strong>Correctas:</strong> {currentItem.correctAnswers.join(' → ')}</p>
           )}
-          <button
-            onClick={handleNext}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Continuar
-          </button>
+          <button onClick={handleNext} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Continuar</button>
         </div>
       )}
 
-      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
           Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 49
-          {consecutiveZeros > 0 && (
-            <span className="ml-2 text-xs text-orange-600">
-              (Fallos consecutivos: {consecutiveZeros}/3)
-            </span>
-          )}
+          {consecutiveZeros > 0 && <span className="ml-2 text-xs text-orange-600">(Fallos consecutivos: {consecutiveZeros}/3)</span>}
         </p>
       </div>
     </div>

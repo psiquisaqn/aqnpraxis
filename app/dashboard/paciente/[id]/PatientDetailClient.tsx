@@ -24,8 +24,8 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
   const [editing, setEditing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [showNewSessionModal, setShowNewSessionModal] = useState(false)
   const router = useRouter()
-  
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -63,7 +63,6 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
           notes: data.notes || ''
         })
         
-        // Cargar sesiones del paciente
         const { data: sessionsData, error: sessionsError } = await supabase
           .from('sessions')
           .select('*')
@@ -96,7 +95,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
   }
 
   const handleDelete = async () => {
-    if (!confirm('┬┐Estás seguro de eliminar este paciente? Esta acción no se puede deshacer.')) {
+    if (!confirm('¿Estás seguro de eliminar este paciente? Esta acción no se puede deshacer.')) {
       return
     }
 
@@ -115,7 +114,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
   }
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (!confirm('┬┐Eliminar esta evaluación?')) return
+    if (!confirm('¿Eliminar esta evaluación?')) return
     
     const { error } = await supabase
       .from('sessions')
@@ -134,9 +133,26 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
       coopersmith: 'Coopersmith SEI',
       bdi2: 'BDI-II',
       peca: 'PECA',
-      wisc5: 'WISC-V'
+      wisc5: 'WISC-V',
+      wisc5_cl: 'WISC-V'
     }
     return tests[testId] || testId
+  }
+
+  // Determinar link de continuación según tipo de test
+  const getContinueLink = (session: Session): string => {
+    if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
+      return `/dashboard/paciente/${patientId}`
+    }
+    return `/session/${session.id}`
+  }
+
+  // Determinar link de informe según tipo de test
+  const getReportLink = (session: Session): string => {
+    if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
+      return `/resultados/wisc5?session=${session.id}`
+    }
+    return `/resultados/${session.test_id}?session=${session.id}`
   }
 
   if (loading) {
@@ -195,38 +211,27 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
-                <input
-                  type="text"
-                  value={formData.full_name}
+                <input type="text" value={formData.full_name}
                   onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">RUT</label>
-                <input
-                  type="text"
-                  value={formData.rut}
+                <input type="text" value={formData.rut}
                   onChange={(e) => setFormData({...formData, rut: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
-                <input
-                  type="date"
-                  value={formData.birth_date?.split('T')[0] || ''}
+                <input type="date" value={formData.birth_date?.split('T')[0] || ''}
                   onChange={(e) => setFormData({...formData, birth_date: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Género</label>
-                <select
-                  value={formData.gender}
+                <select value={formData.gender}
                   onChange={(e) => setFormData({...formData, gender: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg">
                   <option value="">Seleccionar</option>
                   <option value="M">Masculino</option>
                   <option value="F">Femenino</option>
@@ -236,49 +241,34 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Establecimiento</label>
-                <input
-                  type="text"
-                  value={formData.school}
+                <input type="text" value={formData.school}
                   onChange={(e) => setFormData({...formData, school: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Curso/Grado</label>
-                <input
-                  type="text"
-                  value={formData.grade}
+                <input type="text" value={formData.grade}
                   onChange={(e) => setFormData({...formData, grade: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
+                <input type="email" value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
+                <input type="tel" value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notas adicionales</label>
-              <textarea
-                value={formData.notes}
+              <textarea value={formData.notes}
                 onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
+                rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
             </div>
           </div>
         ) : (
@@ -294,6 +284,16 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
             <div className="md:col-span-2"><span className="text-sm text-gray-500">Notas:</span> <p className="text-gray-800 mt-1">{patient.notes || 'Sin notas'}</p></div>
           </div>
         )}
+
+        {/* Botón Nueva evaluación */}
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          <Link
+            href={`/dashboard/paciente/${patientId}/nueva-sesion-dual`}
+            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + Nueva evaluación
+          </Link>
+        </div>
       </div>
 
       {/* Evaluaciones */}
@@ -309,14 +309,16 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                   <div className="font-medium text-gray-800">{getTestName(session.test_id)}</div>
                   <div className="text-xs text-gray-400">
                     {new Date(session.created_at).toLocaleDateString()}
-                    {session.status === 'completed' && ' Completada'}
-                    {session.status === 'in_progress' && ' En curso'}
+                    {session.status === 'completed' && ' · Completada'}
+                    {session.status === 'in_progress' && ' · En curso'}
+                    {session.status === 'completed_brief' && ' · Finalizado (breve)'}
+                    {session.status === 'completed_extended' && ' · Finalizado (extendido)'}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {session.status === 'completed' && (
+                  {(session.status === 'completed' || session.status === 'completed_brief' || session.status === 'completed_extended') && (
                     <Link
-                      href={`/resultados/${session.test_id}?session=${session.id}`}
+                      href={getReportLink(session)}
                       className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
                     >
                       Ver informe
@@ -324,7 +326,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                   )}
                   {session.status === 'in_progress' && (
                     <Link
-                      href={`/session/${session.id}`}
+                      href={getContinueLink(session)}
                       className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
                     >
                       Continuar

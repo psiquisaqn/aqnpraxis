@@ -63,101 +63,83 @@ interface SuggestionResult {
 
 function suggestScore(response: string, itemNum: number): SuggestionResult {
   const disclaimer = '⚠️ Esta sugerencia es automática. Consulte el manual del WISC-V y aplique su criterio profesional.'
-
   if (!response || response.trim().length === 0) {
     return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta vacía', disclaimer }
   }
-
   const norm = normalizeText(response)
 
-  // Palabras clave para puntuación 2 (definición completa y precisa)
   const score2Keywords: Record<number, string[]> = {
     1: ['flor', 'girasol', 'margarita'],
     2: ['sol'],
     3: ['pera'],
     4: ['balde', 'cubo', 'cubeta'],
-    5: ['animal', 'mamifero', 'vaca', 'bovino', 'vacuno', 'leche', 'muge'],
-    6: ['feliz', 'contento', 'alegre', 'animar', 'animo', 'hacer reir', 'transmitir felicidad'],
+    5: ['animal', 'mamifero', 'bovino', 'vacuno', 'leche', 'muge'],
+    6: ['feliz', 'contento', 'alegre', 'animar', 'hacer reir'],
     7: ['mentir', 'mentira', 'hacer creer', 'no es verdad', 'falso'],
     8: ['cria', 'perro bebe', 'recien nacido', 'mamifero'],
     9: ['para siempre', 'nunca termina', 'nunca acaba', 'eterno'],
-    10: ['perdido', 'desaparecido', 'perder', 'rumbo', 'extraviado'],
-    11: ['vehiculo', 'transporte', 'publico', 'micro', 'autobus', 'mucha gente', 'furgon'],
-    12: ['significado', 'definicion', 'palabras', 'diccionario', 'libro'],
-    13: ['cumplir', 'compromiso', 'acuerdo', 'juramento', 'palabra', 'contrato'],
-    14: ['ciencia', 'cientifico', 'investigador', 'metodo cientifico', 'experimento', 'descubrimiento'],
-    15: ['respetar', 'aguantar', 'soportar', 'tolerar', 'ideas', 'distintas', 'paciencia'],
-    16: ['simpatico', 'agradable', 'amable', 'cae bien', 'hechicero', 'brujo'],
-    17: ['suficiente', 'bastante', 'adecuado', 'necesario', 'basta'],
-    18: ['fugitivo', 'escapo', 'escapa', 'justicia', 'ley', 'ladron', 'profugo'],
-    19: ['acortado', 'resumido', 'abreviado', 'breve', 'corto', 'version'],
-    20: ['breve', 'instante', 'poco tiempo', 'fugaz', 'rapido', 'veloz'],
-    21: ['desafia', 'normas', 'reglas', 'leyes', 'transgresor', 'rebelde', 'disconforme'],
-    22: ['complejo', 'elegante', 'refinado', 'sofisticado', 'lujo'],
-    23: ['ciudad', 'citadino', 'urbano', 'cortes', 'educado'],
-    24: ['romper', 'quebrar', 'saltarse', 'normas', 'reglas', 'ley', 'transgredir'],
-    25: ['unilateral', 'una parte', 'un lado', 'considera'],
-    26: ['dañino', 'perjudicial', 'nocivo', 'malo', 'hace mal'],
-    27: ['utopia', 'sociedad', 'ideal', 'futura', 'paraiso'],
-    28: ['sensible', 'fragil', 'susceptible', 'molesta', 'facilmente'],
-    29: ['propiciar', 'condiciones', 'favorecer', 'facilitar', 'generar']
+    10: ['perdido', 'desaparecido', 'rumbo'],
+    11: ['vehiculo', 'transporte', 'publico', 'micro', 'autobus', 'mucha gente'],
+    12: ['significado', 'definicion', 'palabras', 'diccionario'],
+    13: ['cumplir', 'compromiso', 'acuerdo', 'juramento', 'contrato'],
+    14: ['ciencia', 'cientifico', 'investigador', 'experimento', 'descubrimiento'],
+    15: ['respetar', 'aguantar', 'soportar', 'ideas', 'distintas', 'paciencia'],
+    16: ['simpatico', 'agradable', 'amable', 'cae bien'],
+    17: ['suficiente', 'bastante', 'adecuado', 'necesario'],
+    18: ['fugitivo', 'escapo', 'justicia', 'ley', 'ladron'],
+    19: ['acortado', 'resumido', 'breve', 'corto'],
+    20: ['breve', 'instante', 'poco tiempo', 'rapido', 'veloz'],
+    21: ['desafia', 'normas', 'reglas', 'leyes', 'transgresor', 'disconforme'],
+    22: ['complejo', 'elegante', 'refinado', 'lujo'],
+    23: ['ciudad', 'citadino', 'cortes', 'educado'],
+    24: ['romper', 'quebrar', 'saltarse', 'normas', 'reglas', 'ley'],
+    25: ['unilateral', 'una parte', 'un lado'],
+    26: ['dañino', 'perjudicial', 'malo', 'hace mal'],
+    27: ['utopia', 'sociedad', 'ideal', 'paraiso'],
+    28: ['sensible', 'fragil', 'molesta', 'facilmente'],
+    29: ['condiciones', 'favorecer', 'facilitar', 'generar']
   }
 
-  // Palabras clave para puntuación 1 (definición parcial o ejemplo)
   const score1Keywords: Record<number, string[]> = {
     1: ['planta', 'crece'],
     2: ['brilla', 'estrella', 'circulo'],
     3: ['fruta', 'comida', 'dulce', 'manzana'],
-    4: ['lata', 'tarro', 'canasta', 'caja', 'agua', 'limpiar', 'trapear'],
-    5: ['leche', 'pasto', 'granja', 'campo', 'cuernos', 'herbivoro'],
-    6: ['divertir', 'regalo', 'buena noticia', 'siente bien'],
-    7: ['ocultar', 'verdad', 'traicionar', 'abuso', 'confianza', 'pareja'],
-    8: ['animal', 'mascota', 'perro', 'perrito', 'pequeño', 'chico'],
+    4: ['lata', 'tarro', 'canasta', 'caja', 'agua', 'limpiar'],
+    5: ['leche', 'pasto', 'granja', 'campo', 'cuernos'],
+    6: ['divertir', 'regalo', 'buena noticia'],
+    7: ['ocultar', 'verdad', 'traicionar', 'confianza'],
+    8: ['animal', 'mascota', 'perro', 'pequeño', 'chico'],
     9: ['mucho tiempo', 'nunca cambia', 'largo'],
-    10: ['olvidado', 'perdido', 'desaparecido'],
+    10: ['olvidado'],
     11: ['vehiculo', 'transporte', 'viaje', 'escuela', 'pasajeros'],
-    12: ['significado', 'palabras', 'aprender', 'traducir', 'ordenadas'],
-    13: ['decir', 'hacer', 'cumplir', 'responsable', 'verdad'],
-    14: ['descubre', 'inventa', 'investigador', 'experimento', 'biologo', 'fisico', 'quimico'],
-    15: ['respetar', 'paciencia', 'aceptar', 'admitir', 'empatia'],
-    16: ['bonita', 'educado', 'lindo', 'hermoso', 'bello', 'tierno', 'alegre'],
-    17: ['bien', 'justo', 'lleno', 'no quiero mas'],
+    12: ['significado', 'palabras', 'aprender', 'traducir'],
+    13: ['decir', 'hacer', 'cumplir', 'responsable'],
+    14: ['descubre', 'inventa', 'biologo', 'fisico', 'quimico'],
+    15: ['respetar', 'paciencia', 'aceptar', 'admitir'],
+    16: ['bonita', 'educado', 'lindo', 'hermoso', 'tierno'],
+    17: ['bien', 'justo', 'lleno'],
     18: ['escapar', 'buscado', 'escondido'],
-    19: ['breve', 'corto', 'rapido', 'resumen'],
+    19: ['breve', 'corto', 'rapido'],
     20: ['rapido', 'veloz'],
-    21: ['indignado', 'disconforme', 'desobedece', 'contrario'],
-    22: ['complejo', 'dificil', 'exclusivo', 'culto', 'mejor'],
-    23: ['ciudad', 'habitado', 'viven', 'estilo', 'moda'],
-    24: ['inadecuado', 'agredir', 'pegar', 'golpear'],
-    25: ['un lado', 'lateral', 'parte'],
-    26: ['disgusta', 'molesto', 'desagradable', 'incomodo'],
-    27: ['sociedad', 'futuro', 'paraiso', 'ideal', 'dificil'],
+    21: ['indignado', 'desobedece', 'contrario'],
+    22: ['dificil', 'exclusivo', 'culto'],
+    23: ['ciudad', 'habitado', 'estilo'],
+    24: ['inadecuado', 'agredir', 'pegar'],
+    25: ['un lado', 'lateral'],
+    26: ['disgusta', 'molesto', 'desagradable'],
+    27: ['futuro', 'ideal', 'dificil'],
     28: ['influenciable', 'inseguro'],
     29: ['dar', 'entregar', 'generar', 'ofrecer']
   }
 
-  // Verificar puntuación 2
   const kw2 = score2Keywords[itemNum] || []
-  for (const kw of kw2) {
-    if (norm.includes(normalizeText(kw))) {
-      return { suggestedScore: 2, confidence: 'high', reason: 'Palabra clave de puntuación 2 detectada: ' + kw, disclaimer }
-    }
-  }
+  for (const kw of kw2) { if (norm.includes(normalizeText(kw))) return { suggestedScore: 2, confidence: 'high', reason: 'Palabra clave de puntuación 2: ' + kw, disclaimer } }
 
-  // Verificar puntuación 1
   const kw1 = score1Keywords[itemNum] || []
-  for (const kw of kw1) {
-    if (norm.includes(normalizeText(kw))) {
-      return { suggestedScore: 1, confidence: 'medium', reason: 'Palabra clave de puntuación 1 detectada: ' + kw, disclaimer }
-    }
-  }
+  for (const kw of kw1) { if (norm.includes(normalizeText(kw))) return { suggestedScore: 1, confidence: 'medium', reason: 'Palabra clave de puntuación 1: ' + kw, disclaimer } }
 
-  // Si la respuesta es elaborada pero sin palabras clave
-  if (norm.split(' ').length >= 5) {
-    return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada, pero sin palabras clave específicas', disclaimer }
-  }
-
-  return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta insuficiente o incorrecta', disclaimer }
+  if (norm.split(' ').length >= 5) return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada', disclaimer }
+  return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta insuficiente', disclaimer }
 }
 
 // ============================================================
@@ -216,52 +198,39 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
 
-  useEffect(() => {
-    onCompleteRef.current = onComplete
-    onUpdatePatientRef.current = onUpdatePatient
-  }, [onComplete, onUpdatePatient])
+  useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
 
-  // Enviar estímulo al display
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
-        type: 'wisc5_voc',
-        itemNum: currentItem.num,
-        word: currentItem.word,
-        instruction: currentItem.instruction,
-        hasImage: currentItem.hasImage,
+        type: 'wisc5_voc', itemNum: currentItem.num, word: currentItem.word,
+        instruction: currentItem.instruction, hasImage: currentItem.hasImage,
         imagePath: currentItem.imagePath || null
       })
     }
   }, [currentItem, isCompleted])
 
-  // Sugerencia en tiempo real
   useEffect(() => {
     if (currentItem && response.trim().length > 0 && scores[currentItem.num] === undefined) {
-      const result = suggestScore(response, currentItem.num)
-      setSuggestion(result)
+      setSuggestion(suggestScore(response, currentItem.num))
     } else {
       setSuggestion(null)
     }
   }, [response, currentItem])
 
-  // Verificar bonus
   useEffect(() => {
     if (!bonusApplied && checkBonusEligibility(scores)) {
       setBonusApplied(true)
-      const bonus = calculateBonusPoints()
-      console.log('🎉 Bonus de +' + bonus + ' puntos aplicado')
+      console.log('🎉 Bonus de +' + calculateBonusPoints() + ' puntos aplicado')
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
   const markSkippedItemsAsCorrect = (
-    newScores: Record<number, number>,
-    fromItem: number,
-    toItem: number
+    newScores: Record<number, number>, fromItem: number, toItem: number
   ): Record<number, number> => {
     const updatedScores = { ...newScores }
     for (let i = toItem + 1; i < fromItem; i++) {
-      if (updatedScores[i] === undefined) {
+      if (updatedScores[i] === undefined && i >= 1 && i <= 29) {
         updatedScores[i] = 2
         console.log('✓ Ítem ' + i + ' no administrado - se asigna puntaje 2 automáticamente')
       }
@@ -273,11 +242,10 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
     let updatedScores = { ...scores }
     const currentIdx = VOC_ITEMS.findIndex(i => i.num === currentItemNum)
 
+    // Sin retroceso para ≤8 años
     if (!hasBacktrack) {
       let nextIdx = currentIdx + 1
-      while (nextIdx < VOC_ITEMS.length && updatedScores[VOC_ITEMS[nextIdx].num] !== undefined) {
-        nextIdx++
-      }
+      while (nextIdx < VOC_ITEMS.length && updatedScores[VOC_ITEMS[nextIdx].num] !== undefined) nextIdx++
       return { nextIndex: nextIdx, updatedScores }
     }
 
@@ -296,48 +264,36 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
         }
 
         let prevItem = currentItemNum - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          prevItem--
-        }
-        if (prevItem >= 1) {
-          return { nextIndex: VOC_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) prevItem--
+        if (prevItem >= 1) return { nextIndex: VOC_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       } else {
         setConsecutiveSuccessesInBacktrack(0)
         let prevItem = currentItemNum - 1
-        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-          prevItem--
-        }
-        if (prevItem >= 1) {
-          return { nextIndex: VOC_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-        }
+        while (prevItem >= 1 && updatedScores[prevItem] !== undefined) prevItem--
+        if (prevItem >= 1) return { nextIndex: VOC_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
       }
       setBacktrackMode(false)
       setConsecutiveSuccessesInBacktrack(0)
     }
 
     // Verificar si se debe activar secuencia inversa
-    const isFirstTwo = currentItemNum === firstStartItem || currentItemNum === secondStartItem
+    // CORRECCIÓN: El retroceso se activa si falla (puntaje < 2) en CUALQUIERA de los primeros dos
+    const isFirstTwoAdministered = currentItemNum === firstStartItem || currentItemNum === secondStartItem
     const isFailure = currentScore < 2
 
-    if (isFirstTwo && isFailure) {
+    if (isFirstTwoAdministered && isFailure) {
+      console.log('🔄 Activando retroceso: ítem ' + currentItemNum + ', puntaje ' + currentScore + ' (primeros dos: ' + firstStartItem + ', ' + secondStartItem + ')')
       setBacktrackMode(true)
       setFailedStartItem(currentItemNum)
       setConsecutiveSuccessesInBacktrack(0)
 
       let prevItem = currentItemNum - 1
-      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) {
-        prevItem--
-      }
-      if (prevItem >= 1) {
-        return { nextIndex: VOC_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
-      }
+      while (prevItem >= 1 && updatedScores[prevItem] !== undefined) prevItem--
+      if (prevItem >= 1) return { nextIndex: VOC_ITEMS.findIndex(i => i.num === prevItem), updatedScores }
     }
 
     let nextIdx = currentIdx + 1
-    while (nextIdx < VOC_ITEMS.length && updatedScores[VOC_ITEMS[nextIdx].num] !== undefined) {
-      nextIdx++
-    }
+    while (nextIdx < VOC_ITEMS.length && updatedScores[VOC_ITEMS[nextIdx].num] !== undefined) nextIdx++
     return { nextIndex: nextIdx, updatedScores }
   }
 
@@ -390,16 +346,10 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
     const bonus = bonusApplied ? calculateBonusPoints() : 0
     const total = Object.values(scores).reduce((a, b) => a + b, 0) + bonus
     const maxP = VOC_ITEMS.length * 2
-
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">
-          Puntaje total: {total} / {maxP}
-          {bonusApplied && (
-            <span className="ml-2 text-blue-600">(incluye +{bonus} puntos por bonus)</span>
-          )}
-        </p>
+        <p className="text-sm text-green-600 mt-1">Puntaje total: {total} / {maxP}{bonusApplied && <span className="ml-2 text-blue-600">(incluye +{bonus} bonus)</span>}</p>
       </div>
     )
   }
@@ -410,117 +360,77 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
 
   return (
     <div className="space-y-4">
-      {/* Barra de progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Vocabulario</span>
-          <span className="text-gray-800 font-medium">
-            Ítem {currentItem.num} / {VOC_ITEMS.length}
-          </span>
+          <span className="text-gray-800 font-medium">Ítem {currentItem.num} / {VOC_ITEMS.length}</span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{
-            width: (Object.keys(scores).length / VOC_ITEMS.length) * 100 + '%'
-          }} />
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: (Object.keys(scores).length / VOC_ITEMS.length) * 100 + '%' }} />
         </div>
         {isGoingBack && <p className="text-xs text-orange-600 mt-1">↩️ Retrocediendo para verificar nivel basal...</p>}
-        {backtrackMode && (
-          <p className="text-xs text-orange-600 mt-1">🔄 Modo retroceso activo - Éxitos consecutivos: {consecutiveSuccessesInBacktrack}/2</p>
-        )}
+        {backtrackMode && <p className="text-xs text-orange-600 mt-1">🔄 Modo retroceso activo - Éxitos consecutivos: {consecutiveSuccessesInBacktrack}/2</p>}
         {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{bonusPts} puntos aplicado</p>}
       </div>
 
-      {/* Estímulo (imagen o palabra) */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
         {currentItem.hasImage && currentItem.imagePath ? (
           <div>
             <p className="text-sm text-blue-700 mb-3">{currentItem.instruction}</p>
-            <img
-              src={currentItem.imagePath}
-              alt={'Ítem ' + currentItem.num}
-              className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200"
-              onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
-            />
+            <img src={currentItem.imagePath} alt={'Ítem ' + currentItem.num} className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} />
           </div>
         ) : (
           <div>
             <p className="text-sm text-blue-700 mb-3">{currentItem.instruction}</p>
-            <p className="text-3xl md:text-4xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
-              {currentItem.word}
-            </p>
+            <p className="text-3xl md:text-4xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>{currentItem.word}</p>
           </div>
         )}
       </div>
 
-      {/* Campo de respuesta */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Respuesta del evaluado</label>
-        <textarea
-          value={response}
-          onChange={(e) => setResponse(e.target.value)}
-          disabled={scores[currentItem.num] !== undefined}
+        <textarea value={response} onChange={(e) => setResponse(e.target.value)} disabled={scores[currentItem.num] !== undefined}
           placeholder="Escribe la respuesta del evaluado..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] disabled:bg-gray-100 disabled:text-gray-500"
-        />
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] disabled:bg-gray-100 disabled:text-gray-500" />
 
         {suggestion && scores[currentItem.num] === undefined && (
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex justify-between items-start gap-3">
               <div className="flex-1">
-                <p className="text-sm text-blue-700">
-                  <strong>Sugerencia de puntaje:</strong> {suggestion.suggestedScore}
-                  <span className="text-xs ml-2 text-blue-500">
-                    ({suggestion.confidence === 'high' ? 'Alta' : suggestion.confidence === 'medium' ? 'Media' : 'Baja'} confianza)
-                  </span>
+                <p className="text-sm text-blue-700"><strong>Sugerencia de puntaje:</strong> {suggestion.suggestedScore}
+                  <span className="text-xs ml-2 text-blue-500">({suggestion.confidence === 'high' ? 'Alta' : suggestion.confidence === 'medium' ? 'Media' : 'Baja'} confianza)</span>
                 </p>
                 {suggestion.reason && <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>}
                 <p className="text-xs text-orange-600 mt-2">{suggestion.disclaimer}</p>
               </div>
-              <button onClick={applySuggestion}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap">
-                Aplicar
-              </button>
+              <button onClick={applySuggestion} className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap">Aplicar</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Botones de puntaje */}
       {scores[currentItem.num] === undefined && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-600 mb-3">Puntaje para este ítem:</p>
           <div className="grid grid-cols-3 gap-3">
-            <button onClick={() => handleScore(0)}
-              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
-              0 - Incorrecto
-            </button>
-            <button onClick={() => handleScore(1)}
-              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
-              1 - Parcial
-            </button>
-            <button onClick={() => handleScore(2)}
-              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
-              2 - Correcto
-            </button>
+            <button onClick={() => handleScore(0)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">0 - Incorrecto</button>
+            <button onClick={() => handleScore(1)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">1 - Parcial</button>
+            <button onClick={() => handleScore(2)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">2 - Correcto</button>
           </div>
         </div>
       )}
 
-      {/* Confirmación */}
       {scores[currentItem.num] !== undefined && (
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">✓ Ítem respondido con puntaje {scores[currentItem.num]}</p>
         </div>
       )}
 
-      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
           Puntaje bruto acumulado: {displayScore} / {VOC_ITEMS.length * 2}
           {!bonusApplied && patientAge >= 9 && (
-            <span className="ml-2 text-xs text-gray-500">
-              (Bonus potencial: +{bonusPts} pts si acierta ítems {firstStartItem} y {secondStartItem})
-            </span>
+            <span className="ml-2 text-xs text-gray-500">(Bonus potencial: +{bonusPts} pts si acierta ítems {firstStartItem} y {secondStartItem})</span>
           )}
         </p>
       </div>

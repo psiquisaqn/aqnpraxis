@@ -125,9 +125,7 @@ function SubtestPanel({
                   'bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer'
                 }`}>
                 <div className="font-medium">{subtest.name}</div>
-                <div className="text-xs">
-                  {isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}
-                </div>
+                <div className="text-xs">{isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}</div>
               </button>
             )
           })}
@@ -151,9 +149,7 @@ function SubtestPanel({
                   'bg-gray-50 text-gray-700 hover:bg-gray-100 cursor-pointer border border-gray-200'
                 }`}>
                 <div className="font-medium">{subtest.name}</div>
-                <div className="text-xs">
-                  {isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}
-                </div>
+                <div className="text-xs">{isCompleted ? '✓ Completada' : isPendingReview ? '⏳ Pendiente revisión' : isNotAdministered ? 'No administrada' : 'Pendiente'}</div>
               </button>
             )
           })}
@@ -300,6 +296,26 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     return WISC_SUBTESTS.every(s => subtestStatus[s.code] === 'completed')
   }
 
+  const generateBriefReport = async () => {
+    if (!arePrimarySubtestsCompleted()) {
+      alert('Debes completar las 7 subpruebas primarias para generar el informe breve.')
+      return
+    }
+    console.log('📄 Generando informe breve')
+    await saveState('completed_brief', 'brief')
+    router.push(`/resultados/wisc5?session=${sessionId}&type=brief`)
+  }
+
+  const generateExtendedReport = async () => {
+    if (!areAllSubtestsCompleted()) {
+      alert('Debes completar las 15 subpruebas para generar el informe extendido.')
+      return
+    }
+    console.log('📄 Generando informe extendido')
+    await saveState('completed_extended', 'extended')
+    router.push(`/resultados/wisc5?session=${sessionId}&type=extended`)
+  }
+
   const handleStartTest = () => {
     if (!birthDate) { setError('Por favor, ingresa la fecha de nacimiento del paciente'); return }
     setShowQuestionZero(false); setError(null); setShowSubtestPanel(true)
@@ -369,7 +385,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
           <SubtestPanel 
             subtestStatus={subtestStatus} onSelectSubtest={handleSelectSubtest}
             onToggleSubstitution={handleToggleSubstitution} substitutionUsed={substitutionUsed}
-            onGenerateBriefReport={() => {}} onGenerateExtendedReport={() => {}}
+            onGenerateBriefReport={generateBriefReport} onGenerateExtendedReport={generateExtendedReport}
             canGenerateBrief={arePrimarySubtestsCompleted()} canGenerateExtended={areAllSubtestsCompleted()}
           />
         )}
