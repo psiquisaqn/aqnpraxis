@@ -16,7 +16,7 @@ interface Props {
   onClose: () => void
 }
 
-export default function NewSessionModal({ patientId, onClose }: Props) {
+export function NewSessionModal({ patientId, onClose }: Props) {
   const router = useRouter()
   const [selected, setSelected] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
