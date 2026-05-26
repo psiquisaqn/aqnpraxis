@@ -72,9 +72,9 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
           .order('created_at', { ascending: false })
         
         if (!sessionsError && sessionsData) {
-          // Para sesiones WISC-V en progreso, buscar la sesión dual asociada
+          // Para sesiones WISC-V, buscar la sesión dual asociada
           const wiscSessions = sessionsData.filter((s: any) => 
-            (s.test_id === 'wisc5' || s.test_id === 'wisc5_cl') && s.status === 'in_progress'
+            (s.test_id === 'wisc5' || s.test_id === 'wisc5_cl')
           )
           
           if (wiscSessions.length > 0) {
@@ -83,7 +83,6 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
               .from('dual_sessions')
               .select('id, session_id')
               .in('session_id', sessionIds)
-              .eq('is_active', true)
             
             const dualMap = new Map()
             if (dualData) {
@@ -273,13 +272,37 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  {/* Abrir panel WISC-V si existe sesión dual */}
+                  {session.dual_session_id && (
+                    <Link
+                      href={`/dual-control/${session.dual_session_id}`}
+                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                    >
+                      Abrir panel
+                    </Link>
+                  )}
                   {(session.status === 'completed' || session.status === 'completed_brief' || session.status === 'completed_extended') && (
-                    <Link href={getReportLink(session)} className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors">Ver informe</Link>
+                    <Link
+                      href={getReportLink(session)}
+                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                    >
+                      Ver informe
+                    </Link>
                   )}
-                  {session.status === 'in_progress' && (
-                    <Link href={getContinueLink(session)} className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors">Continuar</Link>
+                  {session.status === 'in_progress' && !session.dual_session_id && (
+                    <Link
+                      href={getContinueLink(session)}
+                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                    >
+                      Continuar
+                    </Link>
                   )}
-                  <button onClick={() => handleDeleteSession(session.id)} className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors">Eliminar</button>
+                  <button
+                    onClick={() => handleDeleteSession(session.id)}
+                    className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    Eliminar
+                  </button>
                 </div>
               </div>
             ))}

@@ -69,53 +69,53 @@ function generateInterpretation(indexes: Record<string, any>, scaledScores: Reco
   const interpretations: string[] = []
   if (indexes.CIT) {
     const cit = indexes.CIT
-    interpretations.push(`El Coeficiente Intelectual Total (CIT) obtenido es de ${cit.score}, lo que corresponde a una clasificación "${getClassification(cit.score)}" y se ubica en el percentil ${cit.percentile}.`)
+    interpretations.push(`El Coeficiente Intelectual Total (CIT) obtenido es de ${cit.score}, clasificación "${getClassification(cit.score)}", percentil ${cit.percentile}.`)
   }
   const indexValues = Object.entries(indexes).filter(([k]) => k !== 'CIT').map(([k, v]: any) => ({ score: v.score })).filter(v => v.score)
   if (indexValues.length > 0) {
     const scores = indexValues.map(v => v.score)
     const dispersion = Math.max(...scores) - Math.min(...scores)
-    if (dispersion >= 23) interpretations.push(`Se observa una dispersión significativa entre los índices (${dispersion} puntos).`)
-    else if (dispersion >= 15) interpretations.push(`Existe una dispersión moderada entre los índices (${dispersion} puntos).`)
-    else interpretations.push(`Los índices muestran un perfil cognitivo relativamente homogéneo.`)
+    if (dispersion >= 23) interpretations.push(`Dispersión significativa entre índices (${dispersion} puntos). Perfil heterogéneo.`)
+    else if (dispersion >= 15) interpretations.push(`Dispersión moderada entre índices (${dispersion} puntos).`)
+    else interpretations.push(`Perfil cognitivo relativamente homogéneo.`)
   }
   if (scaledScores && Object.keys(scaledScores).length > 0) {
     const entries = Object.entries(scaledScores).filter(([_, v]) => v !== undefined && v !== null) as [string, number][]
     if (entries.length > 0) {
       const maxSubtest = entries.reduce((a, b) => a[1] > b[1] ? a : b)
       const minSubtest = entries.reduce((a, b) => a[1] < b[1] ? a : b)
-      interpretations.push(`Mayor rendimiento: ${SUBTEST_LABELS[maxSubtest[0]] || maxSubtest[0]} (PE ${maxSubtest[1]}). Menor rendimiento: ${SUBTEST_LABELS[minSubtest[0]] || minSubtest[0]} (PE ${minSubtest[1]}).`)
+      interpretations.push(`Mayor rendimiento: ${SUBTEST_LABELS[maxSubtest[0]] || maxSubtest[0]} (PE ${maxSubtest[1]}). Menor: ${SUBTEST_LABELS[minSubtest[0]] || minSubtest[0]} (PE ${minSubtest[1]}).`)
     }
   }
   return interpretations
 }
 
 function generateRecommendations(indexes: Record<string, any>, scaledScores: Record<string, number>, patientName: string): string[] {
-  const recommendations: string[] = []
-  recommendations.push(`Con base en los resultados obtenidos por ${patientName} en la escala WISC-V, se sugieren las siguientes recomendaciones:`)
+  const recommendations: string[] = [`Recomendaciones para ${patientName}:`]
   if (indexes.CIT) {
     const cit = indexes.CIT.score
-    if (cit >= 120) recommendations.push('Dado el alto rendimiento intelectual, se recomienda proporcionar oportunidades de enriquecimiento curricular y programas para altas capacidades.')
-    else if (cit >= 90) recommendations.push('Se sugiere continuar con el plan educativo regular, prestando atención a las áreas de mayor y menor rendimiento.')
-    else recommendations.push('Se recomienda implementar un plan de apoyo psicopedagógico individualizado con adecuaciones curriculares.')
+    if (cit >= 120) recommendations.push('Alto rendimiento: enriquecimiento curricular y programas para altas capacidades.')
+    else if (cit >= 90) recommendations.push('Continuar con plan regular, atendiendo áreas específicas.')
+    else recommendations.push('Apoyo psicopedagógico individualizado con adecuaciones curriculares.')
   }
   const lowIndexes = Object.entries(indexes).filter(([_, v]: any) => v.score < 85).map(([k]) => k)
   for (const code of lowIndexes) {
     switch (code) {
-      case 'ICV': recommendations.push('Para fortalecer la comprensión verbal: lecturas compartidas, conversaciones variadas, vocabulario en contexto.'); break
-      case 'IMT': recommendations.push('Para mejorar la memoria de trabajo: estrategias de repetición, dividir tareas, apoyos visuales.'); break
-      case 'IVP': recommendations.push('Para potenciar la velocidad de procesamiento: tiempo adicional en tareas escritas, reducir ejercicios repetitivos.'); break
-      case 'IRF': recommendations.push('Para desarrollar el razonamiento fluido: resolución de problemas cotidianos, juegos de lógica, puzzles.'); break
-      case 'IVE': recommendations.push('Para estimular el área visoespacial: construcción, dibujo, mapas, rompecabezas.'); break
+      case 'ICV': recommendations.push('Comprensión verbal: lecturas compartidas, conversaciones variadas, vocabulario en contexto.'); break
+      case 'IMT': recommendations.push('Memoria de trabajo: estrategias de repetición, dividir tareas, apoyos visuales.'); break
+      case 'IVP': recommendations.push('Velocidad de procesamiento: tiempo adicional en tareas escritas, reducir ejercicios repetitivos.'); break
+      case 'IRF': recommendations.push('Razonamiento fluido: problemas cotidianos, juegos de lógica, puzzles.'); break
+      case 'IVE': recommendations.push('Área visoespacial: construcción, dibujo, mapas, rompecabezas.'); break
     }
   }
-  recommendations.push('Se recomienda seguimiento del progreso en 6 a 12 meses y considerar reevaluación si hay cambios significativos.')
+  recommendations.push('Seguimiento en 6-12 meses y reevaluación si hay cambios significativos.')
   return recommendations
 }
 
 // ============================================================
-// COMPONENTE INTERNO QUE USA useSearchParams
+// COMPONENTE INTERNO
 // ============================================================
+
 function Wisc5ResultsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -134,13 +134,21 @@ function Wisc5ResultsContent() {
   const { generating, downloadDocx, downloadOdt } = useReportDownload()
 
   useEffect(() => {
-    const loadResults = async () => {
+    const load = async () => {
       if (!sessionId) { setError('No se especificó una sesión'); setLoading(false); return }
       const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
       try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setError('No autenticado'); setLoading(false); return }
+
         const { data: sessionData, error: sessionError } = await supabase
-          .from('sessions').select('*, patients(full_name, birth_date)').eq('id', sessionId).single()
-        if (sessionError || !sessionData) { setError('No se encontró la sesión'); setLoading(false); return }
+          .from('sessions')
+          .select('*, patients(full_name, birth_date)')
+          .eq('id', sessionId)
+          .eq('psychologist_id', user.id)
+          .single()
+
+        if (sessionError || !sessionData) { setError('Sesión no encontrada o sin permiso'); setLoading(false); return }
         setPatientName(sessionData.patients?.full_name || 'Paciente')
         setPatientId(sessionData.patient_id || '')
         setEvalDate(sessionData.created_at ? new Date(sessionData.created_at).toLocaleDateString('es-CL') : '')
@@ -152,14 +160,15 @@ function Wisc5ResultsContent() {
           if (months < 0) { years--; months += 12 }
           setPatientAge(`${years} años, ${months} meses`)
         }
+
         const { data: wiscData, error: wiscError } = await supabase
           .from('wisc5_scores').select('*').eq('session_id', sessionId).single()
         if (wiscError || !wiscData) { setError('No se encontraron puntajes WISC-V'); setLoading(false); return }
         setData(wiscData)
         setLoading(false)
-      } catch (err: any) { setError('Error al cargar resultados: ' + err.message); setLoading(false) }
+      } catch (err: any) { setError('Error: ' + err.message); setLoading(false) }
     }
-    loadResults()
+    load()
   }, [sessionId])
 
   if (loading) {
@@ -180,7 +189,6 @@ function Wisc5ResultsContent() {
 
   const scaledScores = data.scaled_scores || {}
   const compositeScores = data.composite_scores || {}
-  const substitutions = data.substitution_used || null
   const completedSubtests = data.completed_subtests || {}
   const indexes: Record<string, any> = {}
   for (const code of ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']) {
@@ -200,9 +208,8 @@ function Wisc5ResultsContent() {
       patientName={patientName} patientId={patientId}
       testName="WISC-V" testCode="wisc5" evalDate={evalDate}
       pdfMeta={{
-        sessionId: sessionId || '', patientId: patientId,
-        testId: 'wisc5', patientName: patientName,
-        content: { indexes, scaledScores, reportType }
+        sessionId: sessionId || '', patientId, testId: 'wisc5',
+        patientName, content: { indexes, scaledScores, reportType }
       }}
     >
       <div className="flex justify-end gap-2 mb-4">
@@ -216,7 +223,7 @@ function Wisc5ResultsContent() {
         </button>
         <PdfDownloadButton
           contentRef={contentRef}
-          meta={{ sessionId: sessionId || '', patientId: patientId, testId: 'wisc5', patientName: patientName, content: { indexes, scaledScores, reportType } }}
+          meta={{ sessionId: sessionId || '', patientId, testId: 'wisc5', patientName, content: { indexes, scaledScores, reportType } }}
           label="Guardar PDF"
         />
       </div>
@@ -318,7 +325,7 @@ function Wisc5ResultsContent() {
         </div>
 
         <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-500">Nota: Este informe ha sido generado automáticamente por AQN Praxis. Los resultados deben ser interpretados por un profesional calificado.</p>
+          <p className="text-xs text-gray-500">Nota: Informe generado automáticamente por AQN Praxis. Debe ser interpretado por un profesional calificado.</p>
         </div>
       </div>
     </TestResultsLayout>
@@ -326,7 +333,7 @@ function Wisc5ResultsContent() {
 }
 
 // ============================================================
-// PÁGINA PRINCIPAL CON SUSPENSE
+// PÁGINA PRINCIPAL
 // ============================================================
 export default function Wisc5ResultsPage() {
   return (

@@ -15,6 +15,7 @@ interface RDItem {
   isPractice?: boolean
 }
 
+// Dígitos en orden directo (RD-D)
 const RD_D_ITEMS: RDItem[] = [
   { part: 'RD-D', num: 1, trials: [[2, 9], [5, 4]] },
   { part: 'RD-D', num: 2, trials: [[3, 9, 6], [6, 5, 2]] },
@@ -27,6 +28,7 @@ const RD_D_ITEMS: RDItem[] = [
   { part: 'RD-D', num: 9, trials: [[6, 2, 5, 3, 1, 9, 8, 5, 4, 7], [9, 4, 3, 8, 7, 5, 2, 9, 6, 1]] }
 ]
 
+// Dígitos en orden inverso (RD-I)
 const RD_I_ITEMS: RDItem[] = [
   { part: 'RD-I', num: 'P', trials: [[9, 4], [5, 6]], isPractice: true },
   { part: 'RD-I', num: 1, trials: [[2, 1], [1, 3]] },
@@ -40,6 +42,7 @@ const RD_I_ITEMS: RDItem[] = [
   { part: 'RD-I', num: 9, trials: [[3, 1, 7, 9, 4, 6, 8, 2], [9, 8, 1, 6, 3, 2, 4, 7]] }
 ]
 
+// Dígitos en orden secuenciado (RD-S)
 const RD_S_ITEMS: RDItem[] = [
   { part: 'RD-S', num: 'PA', trials: [[3, 1], [8, 6]], isPractice: true },
   { part: 'RD-S', num: 'PB', trials: [[5, 2, 4], [4, 3, 3]], isPractice: true },
@@ -118,7 +121,6 @@ function DigitInput({ length, value, onChange, disabled = false, autoFocus = tru
     if (disabled) return
     if (e.key === 'Enter') {
       e.preventDefault()
-      // Verificar si todos los dígitos están completos
       const allFilled = value.every(v => v !== null) && !value.some(v => v === null)
       if (allFilled && onSubmit) {
         onSubmit()
@@ -178,7 +180,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   const [currentItemIndex, setCurrentItemIndex] = useState<number>(0)
   const [currentTrial, setCurrentTrial] = useState<0 | 1>(0)
   const [scores, setScores] = useState<Record<string, number>>({})
-  const [consecutiveZeros, setConsecutiveZeros] = useState(0)
+  const [consecutiveZeros, setConsecutiveZeros] = useState(0)  // Para RD-S
   const [isCompleted, setIsCompleted] = useState(false)
   const [digits, setDigits] = useState<(number | null)[]>([])
   const [showResult, setShowResult] = useState<boolean | null>(null)
@@ -215,7 +217,6 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     }
   }, [currentPart, currentItem, isCompleted])
 
-  // Limpiar timer al desmontar
   useEffect(() => {
     return () => { if (resultTimer) clearTimeout(resultTimer) }
   }, [resultTimer])
@@ -243,25 +244,13 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   }
 
   const advanceToNext = (newScores: Record<string, number>) => {
-    // Verificar suspensión RD-D/RD-I
+    // Verificar suspensión RD-D/RD-I (ambos intentos fallados)
     if ((currentPart === 'RD-D' || currentPart === 'RD-I') && shouldSuspendDDorDI(currentPart, currentItem.num, newScores)) {
       moveToNextPartOrComplete(newScores)
       return
     }
 
-    // RD-S: verificar 2 fallos consecutivos
-    if (currentPart === 'RD-S') {
-      const trialKey = getScoreKey(currentPart, currentItem.num, currentTrial)
-      if (newScores[trialKey] === 0) {
-        const newZeros = consecutiveZeros + 1
-        setConsecutiveZeros(newZeros)
-        if (newZeros >= 2) { moveToNextPartOrComplete(newScores); return }
-      } else {
-        setConsecutiveZeros(0)
-      }
-    }
-
-    // Determinar siguiente paso
+    // RD-S: ya se manejó en handleSubmit, aquí solo avanzamos al siguiente trial/ítem
     const trial1Key = getScoreKey(currentPart, currentItem.num, 0)
     const trial2Key = getScoreKey(currentPart, currentItem.num, 1)
 
@@ -280,7 +269,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
 
   const handleSubmit = () => {
     if (!currentTrialDigits) return
-    if (digits.some(d => d === null)) return // No hacer nada si faltan dígitos
+    if (digits.some(d => d === null)) return
 
     const correct = validateResponse(currentPart, currentTrialDigits, digits)
     setIsCorrect(correct)
@@ -292,10 +281,21 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     const newScores = { ...scores, [scoreKey]: effectiveScore }
     setScores(newScores)
 
-    // Avanzar automáticamente después de 800ms
-    const timer = setTimeout(() => {
-      advanceToNext(newScores)
-    }, 800)
+    // Lógica de suspensión específica para RD-S (2 fallos consecutivos)
+    if (currentPart === 'RD-S') {
+      if (effectiveScore === 0) {
+        const newZeros = consecutiveZeros + 1
+        setConsecutiveZeros(newZeros)
+        if (newZeros >= 2) {
+          setTimeout(() => moveToNextPartOrComplete(newScores), 800)
+          return
+        }
+      } else {
+        setConsecutiveZeros(0)  // Acierto → reiniciar contador
+      }
+    }
+
+    const timer = setTimeout(() => advanceToNext(newScores), 800)
     setResultTimer(timer)
   }
 

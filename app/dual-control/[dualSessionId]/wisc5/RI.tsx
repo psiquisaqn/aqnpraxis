@@ -47,10 +47,12 @@ const RI_ITEMS: RIItem[] = [
 ]
 
 const getOptionLetters = (total: number): string[] => 'ABCDEFGHIJKL'.slice(0, total).split('')
+
 const getStimulusPath = (num: number | string): string => {
   if (typeof num === 'string') return `/wisc5/ri/ri${num.toLowerCase()}e.png`
   return `/wisc5/ri/ri${String(num).padStart(3, '0')}e.png`
 }
+
 const getOptionsPath = (num: number | string): string => {
   if (typeof num === 'string') return `/wisc5/ri/ri${num.toLowerCase()}o.png`
   return `/wisc5/ri/ri${String(num).padStart(3, '0')}o.png`
@@ -87,18 +89,23 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
   useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
   useEffect(() => { setSelectedAnswers([]); setPhase('ready'); setShowConfirmation(false) }, [currentIndex])
 
+  // Enviar display inmediatamente al cambiar de fase
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
-        type: 'wisc5_ri', itemNum: currentItem.num, phase: phase,
+        type: 'wisc5_ri',
+        itemNum: currentItem.num,
+        phase: phase,
         stimulusImage: phase === 'showing' ? getStimulusPath(currentItem.num) : null,
         optionsImage: phase === 'answering' ? getOptionsPath(currentItem.num) : null,
-        isPractice: currentItem.isPractice, totalOptions: currentItem.totalOptions,
+        isPractice: currentItem.isPractice,
+        totalOptions: currentItem.totalOptions,
         timeRemaining: phase === 'showing' ? showTimer : 0
       })
     }
   }, [currentItem, phase, showTimer, isCompleted])
 
+  // Temporizador de 5 segundos
   useEffect(() => {
     if (phase === 'showing' && showTimer > 0) {
       timerRef.current = setTimeout(() => setShowTimer(prev => prev - 1), 1000)
@@ -117,12 +124,10 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
 
   const calculateScore = (item: RIItem, answers: string[]): number => {
     if (item.maxScore === 1) return answers.length === 1 && answers[0] === item.correctAnswers[0] ? 1 : 0
-    // Verificar si están todas las correctas y sin extras
     const correctSet = new Set(item.correctAnswers)
     const answerSet = new Set(answers)
     if (correctSet.size !== answerSet.size) return 0
     for (const a of answerSet) if (!correctSet.has(a)) return 0
-    // Coinciden en contenido, verificar orden
     return JSON.stringify(answers) === JSON.stringify(item.correctAnswers) ? 2 : 1
   }
 
@@ -230,12 +235,19 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
       )}
 
       {showConfirmation && (
-        <div className={`rounded-lg p-4 text-center border ${scores[currentItem.num] === 2 ? 'bg-green-50 border-green-200' : scores[currentItem.num] === 1 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
-          <p className={`text-lg font-medium ${scores[currentItem.num] === 2 ? 'text-green-700' : scores[currentItem.num] === 1 ? 'text-yellow-700' : 'text-red-700'}`}>
-            {scores[currentItem.num] === 2 ? '✓ 2 puntos (Orden correcto)' : scores[currentItem.num] === 1 ? '1 punto (Orden incorrecto)' : '✗ 0 puntos (Incorrecto)'}
-            {isPractice && <span className="ml-2 text-xs">(no suma)</span>}
+        <div className={`rounded-lg p-4 text-center border ${isPractice ? 'bg-gray-50 border-gray-200' : scores[currentItem.num] === 2 ? 'bg-green-50 border-green-200' : scores[currentItem.num] === 1 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
+          <p className={`text-lg font-medium ${isPractice ? 'text-gray-600' : scores[currentItem.num] === 2 ? 'text-green-700' : scores[currentItem.num] === 1 ? 'text-yellow-700' : 'text-red-700'}`}>
+            {isPractice 
+              ? 'Ítem de práctica (no suma puntos)' 
+              : scores[currentItem.num] === 2 
+                ? '✓ 2 puntos (Orden correcto)' 
+                : scores[currentItem.num] === 1 
+                  ? '1 punto (Orden incorrecto)' 
+                  : '✗ 0 puntos (Incorrecto)'}
           </p>
-          {scores[currentItem.num] < 2 && <p className="text-sm text-gray-600 mt-2"><strong>Correctas:</strong> {currentItem.correctAnswers.join(' → ')}</p>}
+          {!isPractice && scores[currentItem.num] < 2 && (
+            <p className="text-sm text-gray-600 mt-2"><strong>Correctas:</strong> {currentItem.correctAnswers.join(' → ')}</p>
+          )}
           <button onClick={handleNext} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Continuar</button>
         </div>
       )}
