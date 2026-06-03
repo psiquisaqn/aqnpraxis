@@ -72,9 +72,9 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
           .order('created_at', { ascending: false })
         
         if (!sessionsError && sessionsData) {
-          // Para sesiones WISC-V, buscar la sesión dual asociada
-          const wiscSessions = sessionsData.filter((s: any) => 
-            (s.test_id === 'wisc5' || s.test_id === 'wisc5_cl')
+          // Para todas las sesiones WISC‑V, buscar la sesión dual asociada
+          const wiscSessions = sessionsData.filter((s: any) =>
+            s.test_id === 'wisc5' || s.test_id === 'wisc5_cl'
           )
           
           if (wiscSessions.length > 0) {
@@ -272,7 +272,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {/* Abrir panel WISC-V si existe sesión dual */}
+                  {/* Botón para abrir el panel de WISC-V (si existe sesión dual) */}
                   {session.dual_session_id && (
                     <Link
                       href={`/dual-control/${session.dual_session_id}`}
@@ -281,6 +281,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                       Abrir panel
                     </Link>
                   )}
+                  {/* Ver informe (solo si está completado) */}
                   {(session.status === 'completed' || session.status === 'completed_brief' || session.status === 'completed_extended') && (
                     <Link
                       href={getReportLink(session)}
@@ -289,6 +290,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                       Ver informe
                     </Link>
                   )}
+                  {/* Continuar (solo si está en progreso y no tiene sesión dual) */}
                   {session.status === 'in_progress' && !session.dual_session_id && (
                     <Link
                       href={getContinueLink(session)}

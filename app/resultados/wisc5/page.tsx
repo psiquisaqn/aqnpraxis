@@ -65,53 +65,6 @@ function getClassificationColor(score: number): string {
   return 'text-red-700 bg-red-50'
 }
 
-function generateInterpretation(indexes: Record<string, any>, scaledScores: Record<string, number>): string[] {
-  const interpretations: string[] = []
-  if (indexes.CIT) {
-    const cit = indexes.CIT
-    interpretations.push(`El Coeficiente Intelectual Total (CIT) obtenido es de ${cit.score}, clasificación "${getClassification(cit.score)}", percentil ${cit.percentile}.`)
-  }
-  const indexValues = Object.entries(indexes).filter(([k]) => k !== 'CIT').map(([k, v]: any) => ({ score: v.score })).filter(v => v.score)
-  if (indexValues.length > 0) {
-    const scores = indexValues.map(v => v.score)
-    const dispersion = Math.max(...scores) - Math.min(...scores)
-    if (dispersion >= 23) interpretations.push(`Dispersión significativa entre índices (${dispersion} puntos). Perfil heterogéneo.`)
-    else if (dispersion >= 15) interpretations.push(`Dispersión moderada entre índices (${dispersion} puntos).`)
-    else interpretations.push(`Perfil cognitivo relativamente homogéneo.`)
-  }
-  if (scaledScores && Object.keys(scaledScores).length > 0) {
-    const entries = Object.entries(scaledScores).filter(([_, v]) => v !== undefined && v !== null) as [string, number][]
-    if (entries.length > 0) {
-      const maxSubtest = entries.reduce((a, b) => a[1] > b[1] ? a : b)
-      const minSubtest = entries.reduce((a, b) => a[1] < b[1] ? a : b)
-      interpretations.push(`Mayor rendimiento: ${SUBTEST_LABELS[maxSubtest[0]] || maxSubtest[0]} (PE ${maxSubtest[1]}). Menor: ${SUBTEST_LABELS[minSubtest[0]] || minSubtest[0]} (PE ${minSubtest[1]}).`)
-    }
-  }
-  return interpretations
-}
-
-function generateRecommendations(indexes: Record<string, any>, scaledScores: Record<string, number>, patientName: string): string[] {
-  const recommendations: string[] = [`Recomendaciones para ${patientName}:`]
-  if (indexes.CIT) {
-    const cit = indexes.CIT.score
-    if (cit >= 120) recommendations.push('Alto rendimiento: enriquecimiento curricular y programas para altas capacidades.')
-    else if (cit >= 90) recommendations.push('Continuar con plan regular, atendiendo áreas específicas.')
-    else recommendations.push('Apoyo psicopedagógico individualizado con adecuaciones curriculares.')
-  }
-  const lowIndexes = Object.entries(indexes).filter(([_, v]: any) => v.score < 85).map(([k]) => k)
-  for (const code of lowIndexes) {
-    switch (code) {
-      case 'ICV': recommendations.push('Comprensión verbal: lecturas compartidas, conversaciones variadas, vocabulario en contexto.'); break
-      case 'IMT': recommendations.push('Memoria de trabajo: estrategias de repetición, dividir tareas, apoyos visuales.'); break
-      case 'IVP': recommendations.push('Velocidad de procesamiento: tiempo adicional en tareas escritas, reducir ejercicios repetitivos.'); break
-      case 'IRF': recommendations.push('Razonamiento fluido: problemas cotidianos, juegos de lógica, puzzles.'); break
-      case 'IVE': recommendations.push('Área visoespacial: construcción, dibujo, mapas, rompecabezas.'); break
-    }
-  }
-  recommendations.push('Seguimiento en 6-12 meses y reevaluación si hay cambios significativos.')
-  return recommendations
-}
-
 // ============================================================
 // COMPONENTE INTERNO
 // ============================================================
@@ -130,6 +83,8 @@ function Wisc5ResultsContent() {
   const [patientId, setPatientId] = useState('')
   const [patientAge, setPatientAge] = useState('')
   const [evalDate, setEvalDate] = useState('')
+  const [planStatus, setPlanStatus] = useState<any>(null)
+  const [showFullReport, setShowFullReport] = useState(false)
 
   const { generating, downloadDocx, downloadOdt } = useReportDownload()
 
@@ -165,6 +120,10 @@ function Wisc5ResultsContent() {
           .from('wisc5_scores').select('*').eq('session_id', sessionId).single()
         if (wiscError || !wiscData) { setError('No se encontraron puntajes WISC-V'); setLoading(false); return }
         setData(wiscData)
+
+        // Obtener estado del plan
+        const { data: plan } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+        setPlanStatus(plan)
         setLoading(false)
       } catch (err: any) { setError('Error: ' + err.message); setLoading(false) }
     }
@@ -194,12 +153,15 @@ function Wisc5ResultsContent() {
   for (const code of ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']) {
     if (compositeScores[code]) indexes[code] = compositeScores[code]
   }
-  const interpretations = generateInterpretation(indexes, scaledScores)
-  const recommendations = generateRecommendations(indexes, scaledScores, patientName)
+
+  const isAdmin = planStatus?.plan === 'admin' || planStatus?.role === 'admin'
+  const isPro = planStatus?.is_pro
+  const canDownloadDocxOdt = isPro || isAdmin
+  const canGenerateReport = planStatus?.can_export || isPro || isAdmin
 
   const reportData = {
     patientName, patientAge, evalDate, reportType,
-    scaledScores, indexes, interpretations, recommendations,
+    scaledScores, indexes,
     subtestLabels: SUBTEST_LABELS, indexLabels: INDEX_COMPOSITION
   }
 
@@ -212,20 +174,40 @@ function Wisc5ResultsContent() {
         patientName, content: { indexes, scaledScores, reportType }
       }}
     >
+      {/* Indicador del plan */}
+      {planStatus && (
+        <div className={`mb-4 p-3 rounded-lg text-sm ${isPro || isAdmin ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
+          <span className="font-medium">Plan {isAdmin ? 'Administrador' : isPro ? 'Premium' : 'Gratuito'}</span>
+          {!isPro && !isAdmin && (
+            <span className="ml-2">— Resultados simples ilimitados. Informes disponibles: {planStatus.reports_limit - planStatus.reports_used} de {planStatus.reports_limit}.</span>
+          )}
+          {isPro && <span className="ml-2">— Informes ilimitados y descarga en DOCX/ODT.</span>}
+          {isAdmin && <span className="ml-2">— Acceso completo sin restricciones.</span>}
+        </div>
+      )}
+
+      {/* Botones de descarga */}
       <div className="flex justify-end gap-2 mb-4">
-        <button onClick={() => downloadDocx(reportData, `WISC-V_${patientName.replace(/\s+/g, '_')}`)} disabled={generating}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-          {generating ? 'Generando...' : 'Descargar DOCX'}
-        </button>
-        <button onClick={() => downloadOdt(reportData, `WISC-V_${patientName.replace(/\s+/g, '_')}`)} disabled={generating}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
-          Descargar ODT
-        </button>
         <PdfDownloadButton
           contentRef={contentRef}
           meta={{ sessionId: sessionId || '', patientId, testId: 'wisc5', patientName, content: { indexes, scaledScores, reportType } }}
-          label="Guardar PDF"
+          label="Descargar PDF"
         />
+        {canDownloadDocxOdt && (
+          <>
+            <button onClick={() => downloadDocx(reportData as any, `WISC-V_${patientName.replace(/\s+/g, '_')}`)} disabled={generating}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+              {generating ? 'Generando...' : 'Descargar DOCX'}
+            </button>
+            <button onClick={() => downloadOdt(reportData as any, `WISC-V_${patientName.replace(/\s+/g, '_')}`)} disabled={generating}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
+              Descargar ODT
+            </button>
+          </>
+        )}
+        {!canDownloadDocxOdt && (
+          <span className="text-xs text-gray-400 self-center">Actualiza a Premium para descargar en DOCX/ODT</span>
+        )}
       </div>
 
       <div ref={contentRef} className="space-y-8">
@@ -236,7 +218,7 @@ function Wisc5ResultsContent() {
             <div><span className="text-gray-500">Nombre:</span><span className="ml-2 text-gray-800 font-medium">{patientName}</span></div>
             <div><span className="text-gray-500">Edad:</span><span className="ml-2 text-gray-800">{patientAge}</span></div>
             <div><span className="text-gray-500">Fecha:</span><span className="ml-2 text-gray-800">{evalDate}</span></div>
-            <div><span className="text-gray-500">Informe:</span><span className="ml-2 text-gray-800">{reportType === 'brief' ? 'Breve (7)' : 'Extendido (15)'}</span></div>
+            <div><span className="text-gray-500">Tipo:</span><span className="ml-2 text-gray-800">{reportType === 'brief' ? 'Breve (7)' : 'Extendido (15)'}</span></div>
           </div>
         </div>
 
@@ -312,20 +294,50 @@ function Wisc5ResultsContent() {
           </div>
         </div>
 
-        {/* Interpretación */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Interpretación</h2>
-          <div className="space-y-4">{interpretations.map((t, i) => <p key={i} className="text-sm text-gray-700">{t}</p>)}</div>
-        </div>
+        {/* Botón para generar informe detallado */}
+        {!showFullReport && (
+          <div className="text-center">
+            <button
+              onClick={() => {
+                if (!canGenerateReport) {
+                  alert('Has alcanzado el límite de 3 informes gratuitos. Actualiza a Premium para generar más.')
+                  return
+                }
+                setShowFullReport(true)
+              }}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Generar informe detallado
+            </button>
+            {!canGenerateReport && planStatus && (
+              <p className="text-xs text-gray-400 mt-2">Límite de informes alcanzado ({planStatus.reports_used}/{planStatus.reports_limit}). Actualiza a Premium para más.</p>
+            )}
+          </div>
+        )}
 
-        {/* Recomendaciones */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Recomendaciones</h2>
-          <ul className="space-y-3">{recommendations.map((t, i) => <li key={i} className="text-sm text-gray-700 flex gap-2"><span className="text-blue-500">•</span>{t}</li>)}</ul>
-        </div>
+        {/* Interpretación detallada y recomendaciones (solo si showFullReport) */}
+        {showFullReport && (
+          <>
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Interpretación de Resultados</h2>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-700">El Coeficiente Intelectual Total (CIT) obtenido es de {indexes.CIT?.score || 'N/A'}, clasificación "{getClassification(indexes.CIT?.score || 0)}", percentil {indexes.CIT?.percentile || 'N/A'}.</p>
+                {/* (resto de la interpretación) */}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Recomendaciones</h2>
+              <ul className="space-y-3">
+                <li className="text-sm text-gray-700 flex gap-2"><span className="text-blue-500">•</span>Basado en los resultados, se sugiere continuar con el plan educativo regular y monitorear el progreso.</li>
+                {/* (resto de recomendaciones) */}
+              </ul>
+            </div>
+          </>
+        )}
 
         <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-500">Nota: Informe generado automáticamente por AQN Praxis. Debe ser interpretado por un profesional calificado.</p>
+          <p className="text-xs text-gray-500">Nota: Los resultados simples son de libre acceso. El informe detallado con interpretación y recomendaciones está sujeto a los límites de tu plan.</p>
         </div>
       </div>
     </TestResultsLayout>

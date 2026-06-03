@@ -103,13 +103,8 @@ export default function SalaDisplayPage() {
         return (
           <div className="text-center">
             <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 mb-1">
-                <span>Progreso</span>
-                <span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 58}</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
-              </div>
+              <div className="flex justify-between text-sm text-gray-500 mb-1"><span>Progreso</span><span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 58}</span></div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
             </div>
             <div className="text-sm text-gray-400 mb-4">Ítem {currentDisplay.item} de {currentDisplay.totalItems || 58}</div>
             <div className="text-2xl font-medium text-gray-800 mb-6 leading-relaxed">{currentDisplay.text}</div>
@@ -129,17 +124,10 @@ export default function SalaDisplayPage() {
         const progressBdi = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 21)) * 100
         return (
           <div className="text-center">
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 mb-1"><span>Progreso</span><span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 21}</span></div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressBdi + '%' }} /></div>
-            </div>
+            <div className="mb-6"><div className="flex justify-between text-sm text-gray-500 mb-1"><span>Progreso</span><span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 21}</span></div><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressBdi + '%' }} /></div></div>
             <div className="text-sm text-gray-400 mb-4">Item {currentDisplay.item} de {currentDisplay.totalItems || 21}</div>
             <div className="text-xl font-medium text-gray-800 mb-6 leading-relaxed">{currentDisplay.label}</div>
-            <div className="space-y-3 max-w-md mx-auto">
-              {currentDisplay.options?.map((opt: any) => (
-                <div key={opt.value} className={"p-3 rounded-xl border text-sm " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}>{opt.label}</div>
-              ))}
-            </div>
+            <div className="space-y-3 max-w-md mx-auto">{currentDisplay.options?.map((opt: any) => (<div key={opt.value} className={"p-3 rounded-xl border text-sm " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}>{opt.label}</div>))}</div>
             {currentDisplay.selected !== undefined && <p className="text-xs text-green-600 mt-4">Respuesta registrada</p>}
           </div>
         )
@@ -151,45 +139,32 @@ export default function SalaDisplayPage() {
         const progressPeca = ((currentDisplay.totalCompleted || 0) / (currentDisplay.totalItems || 45)) * 100
         return (
           <div className="text-center">
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 mb-1"><span>Progreso</span><span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 45}</span></div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressPeca + '%' }} /></div>
-            </div>
+            <div className="mb-6"><div className="flex justify-between text-sm text-gray-500 mb-1"><span>Progreso</span><span>{currentDisplay.totalCompleted || 0}/{currentDisplay.totalItems || 45}</span></div><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: progressPeca + '%' }} /></div></div>
             <div className="text-sm text-gray-400 mb-6">Item {currentDisplay.item} de {currentDisplay.totalItems || 45}</div>
-            <div className="flex justify-between gap-6 mb-8">
-              <span className="flex-1 text-left text-lg font-medium text-gray-800">{currentDisplay.leftPhrase}</span>
-              <span className="text-gray-400 text-lg">vs</span>
-              <span className="flex-1 text-right text-lg font-medium text-gray-800">{currentDisplay.rightPhrase}</span>
-            </div>
-            <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto">
-              {currentDisplay.options?.map((opt: any) => (
-                <div key={opt.value} className={"p-3 rounded-xl border text-sm font-medium " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}>{opt.value}</div>
-              ))}
-            </div>
+            <div className="flex justify-between gap-6 mb-8"><span className="flex-1 text-left text-lg font-medium text-gray-800">{currentDisplay.leftPhrase}</span><span className="text-gray-400 text-lg">vs</span><span className="flex-1 text-right text-lg font-medium text-gray-800">{currentDisplay.rightPhrase}</span></div>
+            <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto">{currentDisplay.options?.map((opt: any) => (<div key={opt.value} className={"p-3 rounded-xl border text-sm font-medium " + (currentDisplay.selected === opt.value ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-500 border-gray-200")}>{opt.value}</div>))}</div>
             <div className="flex justify-between text-xs text-gray-400 mt-2 max-w-sm mx-auto px-2"><span>Izquierda</span><span>Derecha</span></div>
             {currentDisplay.selected && <p className="text-xs text-green-600 mt-4">Respuesta registrada</p>}
           </div>
         )
 
       // ============================================================
-      // WISC-V: CC, AN, MR, RD (existentes)
+      // WISC-V: Construcción con Cubos (CC)
       // ============================================================
       case 'wisc5_cc':
         const stimulusNum = currentDisplay.stimulusNum || 1
         return (
           <div className="text-center">
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 mb-1"><span>Construcción con Cubos</span><span>Ítem {stimulusNum}/{currentDisplay.totalItems || 13}</span></div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(stimulusNum / (currentDisplay.totalItems || 13)) * 100}%` }} /></div>
-            </div>
-            <div className="mb-8">
-              <img src={`/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.png`} alt={`Modelo ${stimulusNum}`} className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-md" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} />
-            </div>
+            <div className="mb-6"><div className="flex justify-between text-sm text-gray-500 mb-1"><span>Construcción con Cubos</span><span>Ítem {stimulusNum}/{currentDisplay.totalItems || 13}</span></div><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(stimulusNum / (currentDisplay.totalItems || 13)) * 100}%` }} /></div></div>
+            <div className="mb-8"><img src={`/wisc5/cc/cubos${String(stimulusNum).padStart(3, '0')}.png`} alt={`Modelo ${stimulusNum}`} className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg shadow-md" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} /></div>
             <div className="text-gray-600 text-sm mb-4">{currentDisplay.instructions || 'Construye la figura usando los cubos.'}</div>
             {currentDisplay.twoAttempts && <div className="text-xs text-gray-400">Intento {currentDisplay.currentAttempt || 1} de 2</div>}
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Analogías (AN)
+      // ============================================================
       case 'wisc5_an':
         return (
           <div className="text-center">
@@ -204,6 +179,9 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Matrices de Razonamiento (MR)
+      // ============================================================
       case 'wisc5_mr':
         return (
           <div className="text-center">
@@ -214,6 +192,9 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Retención de Dígitos (RD)
+      // ============================================================
       case 'wisc5_rd':
         return (
           <div className="text-center py-8">
@@ -226,7 +207,7 @@ export default function SalaDisplayPage() {
         )
 
       // ============================================================
-      // WISC-V: CLA, VOC, BAL (nuevos - solo instrucciones o imagen)
+      // WISC-V: Claves (CLA)
       // ============================================================
       case 'wisc5_cla':
         return (
@@ -237,6 +218,9 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Vocabulario (VOC)
+      // ============================================================
       case 'wisc5_voc':
         const isImage = currentDisplay.hasImage && currentDisplay.imagePath
         return (
@@ -251,6 +235,9 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Balanzas (BAL)
+      // ============================================================
       case 'wisc5_bal':
         return (
           <div className="text-center py-4">
@@ -260,6 +247,9 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Rompecabezas Visuales (RV)
+      // ============================================================
       case 'wisc5_rv':
         return (
           <div className="text-center py-4">
@@ -269,26 +259,26 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Retención de Imágenes (RI)
+      // ============================================================
       case 'wisc5_ri':
         return (
           <div className="text-center py-8">
             <div className="mb-4"><span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Retención de Imágenes</span>{currentDisplay.isPractice && <span className="ml-2 inline-block px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">Práctica</span>}</div>
             {currentDisplay.phase === 'showing' && currentDisplay.stimulusImage ? (
-              <div className="mb-6">
-                <p className="text-sm text-blue-600 mb-3">Observa con atención ({currentDisplay.timeRemaining}s)</p>
-                <img src={currentDisplay.stimulusImage} alt="Estímulo" className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} />
-              </div>
+              <div className="mb-6"><p className="text-sm text-blue-600 mb-3">Observa con atención ({currentDisplay.timeRemaining}s)</p><img src={currentDisplay.stimulusImage} alt="Estímulo" className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} /></div>
             ) : currentDisplay.phase === 'answering' && currentDisplay.optionsImage ? (
-              <div className="mb-6">
-                <p className="text-sm text-green-600 mb-3">¿Qué imágenes viste?</p>
-                <img src={currentDisplay.optionsImage} alt="Opciones" className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} />
-              </div>
+              <div className="mb-6"><p className="text-sm text-green-600 mb-3">¿Qué imágenes viste?</p><img src={currentDisplay.optionsImage} alt="Opciones" className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} /></div>
             ) : (
               <p className="text-gray-500 text-sm mt-8">Prepárate para observar las imágenes</p>
             )}
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Búsqueda de Símbolos (BS)
+      // ============================================================
       case 'wisc5_bs':
         return (
           <div className="text-center py-8">
@@ -298,34 +288,45 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Información (IN)
+      // ============================================================
       case 'wisc5_in':
         return (
           <div className="text-center py-8">
             <div className="mb-4"><span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Información</span></div>
             <div className="text-xl md:text-2xl font-medium text-gray-800 mb-4 leading-relaxed max-w-lg mx-auto px-4">{currentDisplay.question || ''}</div>
-            {currentDisplay.tips && <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200 text-left max-w-md mx-auto"><p className="text-xs text-yellow-700">{currentDisplay.tips}</p></div>}
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Secuenciación de Letras y Números (SLN)
+      // ============================================================
       case 'wisc5_sln':
         return (
           <div className="text-center py-8">
             <div className="mb-4"><span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Secuenciación de Letras y Números</span></div>
-            <div className="text-xl md:text-2xl font-medium text-gray-800 mb-6 leading-relaxed max-w-lg mx-auto px-4">{currentDisplay.instruction || 'Escucha con atención las instrucciones del evaluador'}</div>
+            <div className="text-xl md:text-2xl font-medium text-gray-800 mb-6 leading-relaxed max-w-lg mx-auto px-4">{currentDisplay.instruction || 'Escucha con atención'}</div>
             <div className="mt-8 flex justify-center"><div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center text-3xl">🔢</div></div>
             <p className="text-gray-500 text-sm mt-6">Escucha los números y letras, luego responde en orden</p>
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Cancelación (CAN)
+      // ============================================================
       case 'wisc5_can':
         return (
           <div className="text-center py-8">
             <div className="mb-4"><span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Cancelación - {currentDisplay.part || ''}</span></div>
             <div className="text-xl font-medium text-gray-800 mb-4">{currentDisplay.instruction || 'Tacha los animales que sean iguales al modelo.'}</div>
-            <p className="text-gray-500 text-sm mt-8">Parte {currentDisplay.partIndex || 1} de {currentDisplay.totalParts || 2}. Trabaja lo más rápido que puedas.</p>
+            <p className="text-gray-500 text-sm mt-8">Parte {currentDisplay.partIndex || 1} de {currentDisplay.totalParts || 2}</p>
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Comprensión (COM)
+      // ============================================================
       case 'wisc5_com':
         return (
           <div className="text-center py-8">
@@ -334,6 +335,9 @@ export default function SalaDisplayPage() {
           </div>
         )
 
+      // ============================================================
+      // WISC-V: Aritmética (ARI)
+      // ============================================================
       case 'wisc5_ari':
         const hasAriImage = currentDisplay.hasImage && currentDisplay.imagePath
         return (
@@ -347,9 +351,6 @@ export default function SalaDisplayPage() {
           </div>
         )
 
-      // ============================================================
-      // DEFAULT
-      // ============================================================
       default:
         return (
           <div className="text-center">

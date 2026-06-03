@@ -128,6 +128,7 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
     const answerSet = new Set(answers)
     if (correctSet.size !== answerSet.size) return 0
     for (const a of answerSet) if (!correctSet.has(a)) return 0
+    // Coinciden en contenido, verificar orden
     return JSON.stringify(answers) === JSON.stringify(item.correctAnswers) ? 2 : 1
   }
 
@@ -171,15 +172,33 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
 
   return (
     <div className="space-y-4">
+      {/* Barra de progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between items-center mb-1">
           <span className="text-gray-600 text-sm">Retención de Imágenes</span>
           <span className="text-3xl font-bold text-gray-800">{isPractice ? currentItem.num : currentItem.num}</span>
         </div>
-        <div className="flex justify-between text-xs text-gray-500 mb-1"><span>{isPractice ? 'Práctica' : 'Ítem actual'}</span><span>de {RI_ITEMS.filter(i => !i.isPractice).length}</span></div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${(Object.keys(scores).filter(k => k !== 'PA' && k !== 'PB' && k !== 'PC').length / RI_ITEMS.filter(i => !i.isPractice).length) * 100}%` }} /></div>
+        <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <span>{isPractice ? 'Práctica' : 'Ítem actual'}</span>
+          <span>de {RI_ITEMS.filter(i => !i.isPractice).length}</span>
+        </div>
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(Object.keys(scores).filter(k => k !== 'PA' && k !== 'PB' && k !== 'PC').length / RI_ITEMS.filter(i => !i.isPractice).length) * 100}%` }} />
+        </div>
       </div>
 
+      {/* Miniatura del estímulo (siempre visible) */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <p className="text-xs font-medium text-gray-700 mb-2 text-center">📷 Estímulo (miniatura):</p>
+        <img 
+          src={getStimulusPath(currentItem.num)} 
+          alt="Estímulo" 
+          className="mx-auto max-h-24 object-contain border border-gray-200 rounded-lg"
+          onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
+        />
+      </div>
+
+      {/* Fase: Listo para mostrar */}
       {phase === 'ready' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="bg-blue-50 rounded-lg p-4 mb-4">
@@ -192,10 +211,16 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
         </div>
       )}
 
+      {/* Fase: Mostrando estímulos (imagen grande) */}
       {phase === 'showing' && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Estímulo mostrado:</p>
-          <img src={getStimulusPath(currentItem.num)} alt="Estímulo" className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} />
+          <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Estímulo mostrado al evaluado:</p>
+          <img 
+            src={getStimulusPath(currentItem.num)} 
+            alt="Estímulo" 
+            className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg"
+            onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
+          />
           <div className="mt-3 p-2 bg-blue-50 rounded text-center">
             <p className="text-4xl font-bold text-blue-700">{showTimer}</p>
             <p className="text-sm text-blue-600">segundos restantes</p>
@@ -203,10 +228,16 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
         </div>
       )}
 
+      {/* Fase: Respondiendo */}
       {phase === 'answering' && !showConfirmation && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Opciones mostradas:</p>
-          <img src={getOptionsPath(currentItem.num)} alt="Opciones" className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg mb-4" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} />
+          <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Opciones mostradas al evaluado:</p>
+          <img 
+            src={getOptionsPath(currentItem.num)} 
+            alt="Opciones" 
+            className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg mb-4"
+            onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
+          />
           <div className="bg-green-50 rounded-lg p-3 mb-4">
             <p className="text-sm text-green-700">✅ El display ahora muestra las opciones.</p>
             <p className="text-xs text-green-600 mt-1">Selecciona {currentItem.correctAnswers.length === 1 ? 'la imagen correcta' : `las ${currentItem.correctAnswers.length} imágenes correctas`} en el orden indicado por el evaluado.</p>
@@ -234,6 +265,7 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
         </div>
       )}
 
+      {/* Confirmación de puntuación */}
       {showConfirmation && (
         <div className={`rounded-lg p-4 text-center border ${isPractice ? 'bg-gray-50 border-gray-200' : scores[currentItem.num] === 2 ? 'bg-green-50 border-green-200' : scores[currentItem.num] === 1 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
           <p className={`text-lg font-medium ${isPractice ? 'text-gray-600' : scores[currentItem.num] === 2 ? 'text-green-700' : scores[currentItem.num] === 1 ? 'text-yellow-700' : 'text-red-700'}`}>
@@ -252,8 +284,12 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
         </div>
       )}
 
+      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 49{consecutiveZeros > 0 && <span className="ml-2 text-xs text-orange-600">(Fallos consecutivos: {consecutiveZeros}/3)</span>}</p>
+        <p className="text-sm text-gray-600">
+          Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 49
+          {consecutiveZeros > 0 && <span className="ml-2 text-xs text-orange-600">(Fallos consecutivos: {consecutiveZeros}/3)</span>}
+        </p>
       </div>
     </div>
   )

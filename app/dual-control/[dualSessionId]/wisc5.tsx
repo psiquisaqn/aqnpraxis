@@ -319,41 +319,29 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
   const generateBriefReport = async () => {
     if (!arePrimarySubtestsCompleted()) {
-      alert('Debes completar las 7 subpruebas primarias para generar el informe breve.')
+      alert('Debes completar las 7 subpruebas primarias para ver los resultados.')
       return
     }
-    const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: planStatus } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-    if (!planStatus.can_export) {
-      alert('Has alcanzado el límite de 3 informes gratuitos. Actualiza a Premium para generar más.')
-      return
-    }
-    console.log('📄 Generando informe breve')
-    await saveState('completed_brief', 'brief')
+    // Navegar a resultados (pre‑informe breve)
     router.push(`/resultados/wisc5?session=${sessionId}&type=brief`)
   }
 
   const generateExtendedReport = async () => {
-    if (!areAllSubtestsCompleted()) {
-      alert('Debes completar las 15 subpruebas para generar el informe extendido.')
-      return
-    }
     const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: planStatus } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-    if (!planStatus.can_export) {
-      alert('Has alcanzado el límite de 3 informes gratuitos. Actualiza a Premium para generar más.')
-      return
-    }
-    if (planStatus.plan === 'free' && planStatus.role !== 'admin') {
+    const isAdmin = planStatus?.role === 'admin'
+    const isPro = planStatus?.is_pro
+    if (!isPro && !isAdmin) {
       alert('El informe extendido requiere plan Premium.')
       return
     }
-    console.log('📄 Generando informe extendido')
-    await saveState('completed_extended', 'extended')
+    if (!areAllSubtestsCompleted()) {
+      alert('Debes completar las 15 subpruebas para ver los resultados extendidos.')
+      return
+    }
+    // Navegar a resultados (pre‑informe extendido)
     router.push(`/resultados/wisc5?session=${sessionId}&type=extended`)
   }
 

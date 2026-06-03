@@ -63,9 +63,11 @@ interface SuggestionResult {
 
 function suggestScore(response: string, itemNum: number): SuggestionResult {
   const disclaimer = '⚠️ Esta sugerencia es automática. Consulte el manual del WISC-V y aplique su criterio profesional.'
+
   if (!response || response.trim().length === 0) {
     return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta vacía', disclaimer }
   }
+
   const norm = normalizeText(response)
 
   const score2Keywords: Record<number, string[]> = {
@@ -133,12 +135,23 @@ function suggestScore(response: string, itemNum: number): SuggestionResult {
   }
 
   const kw2 = score2Keywords[itemNum] || []
-  for (const kw of kw2) { if (norm.includes(normalizeText(kw))) return { suggestedScore: 2, confidence: 'high', reason: 'Palabra clave de puntuación 2: ' + kw, disclaimer } }
+  for (const kw of kw2) {
+    if (norm.includes(normalizeText(kw))) {
+      return { suggestedScore: 2, confidence: 'high', reason: 'Palabra clave de puntuación 2: ' + kw, disclaimer }
+    }
+  }
 
   const kw1 = score1Keywords[itemNum] || []
-  for (const kw of kw1) { if (norm.includes(normalizeText(kw))) return { suggestedScore: 1, confidence: 'medium', reason: 'Palabra clave de puntuación 1: ' + kw, disclaimer } }
+  for (const kw of kw1) {
+    if (norm.includes(normalizeText(kw))) {
+      return { suggestedScore: 1, confidence: 'medium', reason: 'Palabra clave de puntuación 1: ' + kw, disclaimer }
+    }
+  }
 
-  if (norm.split(' ').length >= 5) return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada', disclaimer }
+  if (norm.split(' ').length >= 5) {
+    return { suggestedScore: 1, confidence: 'low', reason: 'Respuesta elaborada', disclaimer }
+  }
+
   return { suggestedScore: 0, confidence: 'low', reason: 'Respuesta insuficiente', disclaimer }
 }
 
@@ -200,6 +213,7 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
 
   useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
 
+  // Enviar estímulo al display
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
@@ -210,14 +224,17 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
     }
   }, [currentItem, isCompleted])
 
+  // Sugerencia en tiempo real
   useEffect(() => {
     if (currentItem && response.trim().length > 0 && scores[currentItem.num] === undefined) {
-      setSuggestion(suggestScore(response, currentItem.num))
+      const result = suggestScore(response, currentItem.num)
+      setSuggestion(result)
     } else {
       setSuggestion(null)
     }
   }, [response, currentItem])
 
+  // Verificar bonus
   useEffect(() => {
     if (!bonusApplied && checkBonusEligibility(scores)) {
       setBonusApplied(true)
@@ -346,10 +363,16 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
     const bonus = bonusApplied ? calculateBonusPoints() : 0
     const total = Object.values(scores).reduce((a, b) => a + b, 0) + bonus
     const maxP = VOC_ITEMS.length * 2
+
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">Puntaje total: {total} / {maxP}{bonusApplied && <span className="ml-2 text-blue-600">(incluye +{bonus} bonus)</span>}</p>
+        <p className="text-sm text-green-600 mt-1">
+          Puntaje total: {total} / {maxP}
+          {bonusApplied && (
+            <span className="ml-2 text-blue-600">(incluye +{bonus} puntos por bonus)</span>
+          )}
+        </p>
       </div>
     )
   }
@@ -360,77 +383,117 @@ export const VOCInterface = React.memo(function VOCInterface({ onComplete, onUpd
 
   return (
     <div className="space-y-4">
+      {/* Barra de progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Vocabulario</span>
-          <span className="text-gray-800 font-medium">Ítem {currentItem.num} / {VOC_ITEMS.length}</span>
+          <span className="text-gray-800 font-medium">
+            Ítem {currentItem.num} / {VOC_ITEMS.length}
+          </span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{ width: (Object.keys(scores).length / VOC_ITEMS.length) * 100 + '%' }} />
+          <div className="h-full bg-blue-500 rounded-full" style={{
+            width: (Object.keys(scores).length / VOC_ITEMS.length) * 100 + '%'
+          }} />
         </div>
         {isGoingBack && <p className="text-xs text-orange-600 mt-1">↩️ Retrocediendo para verificar nivel basal...</p>}
-        {backtrackMode && <p className="text-xs text-orange-600 mt-1">🔄 Modo retroceso activo - Éxitos consecutivos: {consecutiveSuccessesInBacktrack}/2</p>}
+        {backtrackMode && (
+          <p className="text-xs text-orange-600 mt-1">🔄 Modo retroceso activo - Éxitos consecutivos: {consecutiveSuccessesInBacktrack}/2</p>
+        )}
         {bonusApplied && <p className="text-xs text-blue-600 mt-1">✓ Bonus de +{bonusPts} puntos aplicado</p>}
       </div>
 
+      {/* Estímulo (imagen o palabra) */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
         {currentItem.hasImage && currentItem.imagePath ? (
           <div>
             <p className="text-sm text-blue-700 mb-3">{currentItem.instruction}</p>
-            <img src={currentItem.imagePath} alt={'Ítem ' + currentItem.num} className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200" onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }} />
+            <img
+              src={currentItem.imagePath}
+              alt={'Ítem ' + currentItem.num}
+              className="mx-auto max-h-64 object-contain rounded-lg border border-gray-200"
+              onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
+            />
           </div>
         ) : (
           <div>
             <p className="text-sm text-blue-700 mb-3">{currentItem.instruction}</p>
-            <p className="text-3xl md:text-4xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>{currentItem.word}</p>
+            <p className="text-3xl md:text-4xl font-bold text-gray-800" style={{ fontFamily: 'Georgia, Times New Roman, serif' }}>
+              {currentItem.word}
+            </p>
           </div>
         )}
       </div>
 
+      {/* Campo de respuesta */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Respuesta del evaluado</label>
-        <textarea value={response} onChange={(e) => setResponse(e.target.value)} disabled={scores[currentItem.num] !== undefined}
+        <textarea
+          value={response}
+          onChange={(e) => setResponse(e.target.value)}
+          disabled={scores[currentItem.num] !== undefined}
           placeholder="Escribe la respuesta del evaluado..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] disabled:bg-gray-100 disabled:text-gray-500" />
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] disabled:bg-gray-100 disabled:text-gray-500"
+        />
 
         {suggestion && scores[currentItem.num] === undefined && (
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex justify-between items-start gap-3">
               <div className="flex-1">
-                <p className="text-sm text-blue-700"><strong>Sugerencia de puntaje:</strong> {suggestion.suggestedScore}
-                  <span className="text-xs ml-2 text-blue-500">({suggestion.confidence === 'high' ? 'Alta' : suggestion.confidence === 'medium' ? 'Media' : 'Baja'} confianza)</span>
+                <p className="text-sm text-blue-700">
+                  <strong>Sugerencia de puntaje:</strong> {suggestion.suggestedScore}
+                  <span className="text-xs ml-2 text-blue-500">
+                    ({suggestion.confidence === 'high' ? 'Alta' : suggestion.confidence === 'medium' ? 'Media' : 'Baja'} confianza)
+                  </span>
                 </p>
                 {suggestion.reason && <p className="text-xs text-blue-600 mt-1">{suggestion.reason}</p>}
                 <p className="text-xs text-orange-600 mt-2">{suggestion.disclaimer}</p>
               </div>
-              <button onClick={applySuggestion} className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap">Aplicar</button>
+              <button onClick={applySuggestion}
+                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap">
+                Aplicar
+              </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* Botones de puntaje */}
       {scores[currentItem.num] === undefined && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-600 mb-3">Puntaje para este ítem:</p>
           <div className="grid grid-cols-3 gap-3">
-            <button onClick={() => handleScore(0)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">0 - Incorrecto</button>
-            <button onClick={() => handleScore(1)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">1 - Parcial</button>
-            <button onClick={() => handleScore(2)} className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">2 - Correcto</button>
+            <button onClick={() => handleScore(0)}
+              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
+              0 - Incorrecto
+            </button>
+            <button onClick={() => handleScore(1)}
+              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
+              1 - Parcial
+            </button>
+            <button onClick={() => handleScore(2)}
+              className="py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">
+              2 - Correcto
+            </button>
           </div>
         </div>
       )}
 
+      {/* Confirmación */}
       {scores[currentItem.num] !== undefined && (
         <div className="bg-green-50 rounded-lg p-3 text-center">
           <p className="text-green-700 text-sm">✓ Ítem respondido con puntaje {scores[currentItem.num]}</p>
         </div>
       )}
 
+      {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
           Puntaje bruto acumulado: {displayScore} / {VOC_ITEMS.length * 2}
           {!bonusApplied && patientAge >= 9 && (
-            <span className="ml-2 text-xs text-gray-500">(Bonus potencial: +{bonusPts} pts si acierta ítems {firstStartItem} y {secondStartItem})</span>
+            <span className="ml-2 text-xs text-gray-500">
+              (Bonus potencial: +{bonusPts} pts si acierta ítems {firstStartItem} y {secondStartItem})
+            </span>
           )}
         </p>
       </div>

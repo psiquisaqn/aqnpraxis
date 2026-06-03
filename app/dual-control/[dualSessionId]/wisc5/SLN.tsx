@@ -1,11 +1,10 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 
 // ============================================================
-// CONFIGURACIÓN DE ÍTEMS (la misma de antes)
+// CONFIGURACIÓN DE ÍTEMS PARA SECUENCIACIÓN DE LETRAS Y NÚMEROS (SLN)
 // ============================================================
-// ... (SLN_ITEMS igual que antes, omitido por brevedad)
 
 interface SLNItem {
   num: number | string
@@ -17,15 +16,117 @@ interface SLNItem {
 }
 
 const SLN_ITEMS: SLNItem[] = [
-  // ... (mismo array de antes)
+  // Calificación (solo 6-7 años)
+  {
+    num: 'QC',
+    trials: [['Contar hasta 3'], ['Recitar alfabeto hasta C']],
+    correctAnswers: [['1,2,3'], ['A,B,C']],
+    isPractice: true, isExample: true, type: 'qualifying'
+  },
+  // Ejemplo A y Práctica A (1 número + 1 letra)
+  {
+    num: 'EA',
+    trials: [['A', '2']],
+    correctAnswers: [['2', 'A']],
+    isPractice: true, isExample: true, type: 'simple'
+  },
+  {
+    num: 'PA',
+    trials: [['B', '1']],
+    correctAnswers: [['1', 'B']],
+    isPractice: true, isExample: false, type: 'simple'
+  },
+  // Ítems 1-2 (1 número + 1 letra)
+  {
+    num: 1,
+    trials: [['A', '3'], ['1', 'C'], ['B', '2']],
+    correctAnswers: [['3', 'A'], ['1', 'C'], ['2', 'B']],
+    isPractice: false, isExample: false, type: 'simple'
+  },
+  {
+    num: 2,
+    trials: [['5', 'E'], ['C', '4'], ['1', 'D']],
+    correctAnswers: [['5', 'E'], ['C', '4'], ['1', 'D']],
+    isPractice: false, isExample: false, type: 'simple'
+  },
+  // Ejemplo B y Práctica B (varios números + letras)
+  {
+    num: 'EB',
+    trials: [['3', 'F', '2']],
+    correctAnswers: [['2', '3', 'F']],
+    isPractice: true, isExample: true, type: 'complex'
+  },
+  {
+    num: 'PB',
+    trials: [['E', '5', 'A']],
+    correctAnswers: [['5', 'A', 'E']],
+    isPractice: true, isExample: false, type: 'complex'
+  },
+  // Ítems 3-10 (varios números + letras)
+  {
+    num: 3,
+    trials: [['A', '3', '2'], ['4', '1', 'C'], ['F', 'D', '5']],
+    correctAnswers: [['2', '3', 'A'], ['1', '4', 'C'], ['5', 'D', 'F']],
+    isPractice: false, isExample: false, type: 'complex'
+  },
+  {
+    num: 4,
+    trials: [['Z', 'U', '9'], ['8', '2', 'D'], ['C', '5', 'U']],
+    correctAnswers: [['9', 'U', 'Z'], ['2', '8', 'D'], ['5', 'C', 'U']],
+    isPractice: false, isExample: false, type: 'complex'
+  },
+  {
+    num: 5,
+    trials: [['9', 'H', '3'], ['J', '6', 'N'], ['5', 'E', '8']],
+    correctAnswers: [['3', '9', 'H'], ['6', 'J', 'N'], ['5', '8', 'E']],
+    isPractice: false, isExample: false, type: 'complex'
+  },
+  {
+    num: 6,
+    trials: [['1', 'Z', '4', 'J'], ['T', '8', 'M', '9'], ['5', 'A', '2', 'G']],
+    correctAnswers: [['1', '4', 'J', 'Z'], ['8', '9', 'M', 'T'], ['2', '5', 'A', 'G']],
+    isPractice: false, isExample: false, type: 'complex'
+  },
+  {
+    num: 7,
+    trials: [['U', '1', 'G', '7', 'X'], ['8', 'D', '2', 'R', '7'], ['S', '6', 'K', '3', 'M']],
+    correctAnswers: [['1', '7', 'G', 'U', 'X'], ['2', '7', '8', 'D', 'R'], ['3', '6', 'K', 'M', 'S']],
+    isPractice: false, isExample: false, type: 'complex'
+  },
+  {
+    num: 8,
+    trials: [['1', 'E', '4', 'F', '9', 'H'], ['J', '2', 'P', '5', 'F', '6'], ['7', 'U', '6', 'M', '3', 'T']],
+    correctAnswers: [['1', '4', '9', 'E', 'F', 'H'], ['2', '5', '6', 'F', 'J', 'P'], ['3', '6', '7', 'M', 'T', 'U']],
+    isPractice: false, isExample: false, type: 'complex'
+  },
+  {
+    num: 9,
+    trials: [['S', '2', 'K', '4', 'U', '1', 'G'], ['7', 'S', '9', 'K', '1', 'T', '6'], ['N', '2', 'J', '6', 'R', '8', 'D']],
+    correctAnswers: [['1', '2', '4', 'G', 'K', 'S', 'U'], ['1', '6', '7', '9', 'K', 'S', 'T'], ['2', '6', '8', 'D', 'J', 'N', 'R']],
+    isPractice: false, isExample: false, type: 'complex'
+  },
+  {
+    num: 10,
+    trials: [['4', 'X', '9', 'R', '1', 'M', '7', 'H'], ['D', '2', 'X', '9', 'A', '6', 'Z', '4'], ['2', 'P', '1', 'U', '4', 'K', '7', 'D']],
+    correctAnswers: [['1', '4', '7', '9', 'H', 'M', 'R', 'X'], ['2', '4', '6', '9', 'A', 'D', 'X', 'Z'], ['1', '2', '4', '7', 'D', 'K', 'P', 'U']],
+    isPractice: false, isExample: false, type: 'complex'
+  }
 ]
 
 // ============================================================
-// COMPONENTE DE INPUT DE CARACTERES
+// COMPONENTE DE INPUT DE CARACTERES (MODELO RD)
 // ============================================================
-function CharInput({ length, value, onChange, disabled, autoFocus, onSubmit }: {
-  length: number; value: string[]; onChange: (v: string[]) => void; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void
-}) {
+
+interface CharInputProps {
+  length: number
+  value: string[]
+  onChange: (values: string[]) => void
+  disabled?: boolean
+  autoFocus?: boolean
+  onSubmit?: () => void
+}
+
+function CharInput({ length, value, onChange, disabled = false, autoFocus = true, onSubmit }: CharInputProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
@@ -50,7 +151,9 @@ function CharInput({ length, value, onChange, disabled, autoFocus, onSubmit }: {
     if (e.key === 'Enter') {
       e.preventDefault()
       const allFilled = value.every(v => v && v.trim().length > 0)
-      if (allFilled && onSubmit) onSubmit()
+      if (allFilled && onSubmit) {
+        onSubmit()
+      }
     } else if (e.key === 'Backspace' && !value[index] && index > 0) {
       inputRefs.current[index - 1]?.focus()
     } else if (e.key === 'ArrowLeft' && index > 0) {
@@ -69,7 +172,7 @@ function CharInput({ length, value, onChange, disabled, autoFocus, onSubmit }: {
           onChange={(e) => handleChange(index, e.target.value)}
           onKeyDown={(e) => handleKeyDown(index, e)}
           disabled={disabled}
-          className={`w-10 h-12 text-center text-lg font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`w-10 h-12 text-center text-lg font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
             disabled ? 'bg-gray-100 text-gray-500 border-gray-200' : 'border-gray-300 text-gray-800'
           }`}
         />
@@ -79,8 +182,19 @@ function CharInput({ length, value, onChange, disabled, autoFocus, onSubmit }: {
 }
 
 // ============================================================
-// COMPONENTE PRINCIPAL
+// FUNCIONES AUXILIARES
 // ============================================================
+
+const validateResponse = (userInput: string[], correctAnswers: string[]): boolean => {
+  const userAnswers = userInput.filter(s => s && s.trim().length > 0)
+  if (userAnswers.length === 0) return false
+  return JSON.stringify(userAnswers) === JSON.stringify(correctAnswers)
+}
+
+// ============================================================
+// COMPONENTE PRINCIPAL SLN
+// ============================================================
+
 interface SLNInterfaceProps {
   onComplete: (scores: Record<string | number, number>, rawTotal: number) => void
   onUpdatePatient: (content: any) => void
@@ -88,7 +202,7 @@ interface SLNInterfaceProps {
 }
 
 export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpdatePatient, patientAge }: SLNInterfaceProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState<number>(0)
   const [currentTrial, setCurrentTrial] = useState<0 | 1 | 2>(0)
   const [userInput, setUserInput] = useState<string[]>([])
   const [scores, setScores] = useState<Record<string, number>>({})
@@ -100,6 +214,7 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   const [alphabetOK, setAlphabetOK] = useState<boolean | null>(null)
   const [qualifyingPassed, setQualifyingPassed] = useState<boolean | null>(null)
   const [zeroInItem, setZeroInItem] = useState(0)
+  const [resultTimer, setResultTimer] = useState<NodeJS.Timeout | null>(null)
 
   const currentItem = SLN_ITEMS[currentIndex]
   const currentTrialData = currentItem?.trials[currentTrial]
@@ -111,6 +226,7 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   const onUpdatePatientRef = useRef(onUpdatePatient)
 
   useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
+  useEffect(() => { return () => { if (resultTimer) clearTimeout(resultTimer) } }, [resultTimer])
 
   useEffect(() => {
     if (currentTrialData) {
@@ -123,14 +239,21 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   useEffect(() => {
     if (currentItem && !isCompleted) {
       let instruction = ''
-      if (currentItem.type === 'qualifying') instruction = 'Vamos a hacer unos ejercicios. Primero, cuenta hasta 3. Luego, recita el alfabeto hasta la letra C.'
-      else if (currentItem.type === 'simple') instruction = 'Te voy a decir un número y una letra. Quiero que me los digas en orden: primero el número y después la letra.'
-      else instruction = 'Ahora te voy a decir más números y letras. Quiero que los ordenes: primero los números de menor a mayor y luego las letras en orden alfabético.'
-      onUpdatePatientRef.current({ type: 'wisc5_sln', instruction, itemNum: currentItem.num, isPractice, isExample })
+      if (currentItem.type === 'qualifying') {
+        instruction = 'Vamos a hacer unos ejercicios. Primero, cuenta hasta 3. Luego, recita el alfabeto hasta la letra C.'
+      } else if (currentItem.type === 'simple') {
+        instruction = 'Te voy a decir un número y una letra. Quiero que me los digas en orden: primero el número y después la letra.'
+      } else {
+        instruction = 'Ahora te voy a decir más números y letras. Quiero que los ordenes: primero los números de menor a mayor y luego las letras en orden alfabético.'
+      }
+      onUpdatePatientRef.current({
+        type: 'wisc5_sln', instruction, itemNum: currentItem.num,
+        isPractice: currentItem.isPractice, isExample: currentItem.isExample
+      })
     }
   }, [currentItem, isCompleted])
 
-  const getScoreKey = (itemNum: number | string, trial: number) => `${itemNum}-trial${trial}`
+  const getScoreKey = (itemNum: number | string, trial: number): string => itemNum + '-trial' + trial
 
   const advanceToNext = (newScores: Record<string, number>) => {
     if (currentTrial < 2) {
@@ -154,9 +277,7 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
     if (!currentCorrectAnswers) return
     if (userInput.some(v => !v || v.trim().length === 0)) return
 
-    const userAnswers = userInput.filter(v => v && v.trim().length > 0)
-    const correct = userAnswers.length === currentCorrectAnswers.length && 
-      userAnswers.every((v, i) => v === currentCorrectAnswers[i])
+    const correct = validateResponse(userInput, currentCorrectAnswers)
     setIsCorrect(correct)
     setShowResult(true)
 
@@ -179,16 +300,19 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
       }
     }
 
-    setTimeout(() => advanceToNext(newScores), 800)
+    const timer = setTimeout(() => { advanceToNext(newScores) }, 800)
+    setResultTimer(timer)
   }
 
   const handleQualifyingAnswer = (type: 'counting' | 'alphabet', passed: boolean) => {
     if (type === 'counting') setCountingOK(passed)
     else setAlphabetOK(passed)
-    const finalCounting = type === 'counting' ? passed : countingOK
-    const finalAlphabet = type === 'alphabet' ? passed : alphabetOK
-    if (finalCounting !== null && finalAlphabet !== null) {
-      const finalPassed = finalCounting! && finalAlphabet!
+    
+    const finalCountingOK = type === 'counting' ? passed : countingOK
+    const finalAlphabetOK = type === 'alphabet' ? passed : alphabetOK
+    
+    if (finalCountingOK !== null && finalAlphabetOK !== null) {
+      const finalPassed = finalCountingOK! && finalAlphabetOK!
       setQualifyingPassed(finalPassed)
       if (finalPassed) {
         setTimeout(() => {
@@ -205,22 +329,49 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   if (!currentItem) return null
 
   if (showQualifying && currentItem.type === 'qualifying') {
-    // ... (pantalla de calificación, sin cambios)
+    return (
+      <div className="space-y-4">
+        <div className="bg-gray-50 rounded-lg p-3">
+          <h3 className="text-sm font-semibold text-gray-700">Ítems de Calificación</h3>
+          <p className="text-xs text-gray-500 mt-1">Verifica que el evaluado tenga los conocimientos necesarios</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+          <p className="text-lg font-medium text-gray-800 mb-4">¿El evaluado cuenta correctamente al menos hasta 3?</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => handleQualifyingAnswer('counting', true)} className="px-8 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Sí</button>
+            <button onClick={() => handleQualifyingAnswer('counting', false)} className="px-8 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">No</button>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+          <p className="text-lg font-medium text-gray-800 mb-4">¿El evaluado recita el alfabeto correctamente al menos hasta la letra C?</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => handleQualifyingAnswer('alphabet', true)} className="px-8 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Sí</button>
+            <button onClick={() => handleQualifyingAnswer('alphabet', false)} className="px-8 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">No</button>
+          </div>
+        </div>
+        {qualifyingPassed === false && (
+          <div className="bg-red-50 rounded-lg p-4 text-center border border-red-200">
+            <p className="text-red-700 font-medium">El evaluado no cumple con los requisitos mínimos.</p>
+            <p className="text-sm text-red-600 mt-1">No se debe administrar esta subprueba.</p>
+          </div>
+        )}
+      </div>
+    )
   }
 
   if (isCompleted) {
     const totalScore = Object.values(scores).reduce((a, b) => a + b, 0)
+    const maxScore = 30
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">Puntaje total: {totalScore} / 30</p>
+        <p className="text-sm text-green-600 mt-1">Puntaje total: {totalScore} / {maxScore}</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {/* Barra de progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Secuenciación de Letras y Números</span>
@@ -230,27 +381,22 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
           </span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(Object.keys(scores).length / 30) * 100}%` }} />
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: (Object.keys(scores).length / 30) * 100 + '%' }} />
         </div>
         {isExample && <p className="text-xs text-gray-400 mt-1">Ítem de ejemplo (no suma puntos)</p>}
         {isPractice && <p className="text-xs text-gray-400 mt-1">Ítem de práctica (no suma puntos)</p>}
       </div>
 
-      {/* Estímulo */}
       <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 text-center">
         <p className="text-sm text-blue-700 mb-3">📢 Secuencia para leer al evaluado (1 por segundo):</p>
-        <p className="text-4xl font-mono font-bold tracking-wider text-gray-800">
-          {currentTrialData?.join(' - ')}
-        </p>
+        <p className="text-4xl font-mono font-bold tracking-wider text-gray-800">{currentTrialData?.join(' - ')}</p>
         {currentItem.type === 'simple' && <p className="text-xs text-blue-500 mt-3">El evaluado debe decir primero el número y luego la letra</p>}
         {currentItem.type === 'complex' && <p className="text-xs text-blue-500 mt-3">El evaluado debe ordenar números de menor a mayor y letras en orden alfabético</p>}
       </div>
 
-      {/* Input */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-4 text-center">
-          ✏️ Respuesta del evaluado ({currentTrialData?.length} caracteres):
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-4 text-center">✏️ Respuesta del evaluado:</label>
+        
         <CharInput
           length={currentTrialData?.length || 0}
           value={userInput}
@@ -259,12 +405,12 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
           autoFocus={!showResult}
           onSubmit={handleSubmit}
         />
+        
         <p className="text-xs text-gray-400 mt-4 text-center">
-          <strong>⏎ Presiona ENTER</strong> para confirmar y avanzar
+          <strong>⏎ Presiona ENTER</strong> para confirmar y avanzar al siguiente
         </p>
       </div>
 
-      {/* Resultado */}
       {showResult && (
         <div className={`rounded-lg p-4 text-center ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
           <p className={`font-medium text-lg ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
@@ -272,21 +418,21 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
           </p>
           {!isCorrect && currentCorrectAnswers && (
             <p className="text-sm text-gray-600 mt-2">
-              <strong>Respuesta esperada:</strong> {currentCorrectAnswers.join(' - ')}
+              <strong>Respuesta esperada:</strong>{' '}
+              <span className="font-mono text-lg">{currentCorrectAnswers.join(' - ')}</span>
             </p>
           )}
         </div>
       )}
 
       <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">
-          Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 30
-        </p>
+        <p className="text-sm text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 30</p>
       </div>
 
       <div className="bg-blue-50 rounded-lg p-3">
         <p className="text-xs text-blue-700">
-          <strong>Importante:</strong> Lea cada ítem a un ritmo de un número o letra por segundo. No repita ningún intento.
+          <strong>Importante:</strong> Lea cada ítem a un ritmo de un número o letra por segundo. 
+          No repita ningún intento. Si el evaluado se autocorrige, registre la respuesta final.
         </p>
       </div>
     </div>

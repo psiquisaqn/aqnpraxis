@@ -120,11 +120,11 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onT
 
   return (
     <div className="text-center">
-      <div className={'text-4xl font-mono font-bold mb-2 transition-colors ' + (isTimeCritical ? 'text-red-600 animate-pulse' : 'text-gray-800')}>
+      <div className={`text-4xl font-mono font-bold mb-2 transition-colors ${isTimeCritical ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>
         {formatTime(seconds)}
       </div>
       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div className={'h-full transition-all duration-1000 ' + (isTimeCritical ? 'bg-red-500' : 'bg-blue-500')}
+        <div className={`h-full transition-all duration-1000 ${isTimeCritical ? 'bg-red-500' : 'bg-blue-500'}`}
           style={{ width: getProgressPercent() + '%' }} />
       </div>
       <div className="flex gap-2 justify-center mt-2">
@@ -185,6 +185,7 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
   const [timeEnded, setTimeEnded] = useState(false)
   const [showAnswer, setShowAnswer] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
+  const [isRunning, setIsRunning] = useState(false)
 
   const currentItem = ARI_ITEMS[currentIndex]
   const { first: firstStartItem, second: secondStartItem, jumpAfterBacktrack } = getStartItems()
@@ -219,7 +220,6 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
 
   const handleTimeUpdate = useCallback((seconds: number) => { setElapsedTime(seconds) }, [])
   const handleTimeEnd = useCallback(() => { setTimeEnded(true); setIsRunning(false) }, [])
-  const [isRunning, setIsRunning] = useState(false)
   const toggleRunning = useCallback(() => setIsRunning(prev => !prev), [])
 
   const checkAnswer = (userAnswer: string): boolean => {
@@ -233,7 +233,6 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
     const cleanUser = userAnswer.toLowerCase().trim()
     const cleanCorrect = String(correctAnswer).toLowerCase()
     
-    // Manejar casos especiales como "9 u 8.75"
     const parts = cleanCorrect.split(' o ')
     return parts.some(p => cleanUser.includes(p.trim()))
   }
@@ -296,38 +295,78 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
     return { nextIndex: nextIdx, updatedScores }
   }
 
-  const handleScore = (score: number) => {
-    if (scores[currentItem.num] !== undefined) return
+  const handleVerify = () => {
+    if (!response.trim() || scores[currentItem.num] !== undefined) return
 
-    const isLearning = currentItem.isLearning || false
-    const effectiveScore = isLearning ? 1 : score
+    const correct = checkAnswer(response)
+    setIsCorrect(correct)
+    setShowAnswer(true)
+
+    const score = correct ? 1 : 0
+    const effectiveScore = currentItem.isLearning ? 1 : score // ítems de aprendizaje siempre puntúan
     let newScores = { ...scores, [currentItem.num]: effectiveScore }
     setScores(newScores)
-    setResponse('')
-    setShowAnswer(false)
-    setIsCorrect(null)
 
-    if (score === 0 && !isLearning) {
-      const newZeros = consecutiveZeros + 1
-      setConsecutiveZeros(newZeros)
-      if (newZeros >= 3) {
-        const bonus = bonusApplied ? calculateBonusPoints() : 0
-        const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonus
-        setIsCompleted(true); onCompleteRef.current(newScores, total)
-        return
+    // Lógica de autoavance
+    setTimeout(() => {
+      if (score === 0 && !currentItem.isLearning) {
+        const newZeros = consecutiveZeros + 1
+        setConsecutiveZeros(newZeros)
+        if (newZeros >= 3) {
+          const bonus = bonusApplied ? calculateBonusPoints() : 0
+          const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonus
+          setIsCompleted(true)
+          onCompleteRef.current(newScores, total)
+          return
+        }
+      } else {
+        setConsecutiveZeros(0)
       }
-    } else {
-      setConsecutiveZeros(0)
-    }
 
-    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, score)
-    newScores = updatedScores
+      const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, effectiveScore)
+      newScores = updatedScores
+      setScores(newScores)
+
+      if (nextIndex >= ARI_ITEMS.length) {
+        const bonus = bonusApplied || checkBonusEligibility(newScores) ? calculateBonusPoints() : 0
+        const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonus
+        setIsCompleted(true)
+        onCompleteRef.current(newScores, total)
+      } else {
+        setCurrentIndex(nextIndex)
+        setIsGoingBack(nextIndex < currentIndex)
+        setTimeEnded(false)
+        setElapsedTime(0)
+        setCronometroKey(prev => prev + 1)
+      }
+      setShowAnswer(false)
+      setIsCorrect(null)
+      setResponse('')
+    }, 1000)
+  }
+
+  const handleTimeExpired = () => {
+    if (scores[currentItem.num] !== undefined) return
+    const newScores = { ...scores, [currentItem.num]: 0 }
     setScores(newScores)
 
-    if (nextIndex >= ARI_ITEMS.length) {
-      const bonus = bonusApplied || checkBonusEligibility(newScores) ? calculateBonusPoints() : 0
+    const newZeros = consecutiveZeros + 1
+    setConsecutiveZeros(newZeros)
+    if (newZeros >= 3) {
+      const bonus = bonusApplied ? calculateBonusPoints() : 0
       const total = Object.values(newScores).reduce((a, b) => a + b, 0) + bonus
-      setIsCompleted(true); onCompleteRef.current(newScores, total)
+      setIsCompleted(true)
+      onCompleteRef.current(newScores, total)
+      return
+    }
+
+    const { nextIndex, updatedScores } = getNextItemIndex(currentItem.num, 0)
+    setScores(updatedScores)
+    if (nextIndex >= ARI_ITEMS.length) {
+      const bonus = bonusApplied || checkBonusEligibility(updatedScores) ? calculateBonusPoints() : 0
+      const total = Object.values(updatedScores).reduce((a, b) => a + b, 0) + bonus
+      setIsCompleted(true)
+      onCompleteRef.current(updatedScores, total)
     } else {
       setCurrentIndex(nextIndex)
       setIsGoingBack(nextIndex < currentIndex)
@@ -335,13 +374,6 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
       setElapsedTime(0)
       setCronometroKey(prev => prev + 1)
     }
-  }
-
-  const handleVerify = () => {
-    if (!response.trim()) return
-    const correct = checkAnswer(response)
-    setIsCorrect(correct)
-    setShowAnswer(true)
   }
 
   if (!currentItem) return null
@@ -353,10 +385,7 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">
-          Puntaje total: {total} / {maxP}
-          {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{bonus} puntos por bonus)</span>}
-        </p>
+        <p className="text-sm text-green-600 mt-1">Puntaje total: {total} / {maxP}{bonusApplied && <span className="ml-2 text-blue-600">(incluye +{bonus} bonus)</span>}</p>
       </div>
     )
   }
@@ -392,7 +421,7 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
       {timeEnded && scores[currentItem.num] === undefined && (
         <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
           <p className="text-yellow-700 text-sm">⏰ ¡Tiempo finalizado!</p>
-          <button onClick={() => handleScore(0)} className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm">
+          <button onClick={handleTimeExpired} className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm">
             Registrar como incorrecto
           </button>
         </div>
@@ -430,7 +459,8 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
           <input type="text" value={response} onChange={(e) => setResponse(e.target.value)}
             disabled={scores[currentItem.num] !== undefined || timeEnded}
             placeholder="Escribe la respuesta..."
-            className="flex-1 px-4 py-2 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" />
+            className="flex-1 px-4 py-2 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleVerify() }} />
           <button onClick={handleVerify} disabled={!response.trim() || scores[currentItem.num] !== undefined}
             className={'px-6 py-2 rounded-lg font-medium ' + (response.trim() && scores[currentItem.num] === undefined ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed')}>
             Verificar
@@ -448,26 +478,6 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
         )}
       </div>
 
-      {/* Botones de puntaje */}
-      {scores[currentItem.num] === undefined && !timeEnded && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-3">Asignar puntaje:</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleScore(0)}
-              className="py-3 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">0 - Incorrecto</button>
-            <button onClick={() => handleScore(1)}
-              className="py-3 rounded-lg border border-gray-200 text-sm hover:bg-gray-50 transition-colors">1 - Correcto</button>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmación */}
-      {scores[currentItem.num] !== undefined && (
-        <div className="bg-green-50 rounded-lg p-3 text-center">
-          <p className="text-green-700 text-sm">✓ Ítem respondido con puntaje {scores[currentItem.num]}</p>
-        </div>
-      )}
-
       {/* Puntaje acumulado */}
       <div className="bg-gray-50 rounded-lg p-3">
         <p className="text-sm text-gray-600">
@@ -481,8 +491,8 @@ export const ARIInterface = React.memo(function ARIInterface({ onComplete, onUpd
       {/* Instrucciones */}
       <div className="bg-blue-50 rounded-lg p-3">
         <p className="text-xs text-blue-700">
-          <strong>📋 Recordatorio:</strong> Tiempo límite 30 segundos por ítem. No repetir ítems 1-19. 
-          Repeticiones permitidas en ítems 20-34 (pausar cronómetro). Notificar a los 20 segundos si no hay respuesta.
+          <strong>📋 Recordatorio:</strong> Tiempo límite 30 segundos por ítem. No repetir ítems 1‑19. 
+          Repeticiones permitidas en ítems 20‑34 (pausar cronómetro). Notificar a los 20 segundos si no hay respuesta.
         </p>
       </div>
     </div>

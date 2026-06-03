@@ -70,7 +70,7 @@ export function PatientCard({ patient, onNewSession }: Props) {
   // Determinar link de continuación según tipo de test
   const getContinueLink = (session: LocalSession): string => {
     if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
-      // WISC-V redirige a ficha del paciente para retomar desde allí
+      // WISC‑V redirige a ficha del paciente para retomar desde allí
       return `/dashboard/paciente/${patient.id}`
     }
     // Otros tests redirigen directamente a la sesión
