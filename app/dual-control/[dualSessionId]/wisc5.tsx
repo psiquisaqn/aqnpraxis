@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { DualTestWrapper } from './DualTestWrapper'
+import { Wisc5Engine, type RawScores, type ScaledScores } from '@/lib/wisc5/engine'
 import { CCInterface } from './wisc5/CC'
 import { ANInterface } from './wisc5/AN'
 import { MRInterface } from './wisc5/MR'
@@ -201,29 +202,33 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   const [birthDate, setBirthDate] = useState<string>('')
   const [evalDate, setEvalDate] = useState<string>(() => new Date().toISOString().split('T')[0])
   const [ageInfo, setAgeInfo] = useState<{ years: number; months: number; group: string } | null>(null)
-  const [rawScores, setRawScores] = useState<Record<string, number>>({})
-  const [scaledScores, setScaledScores] = useState<Record<string, number>>({})
+  const [rawScores, setRawScores] = useState<RawScores>({})
+  const [scaledScores, setScaledScores] = useState<ScaledScores>({})
   const [subtestStatus, setSubtestStatus] = useState<Record<string, 'pending' | 'completed' | 'not_administered' | 'pending_review' | 'interrupted'>>({})
   const [substitutionUsed, setSubstitutionUsed] = useState(false)
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const [activeSubtest, setActiveSubtest] = useState<string | null>(null)
   const [showSubtestPanel, setShowSubtestPanel] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [engine] = useState(() => new Wisc5Engine())
+
+  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
   useEffect(() => {
     const loadSavedState = async () => {
-      const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
       const { data } = await supabase.from('wisc5_scores')
-        .select('status, substitution_used, completed_subtests, report_type')
+        .select('status, substitution_used, completed_subtests, raw_scores, scaled_scores, composite_scores, report_type')
         .eq('session_id', sessionId).single()
       if (data) {
         if (data.substitution_used === 'RV') setSubstitutionUsed(true)
         if (data.completed_subtests) setSubtestStatus(data.completed_subtests as any)
+        if (data.raw_scores) setRawScores(data.raw_scores)
+        if (data.scaled_scores) setScaledScores(data.scaled_scores)
         if (data.status === 'completed_brief' || data.status === 'completed_extended') setShowSubtestPanel(false)
       }
     }
     if (sessionId) loadSavedState()
-  }, [sessionId])
+  }, [sessionId, supabase])
 
   useEffect(() => {
     if (birthDate && evalDate) {
@@ -236,7 +241,6 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   }, [birthDate, evalDate])
 
   const fetchScaledScore = async (code: string, raw: number, ageGroup: string) => {
-    const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
     const { data } = await supabase.from('wisc5_norms_subtest').select('scaled_score')
       .eq('age_group', ageGroup).eq('subtest_code', code)
       .lte('raw_score_min', raw).gte('raw_score_max', raw).single()
@@ -244,42 +248,87 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   }
 
   const saveState = async (status: string, reportType?: string) => {
-    const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
     await supabase.from('wisc5_scores').upsert({
-      session_id: sessionId, status,
+      session_id: sessionId,
+      status,
       substitution_used: substitutionUsed ? 'RV' : null,
       completed_subtests: subtestStatus as any,
+      raw_scores: rawScores,
+      scaled_scores: scaledScores,
       report_type: reportType || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'session_id' })
   }
 
-  const handleSubtestComplete = (code: string, rawTotal: number) => {
+  const saveCompositeScores = async (composite: any) => {
+    await supabase.from('wisc5_scores').update({
+      composite_scores: composite,
+      updated_at: new Date().toISOString()
+    }).eq('session_id', sessionId)
+  }
+
+  const calculateAndSaveIndices = async () => {
+    if (!ageInfo || !birthDate || !evalDate) return
+    const birth = new Date(birthDate)
+    const evalDt = new Date(evalDate)
+    const result = await engine.score(birth, evalDt, rawScores, { substitution: substitutionUsed ? 'RV' : undefined })
+    if (result) {
+      const compositeScores = {
+        ICV: result.ICV,
+        IVE: result.IVE,
+        IRF: result.IRF,
+        IMT: result.IMT,
+        IVP: result.IVP,
+        CIT: result.CIT
+      }
+      await saveCompositeScores(compositeScores)
+    }
+  }
+
+  const handleSubtestComplete = async (code: string, rawTotal: number) => {
     console.log('✅ Subprueba ' + code + ' completada. Puntaje bruto:', rawTotal)
     
     if (rawTotal === -1) {
       setSubtestStatus(prev => ({ ...prev, [code]: 'pending_review' }))
-      saveState('in_progress')
+      await saveState('in_progress')
       setActiveSubtest(null)
       setShowSubtestPanel(true)
       return
     }
     if (rawTotal === -2) {
       setSubtestStatus(prev => ({ ...prev, [code]: 'interrupted' }))
-      saveState('in_progress')
+      await saveState('in_progress')
       setActiveSubtest(null)
       setShowSubtestPanel(true)
       return
     }
     
-    setRawScores({ ...rawScores, [code]: rawTotal })
-    setSubtestStatus(prev => ({ ...prev, [code]: 'completed' }))
+    const newRawScores = { ...rawScores, [code]: rawTotal }
+    setRawScores(newRawScores)
+    let newScaledScores = { ...scaledScores }
+    
     if (ageInfo?.group) {
-      fetchScaledScore(code, rawTotal, ageInfo.group).then(scaled => {
-        if (scaled) setScaledScores({ ...scaledScores, [code]: scaled })
-      })
+      const scaled = await fetchScaledScore(code, rawTotal, ageInfo.group)
+      if (scaled !== null) {
+        newScaledScores = { ...newScaledScores, [code]: scaled }
+        setScaledScores(newScaledScores)
+      }
     }
-    saveState('in_progress')
+    
+    setSubtestStatus(prev => ({ ...prev, [code]: 'completed' }))
+    await saveState('in_progress')
+    
+    // Verificar si ya se completaron las 7 primarias (considerando sustitución)
+    const primaryCodes = WISC_SUBTESTS.filter(s => s.primary).map(s => s.code)
+    const effectivePrimary = substitutionUsed ? primaryCodes.filter(c => c !== 'CC').concat(['RV']) : primaryCodes
+    setTimeout(async () => {
+      const updatedStatus = { ...subtestStatus, [code]: 'completed' }
+      const allPrimaryCompleted = effectivePrimary.every(c => updatedStatus[c] === 'completed')
+      if (allPrimaryCompleted) {
+        await calculateAndSaveIndices()
+      }
+    }, 100)
+    
     setActiveSubtest(null)
     setShowSubtestPanel(true)
   }
@@ -293,7 +342,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     setShowSubtestPanel(false)
   }
 
-  const handleToggleSubstitution = (useRV: boolean) => {
+  const handleToggleSubstitution = async (useRV: boolean) => {
     setSubstitutionUsed(useRV)
     if (useRV && subtestStatus['CC'] === 'completed') {
       if (rawScores.CC) setRawScores({ ...rawScores, RV: rawScores.CC, CC: undefined })
@@ -304,7 +353,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       if (scaledScores.RV) setScaledScores({ ...scaledScores, CC: scaledScores.RV, RV: undefined })
       setSubtestStatus(prev => ({ ...prev, CC: prev.RV, RV: 'not_administered' }))
     }
-    saveState('in_progress')
+    await saveState('in_progress')
   }
 
   const arePrimarySubtestsCompleted = () => {
@@ -322,12 +371,11 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       alert('Debes completar las 7 subpruebas primarias para ver los resultados.')
       return
     }
-    // Navegar a resultados (pre‑informe breve)
+    await calculateAndSaveIndices()
     router.push(`/resultados/wisc5?session=${sessionId}&type=brief`)
   }
 
   const generateExtendedReport = async () => {
-    const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: planStatus } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
@@ -341,7 +389,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       alert('Debes completar las 15 subpruebas para ver los resultados extendidos.')
       return
     }
-    // Navegar a resultados (pre‑informe extendido)
+    await calculateAndSaveIndices()
     router.push(`/resultados/wisc5?session=${sessionId}&type=extended`)
   }
 

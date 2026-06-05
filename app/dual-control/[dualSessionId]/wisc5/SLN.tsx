@@ -46,7 +46,7 @@ const SLN_ITEMS: SLNItem[] = [
   {
     num: 2,
     trials: [['5', 'E'], ['C', '4'], ['1', 'D']],
-    correctAnswers: [['5', 'E'], ['C', '4'], ['1', 'D']],
+    correctAnswers: [['5', 'E'], ['4', 'C'], ['1', 'D']], // <-- CORREGIDO: segundo trial ahora es ['4','C']
     isPractice: false, isExample: false, type: 'simple'
   },
   // Ejemplo B y Práctica B (varios números + letras)
@@ -114,7 +114,7 @@ const SLN_ITEMS: SLNItem[] = [
 ]
 
 // ============================================================
-// COMPONENTE DE INPUT DE CARACTERES (MODELO RD)
+// COMPONENTE DE INPUT DE CARACTERES (MONOCARÁCTER)
 // ============================================================
 
 interface CharInputProps {
@@ -137,6 +137,7 @@ function CharInput({ length, value, onChange, disabled = false, autoFocus = true
 
   const handleChange = (index: number, newValue: string) => {
     if (disabled) return
+    // Permitir letras mayúsculas y números
     const char = newValue.replace(/[^A-Za-z0-9]/g, '').slice(0, 1).toUpperCase()
     const newValues = [...value]
     newValues[index] = char
@@ -166,13 +167,16 @@ function CharInput({ length, value, onChange, disabled = false, autoFocus = true
   return (
     <div className="flex justify-center gap-2 flex-wrap">
       {Array.from({ length }).map((_, index) => (
-        <input key={index} ref={el => { inputRefs.current[index] = el }}
-          type="text" maxLength={1}
+        <input
+          key={index}
+          ref={el => { inputRefs.current[index] = el }}
+          type="text"
+          maxLength={1}
           value={value[index] || ''}
           onChange={(e) => handleChange(index, e.target.value)}
           onKeyDown={(e) => handleKeyDown(index, e)}
           disabled={disabled}
-          className={`w-10 h-12 text-center text-lg font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+          className={`w-9 h-10 text-center text-lg font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
             disabled ? 'bg-gray-100 text-gray-500 border-gray-200' : 'border-gray-300 text-gray-800'
           }`}
         />
@@ -188,6 +192,7 @@ function CharInput({ length, value, onChange, disabled = false, autoFocus = true
 const validateResponse = (userInput: string[], correctAnswers: string[]): boolean => {
   const userAnswers = userInput.filter(s => s && s.trim().length > 0)
   if (userAnswers.length === 0) return false
+  // Comparar arrays (orden y contenido)
   return JSON.stringify(userAnswers) === JSON.stringify(correctAnswers)
 }
 
@@ -213,7 +218,8 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   const [countingOK, setCountingOK] = useState<boolean | null>(null)
   const [alphabetOK, setAlphabetOK] = useState<boolean | null>(null)
   const [qualifyingPassed, setQualifyingPassed] = useState<boolean | null>(null)
-  const [zeroInItem, setZeroInItem] = useState(0)
+  // Contador global de fallos consecutivos (se reinicia solo con acierto)
+  const [globalConsecutiveZeros, setGlobalConsecutiveZeros] = useState(0)
   const [resultTimer, setResultTimer] = useState<NodeJS.Timeout | null>(null)
 
   const currentItem = SLN_ITEMS[currentIndex]
@@ -228,14 +234,16 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
   useEffect(() => { return () => { if (resultTimer) clearTimeout(resultTimer) } }, [resultTimer])
 
+  // Reiniciar input al cambiar de ítem o trial
   useEffect(() => {
     if (currentTrialData) {
       setUserInput(new Array(currentTrialData.length).fill(''))
       setShowResult(null)
       setIsCorrect(null)
     }
-  }, [currentIndex, currentTrial])
+  }, [currentIndex, currentTrial, currentTrialData])
 
+  // Enviar instrucción al display
   useEffect(() => {
     if (currentItem && !isCompleted) {
       let instruction = ''
@@ -247,8 +255,11 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
         instruction = 'Ahora te voy a decir más números y letras. Quiero que los ordenes: primero los números de menor a mayor y luego las letras en orden alfabético.'
       }
       onUpdatePatientRef.current({
-        type: 'wisc5_sln', instruction, itemNum: currentItem.num,
-        isPractice: currentItem.isPractice, isExample: currentItem.isExample
+        type: 'wisc5_sln',
+        instruction,
+        itemNum: currentItem.num,
+        isPractice: currentItem.isPractice,
+        isExample: currentItem.isExample
       })
     }
   }, [currentItem, isCompleted])
@@ -256,20 +267,24 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   const getScoreKey = (itemNum: number | string, trial: number): string => itemNum + '-trial' + trial
 
   const advanceToNext = (newScores: Record<string, number>) => {
+    // Avanzar al siguiente trial si existe
     if (currentTrial < 2) {
       setCurrentTrial((currentTrial + 1) as 0 | 1 | 2)
+      return
+    }
+    // Si no hay más trials, ir al siguiente ítem
+    let nextIdx = currentIndex + 1
+    while (nextIdx < SLN_ITEMS.length && newScores[getScoreKey(SLN_ITEMS[nextIdx].num, 0)] !== undefined) {
+      nextIdx++
+    }
+    if (nextIdx >= SLN_ITEMS.length) {
+      const total = Object.values(newScores).reduce((a, b) => a + b, 0)
+      setIsCompleted(true)
+      onCompleteRef.current(newScores, total)
     } else {
-      setZeroInItem(0)
-      let nextIdx = currentIndex + 1
-      while (nextIdx < SLN_ITEMS.length && newScores[getScoreKey(SLN_ITEMS[nextIdx].num, 0)] !== undefined) nextIdx++
-      if (nextIdx >= SLN_ITEMS.length) {
-        const total = Object.values(newScores).reduce((a, b) => a + b, 0)
-        setIsCompleted(true)
-        onCompleteRef.current(newScores, total)
-      } else {
-        setCurrentIndex(nextIdx)
-        setCurrentTrial(0)
-      }
+      setCurrentIndex(nextIdx)
+      setCurrentTrial(0)
+      // No reiniciar globalConsecutiveZeros aquí (se reinicia solo con acierto)
     }
   }
 
@@ -287,20 +302,29 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
     const newScores = { ...scores, [scoreKey]: effectiveScore }
     setScores(newScores)
 
-    if (!isPractice && !isExample && effectiveScore === 0) {
-      const newZeros = zeroInItem + 1
-      setZeroInItem(newZeros)
-      if (newZeros >= 3) {
-        setTimeout(() => {
-          const total = Object.values(newScores).reduce((a, b) => a + b, 0)
-          setIsCompleted(true)
-          onCompleteRef.current(newScores, total)
-        }, 800)
-        return
+    // Manejo de fallos consecutivos (global)
+    if (!isPractice && !isExample) {
+      if (effectiveScore === 0) {
+        const newZeros = globalConsecutiveZeros + 1
+        setGlobalConsecutiveZeros(newZeros)
+        if (newZeros >= 3) {
+          // Suspender subprueba
+          setTimeout(() => {
+            const total = Object.values(newScores).reduce((a, b) => a + b, 0)
+            setIsCompleted(true)
+            onCompleteRef.current(newScores, total)
+          }, 800)
+          return
+        }
+      } else {
+        // Acierto → reiniciar contador de fallos
+        setGlobalConsecutiveZeros(0)
       }
     }
 
-    const timer = setTimeout(() => { advanceToNext(newScores) }, 800)
+    const timer = setTimeout(() => {
+      advanceToNext(newScores)
+    }, 800)
     setResultTimer(timer)
   }
 
@@ -315,6 +339,7 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
       const finalPassed = finalCountingOK! && finalAlphabetOK!
       setQualifyingPassed(finalPassed)
       if (finalPassed) {
+        // Pasa a los ítems de ejemplo
         setTimeout(() => {
           const nextIdx = SLN_ITEMS.findIndex(i => i.num === 'EA')
           if (nextIdx >= 0) { setCurrentIndex(nextIdx); setCurrentTrial(0) }
@@ -328,6 +353,7 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
 
   if (!currentItem) return null
 
+  // Pantalla de calificación para niños ≤7 años
   if (showQualifying && currentItem.type === 'qualifying') {
     return (
       <div className="space-y-4">
@@ -338,15 +364,15 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
         <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
           <p className="text-lg font-medium text-gray-800 mb-4">¿El evaluado cuenta correctamente al menos hasta 3?</p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => handleQualifyingAnswer('counting', true)} className="px-8 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Sí</button>
-            <button onClick={() => handleQualifyingAnswer('counting', false)} className="px-8 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">No</button>
+            <button onClick={() => handleQualifyingAnswer('counting', true)} className="px-8 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Sí</button>
+            <button onClick={() => handleQualifyingAnswer('counting', false)} className="px-8 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">No</button>
           </div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
           <p className="text-lg font-medium text-gray-800 mb-4">¿El evaluado recita el alfabeto correctamente al menos hasta la letra C?</p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => handleQualifyingAnswer('alphabet', true)} className="px-8 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Sí</button>
-            <button onClick={() => handleQualifyingAnswer('alphabet', false)} className="px-8 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">No</button>
+            <button onClick={() => handleQualifyingAnswer('alphabet', true)} className="px-8 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Sí</button>
+            <button onClick={() => handleQualifyingAnswer('alphabet', false)} className="px-8 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">No</button>
           </div>
         </div>
         {qualifyingPassed === false && (
@@ -370,6 +396,16 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
     )
   }
 
+  // Validar que exista trial data (seguridad)
+  if (!currentTrialData) {
+    return (
+      <div className="bg-red-50 rounded-lg p-4 text-center">
+        <p className="text-red-700 font-medium">Error interno: No hay datos para este ítem/trial.</p>
+        <button onClick={() => advanceToNext(scores)} className="mt-2 px-4 py-2 bg-gray-600 text-white rounded">Omitir</button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="bg-gray-50 rounded-lg p-3">
@@ -385,20 +421,23 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
         </div>
         {isExample && <p className="text-xs text-gray-400 mt-1">Ítem de ejemplo (no suma puntos)</p>}
         {isPractice && <p className="text-xs text-gray-400 mt-1">Ítem de práctica (no suma puntos)</p>}
+        {globalConsecutiveZeros > 0 && (
+          <p className="text-xs text-orange-600 mt-1">Fallos consecutivos: {globalConsecutiveZeros}/3</p>
+        )}
       </div>
 
       <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 text-center">
         <p className="text-sm text-blue-700 mb-3">📢 Secuencia para leer al evaluado (1 por segundo):</p>
-        <p className="text-4xl font-mono font-bold tracking-wider text-gray-800">{currentTrialData?.join(' - ')}</p>
+        <p className="text-4xl font-mono font-bold tracking-wider text-gray-800">{currentTrialData.join(' - ')}</p>
         {currentItem.type === 'simple' && <p className="text-xs text-blue-500 mt-3">El evaluado debe decir primero el número y luego la letra</p>}
         {currentItem.type === 'complex' && <p className="text-xs text-blue-500 mt-3">El evaluado debe ordenar números de menor a mayor y letras en orden alfabético</p>}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-4 text-center">✏️ Respuesta del evaluado:</label>
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <label className="block text-sm font-medium text-gray-700 mb-3 text-center">✏️ Respuesta del evaluado:</label>
         
         <CharInput
-          length={currentTrialData?.length || 0}
+          length={currentTrialData.length}
           value={userInput}
           onChange={setUserInput}
           disabled={showResult === true}
@@ -406,8 +445,8 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
           onSubmit={handleSubmit}
         />
         
-        <p className="text-xs text-gray-400 mt-4 text-center">
-          <strong>⏎ Presiona ENTER</strong> para confirmar y avanzar al siguiente
+        <p className="text-xs text-gray-400 mt-3 text-center">
+          <strong>⏎ Presiona ENTER</strong> para confirmar y avanzar
         </p>
       </div>
 

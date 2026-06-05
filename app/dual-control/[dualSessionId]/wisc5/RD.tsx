@@ -60,7 +60,11 @@ const RD_S_ITEMS: RDItem[] = [
 const ALL_PARTS: RDPart[] = ['RD-D', 'RD-I', 'RD-S']
 
 const getItemsForPart = (part: RDPart): RDItem[] => {
-  switch (part) { case 'RD-D': return RD_D_ITEMS; case 'RD-I': return RD_I_ITEMS; case 'RD-S': return RD_S_ITEMS }
+  switch (part) {
+    case 'RD-D': return RD_D_ITEMS
+    case 'RD-I': return RD_I_ITEMS
+    case 'RD-S': return RD_S_ITEMS
+  }
 }
 
 const getPartInstruction = (part: RDPart): string => {
@@ -77,14 +81,21 @@ const sortAscending = (arr: number[]): number[] => [...arr].sort((a, b) => a - b
 const validateResponse = (part: RDPart, trial: number[], digits: (number | null)[]): boolean => {
   const userDigits = digits.filter(d => d !== null) as number[]
   let expected: number[]
-  switch (part) { case 'RD-D': expected = trial; break; case 'RD-I': expected = reverseArray(trial); break; case 'RD-S': expected = sortAscending(trial); break }
+  switch (part) {
+    case 'RD-D': expected = trial; break
+    case 'RD-I': expected = reverseArray(trial); break
+    case 'RD-S': expected = sortAscending(trial); break
+    default: return false
+  }
   if (userDigits.length !== expected.length) return false
-  for (let i = 0; i < userDigits.length; i++) { if (userDigits[i] !== expected[i]) return false }
+  for (let i = 0; i < userDigits.length; i++) {
+    if (userDigits[i] !== expected[i]) return false
+  }
   return true
 }
 
 // ============================================================
-// COMPONENTE DE INPUT DE DÍGITOS
+// COMPONENTE DE INPUT DE DÍGITOS (con altura reducida)
 // ============================================================
 
 interface DigitInputProps {
@@ -122,9 +133,7 @@ function DigitInput({ length, value, onChange, disabled = false, autoFocus = tru
     if (e.key === 'Enter') {
       e.preventDefault()
       const allFilled = value.every(v => v !== null) && !value.some(v => v === null)
-      if (allFilled && onSubmit) {
-        onSubmit()
-      }
+      if (allFilled && onSubmit) onSubmit()
     } else if (e.key === 'Backspace' && !value[index] && index > 0) {
       inputRefs.current[index - 1]?.focus()
     } else if (e.key === 'ArrowLeft' && index > 0) {
@@ -150,13 +159,18 @@ function DigitInput({ length, value, onChange, disabled = false, autoFocus = tru
   return (
     <div className="flex justify-center gap-2" onPaste={handlePaste}>
       {Array.from({ length }).map((_, index) => (
-        <input key={index} ref={el => { inputRefs.current[index] = el }}
-          type="text" inputMode="numeric" pattern="\d*" maxLength={1}
+        <input
+          key={index}
+          ref={el => { inputRefs.current[index] = el }}
+          type="text"
+          inputMode="numeric"
+          pattern="\d*"
+          maxLength={1}
           value={value[index] !== null ? value[index]?.toString() : ''}
           onChange={(e) => handleChange(index, e.target.value)}
           onKeyDown={(e) => handleKeyDown(index, e)}
           disabled={disabled}
-          className={`w-12 h-14 text-center text-2xl font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+          className={`w-10 h-10 text-center text-xl font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
             disabled ? 'bg-gray-100 text-gray-500 border-gray-200' : 'border-gray-300 text-gray-800'
           }`}
         />
@@ -180,7 +194,8 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   const [currentItemIndex, setCurrentItemIndex] = useState<number>(0)
   const [currentTrial, setCurrentTrial] = useState<0 | 1>(0)
   const [scores, setScores] = useState<Record<string, number>>({})
-  const [consecutiveZeros, setConsecutiveZeros] = useState(0)  // Para RD-S
+  // Contador global de fallos consecutivos para RD-S (se reinicia solo con acierto)
+  const [globalConsecutiveZeros, setGlobalConsecutiveZeros] = useState(0)
   const [isCompleted, setIsCompleted] = useState(false)
   const [digits, setDigits] = useState<(number | null)[]>([])
   const [showResult, setShowResult] = useState<boolean | null>(null)
@@ -204,12 +219,13 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
       setShowResult(null)
       setIsCorrect(null)
     }
-  }, [currentPartIndex, currentItemIndex, currentTrial])
+  }, [currentPartIndex, currentItemIndex, currentTrial, currentTrialDigits])
 
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
-        type: 'wisc5_rd', part: currentPart,
+        type: 'wisc5_rd',
+        part: currentPart,
         partName: currentPart === 'RD-D' ? 'Dígitos en orden directo' : currentPart === 'RD-I' ? 'Dígitos en orden inverso' : 'Dígitos en orden secuenciado',
         instruction: getPartInstruction(currentPart),
         isPractice: currentItem.isPractice || false
@@ -233,7 +249,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
       setCurrentPartIndex(currentPartIndex + 1)
       setCurrentItemIndex(0)
       setCurrentTrial(0)
-      setConsecutiveZeros(0)
+      setGlobalConsecutiveZeros(0)  // Reiniciar contador global al cambiar de parte
       setShowResult(null)
       setIsCorrect(null)
     } else {
@@ -244,13 +260,13 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   }
 
   const advanceToNext = (newScores: Record<string, number>) => {
-    // Verificar suspensión RD-D/RD-I (ambos intentos fallados)
+    // Verificar suspensión RD-D / RD-I (ambos intentos fallados)
     if ((currentPart === 'RD-D' || currentPart === 'RD-I') && shouldSuspendDDorDI(currentPart, currentItem.num, newScores)) {
       moveToNextPartOrComplete(newScores)
       return
     }
 
-    // RD-S: ya se manejó en handleSubmit, aquí solo avanzamos al siguiente trial/ítem
+    // Para RD-S: si ya falló el primer intento y aún no se ha hecho el segundo, pasar al segundo intento
     const trial1Key = getScoreKey(currentPart, currentItem.num, 0)
     const trial2Key = getScoreKey(currentPart, currentItem.num, 1)
 
@@ -259,6 +275,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
       return
     }
 
+    // Avanzar al siguiente ítem
     if (currentItemIndex + 1 < partItems.length) {
       setCurrentItemIndex(currentItemIndex + 1)
       setCurrentTrial(0)
@@ -281,17 +298,19 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     const newScores = { ...scores, [scoreKey]: effectiveScore }
     setScores(newScores)
 
-    // Lógica de suspensión específica para RD-S (2 fallos consecutivos)
+    // Lógica de suspensión específica para RD-S (global)
     if (currentPart === 'RD-S') {
       if (effectiveScore === 0) {
-        const newZeros = consecutiveZeros + 1
-        setConsecutiveZeros(newZeros)
+        const newZeros = globalConsecutiveZeros + 1
+        setGlobalConsecutiveZeros(newZeros)
+        // Suspender la parte si se alcanzan 2 fallos consecutivos
         if (newZeros >= 2) {
           setTimeout(() => moveToNextPartOrComplete(newScores), 800)
           return
         }
       } else {
-        setConsecutiveZeros(0)  // Acierto → reiniciar contador
+        // Acierto → reiniciar contador global
+        setGlobalConsecutiveZeros(0)
       }
     }
 
@@ -318,7 +337,9 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         <p className="text-green-700 font-medium">Subprueba completada</p>
         <p className="text-sm text-green-600 mt-1">Puntaje total: {totalScore} / {maxScore}</p>
         <div className="text-xs text-gray-500 mt-2">
-          RD-D: {RD_D_ITEMS.filter(i => !i.isPractice).length * 2} pts max | RD-I: {RD_I_ITEMS.filter(i => !i.isPractice).length * 2} pts max | RD-S: {RD_S_ITEMS.filter(i => !i.isPractice).length * 2} pts max
+          RD-D: {Object.keys(scores).filter(k => k.startsWith('RD-D')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18 |
+          RD-I: {Object.keys(scores).filter(k => k.startsWith('RD-I')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18 |
+          RD-S: {Object.keys(scores).filter(k => k.startsWith('RD-S')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18
         </div>
       </div>
     )
@@ -342,8 +363,8 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
           <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(currentPartIndex / ALL_PARTS.length) * 100}%` }} />
         </div>
         <p className="text-xs text-gray-500 mt-1">Parte {currentPartIndex + 1} de {ALL_PARTS.length}</p>
-        {currentPart === 'RD-S' && consecutiveZeros > 0 && (
-          <span className="text-xs text-orange-600 ml-2">Fallos consecutivos: {consecutiveZeros}/2</span>
+        {currentPart === 'RD-S' && globalConsecutiveZeros > 0 && (
+          <span className="text-xs text-orange-600 ml-2">Fallos consecutivos: {globalConsecutiveZeros}/2</span>
         )}
       </div>
 
@@ -353,9 +374,8 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         {isPractice && <p className="text-xs text-blue-500 mt-3">Ítem de práctica (no suma puntos)</p>}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-4 text-center">✏️ Dígitos que dijo el paciente:</label>
-        
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <label className="block text-sm font-medium text-gray-700 mb-3 text-center">✏️ Dígitos que dijo el paciente:</label>
         <DigitInput
           length={currentTrialDigits?.length || 0}
           value={digits}
@@ -364,10 +384,7 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
           autoFocus={!showResult}
           onSubmit={handleSubmit}
         />
-        
-        <p className="text-xs text-gray-400 mt-4 text-center">
-          <strong>⏎ Presiona ENTER</strong> para confirmar y avanzar al siguiente
-        </p>
+        <p className="text-xs text-gray-400 mt-3 text-center">⏎ Presiona ENTER para confirmar y avanzar</p>
       </div>
 
       {showResult && (
@@ -379,7 +396,9 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
             <p className="text-sm text-gray-600 mt-2">
               <strong>Respuesta esperada:</strong>{' '}
               <span className="font-mono text-lg">
-                {currentPart === 'RD-D' ? currentTrialDigits.join(' - ') : currentPart === 'RD-I' ? reverseArray(currentTrialDigits).join(' - ') : sortAscending(currentTrialDigits).join(' - ')}
+                {currentPart === 'RD-D' ? currentTrialDigits.join(' - ') :
+                 currentPart === 'RD-I' ? reverseArray(currentTrialDigits).join(' - ') :
+                 sortAscending(currentTrialDigits).join(' - ')}
               </span>
             </p>
           )}

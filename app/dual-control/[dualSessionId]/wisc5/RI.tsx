@@ -89,7 +89,7 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
   useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
   useEffect(() => { setSelectedAnswers([]); setPhase('ready'); setShowConfirmation(false) }, [currentIndex])
 
-  // Enviar display inmediatamente al cambiar de fase
+  // Enviar instrucciones y contenido al display según la fase
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
@@ -105,7 +105,7 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
     }
   }, [currentItem, phase, showTimer, isCompleted])
 
-  // Temporizador de 5 segundos
+  // Temporizador de 5 segundos para mostrar estímulo
   useEffect(() => {
     if (phase === 'showing' && showTimer > 0) {
       timerRef.current = setTimeout(() => setShowTimer(prev => prev - 1), 1000)
@@ -148,48 +148,54 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
           setTimeout(() => { setIsCompleted(true); onCompleteRef.current(newScores, Object.values(newScores).reduce((a, b) => a + b, 0)) }, 1000)
           return
         }
-      } else { setConsecutiveZeros(0) }
+      } else {
+        setConsecutiveZeros(0)
+      }
     }
   }
 
   const handleNext = () => {
     let nextIdx = currentIndex + 1
     while (nextIdx < RI_ITEMS.length && scores[RI_ITEMS[nextIdx].num] !== undefined) nextIdx++
-    if (nextIdx >= RI_ITEMS.length) { setIsCompleted(true); onCompleteRef.current(scores, Object.values(scores).reduce((a, b) => a + b, 0)) }
-    else setCurrentIndex(nextIdx)
+    if (nextIdx >= RI_ITEMS.length) {
+      setIsCompleted(true)
+      onCompleteRef.current(scores, Object.values(scores).reduce((a, b) => a + b, 0))
+    } else {
+      setCurrentIndex(nextIdx)
+    }
   }
 
   if (!currentItem) return null
 
   if (isCompleted) {
     return (
-      <div className="bg-green-50 rounded-lg p-4 text-center">
-        <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">Puntaje total: {Object.values(scores).reduce((a, b) => a + b, 0)} / 49</p>
+      <div className="bg-green-50 rounded-lg p-3 text-center">
+        <p className="text-green-700 font-medium text-sm">Subprueba completada</p>
+        <p className="text-xs text-green-600 mt-1">Puntaje total: {Object.values(scores).reduce((a, b) => a + b, 0)} / 49</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Barra de progreso */}
-      <div className="bg-gray-50 rounded-lg p-3">
+      <div className="bg-gray-50 rounded-lg p-2">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-gray-600 text-sm">Retención de Imágenes</span>
-          <span className="text-3xl font-bold text-gray-800">{isPractice ? currentItem.num : currentItem.num}</span>
+          <span className="text-gray-600 text-xs">Retención de Imágenes</span>
+          <span className="text-2xl font-bold text-gray-800">{isPractice ? currentItem.num : currentItem.num}</span>
         </div>
         <div className="flex justify-between text-xs text-gray-500 mb-1">
           <span>{isPractice ? 'Práctica' : 'Ítem actual'}</span>
           <span>de {RI_ITEMS.filter(i => !i.isPractice).length}</span>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(Object.keys(scores).filter(k => k !== 'PA' && k !== 'PB' && k !== 'PC').length / RI_ITEMS.filter(i => !i.isPractice).length) * 100}%` }} />
         </div>
       </div>
 
       {/* Miniatura del estímulo (siempre visible) */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3">
-        <p className="text-xs font-medium text-gray-700 mb-2 text-center">📷 Estímulo (miniatura):</p>
+      <div className="bg-white rounded-lg border border-gray-200 p-2">
+        <p className="text-xs font-medium text-gray-700 mb-1 text-center">📷 Estímulo (miniatura):</p>
         <img 
           src={getStimulusPath(currentItem.num)} 
           alt="Estímulo" 
@@ -200,66 +206,67 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
 
       {/* Fase: Listo para mostrar */}
       {phase === 'ready' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="bg-blue-50 rounded-lg p-4 mb-4">
-            <p className="text-sm text-blue-700 font-medium mb-2">📋 Instrucciones:</p>
-            <p className="text-sm text-blue-600">Presiona el botón para mostrar los estímulos durante <strong>5 segundos</strong> al evaluado.</p>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-blue-50 rounded-lg p-3 mb-3">
+            <p className="text-xs text-blue-700 font-medium mb-1">📋 Instrucciones:</p>
+            <p className="text-xs text-blue-600">Presiona el botón para mostrar los estímulos durante <strong>5 segundos</strong> al evaluado.</p>
           </div>
           <div className="text-center">
-            <button onClick={handleStartShow} className="px-8 py-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors shadow-md">▶ Mostrar estímulos (5 segundos)</button>
+            <button onClick={handleStartShow} className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow">
+              ▶ Mostrar estímulos (5 segundos)
+            </button>
           </div>
         </div>
       )}
 
-      {/* Fase: Mostrando estímulos (imagen grande) */}
+      {/* Fase: Mostrando estímulos - NO mostramos imagen grande aquí, solo el temporizador informativo */}
       {phase === 'showing' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Estímulo mostrado al evaluado:</p>
-          <img 
-            src={getStimulusPath(currentItem.num)} 
-            alt="Estímulo" 
-            className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg"
-            onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
-          />
-          <div className="mt-3 p-2 bg-blue-50 rounded text-center">
-            <p className="text-4xl font-bold text-blue-700">{showTimer}</p>
-            <p className="text-sm text-blue-600">segundos restantes</p>
+        <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+          <p className="text-sm text-gray-600 mb-1">📺 Mostrando estímulo al paciente...</p>
+          <div className="mt-1 p-2 bg-blue-50 rounded">
+            <p className="text-3xl font-bold text-blue-700">{showTimer}</p>
+            <p className="text-xs text-blue-600">segundos restantes</p>
           </div>
         </div>
       )}
 
-      {/* Fase: Respondiendo */}
+      {/* Fase: Respondiendo - NO mostramos imagen de opciones, solo los botones de selección */}
       {phase === 'answering' && !showConfirmation && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Opciones mostradas al evaluado:</p>
-          <img 
-            src={getOptionsPath(currentItem.num)} 
-            alt="Opciones" 
-            className="mx-auto max-w-full h-auto border border-gray-200 rounded-lg mb-4"
-            onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
-          />
-          <div className="bg-green-50 rounded-lg p-3 mb-4">
-            <p className="text-sm text-green-700">✅ El display ahora muestra las opciones.</p>
-            <p className="text-xs text-green-600 mt-1">Selecciona {currentItem.correctAnswers.length === 1 ? 'la imagen correcta' : `las ${currentItem.correctAnswers.length} imágenes correctas`} en el orden indicado por el evaluado.</p>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="bg-green-50 rounded-lg p-2 mb-3">
+            <p className="text-xs text-green-700">✅ El display ahora muestra las opciones.</p>
+            <p className="text-xs text-green-600 mt-0.5">Selecciona {currentItem.correctAnswers.length === 1 ? 'la imagen correcta' : `las ${currentItem.correctAnswers.length} imágenes correctas`} en el orden indicado por el evaluado.</p>
           </div>
-          <p className="text-sm text-gray-600 mb-3">Respuestas ({currentItem.correctAnswers.length} de {currentItem.totalOptions}):</p>
-          <div className="grid grid-cols-4 md:grid-cols-6 gap-2 mb-4">
+          <p className="text-sm text-gray-600 mb-2">Respuestas ({currentItem.correctAnswers.length} de {currentItem.totalOptions}):</p>
+          <div className="grid grid-cols-4 md:grid-cols-6 gap-1.5 mb-3">
             {options.map(letter => {
               const orderIndex = selectedAnswers.indexOf(letter)
               const isSelected = orderIndex !== -1
               return (
-                <button key={letter} onClick={() => toggleAnswer(letter)}
-                  className={`py-3 rounded-lg text-lg font-bold transition-all relative ${isSelected ? 'bg-blue-600 text-white shadow-md scale-105' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                <button
+                  key={letter}
+                  onClick={() => toggleAnswer(letter)}
+                  className={`py-1.5 rounded-lg text-base font-bold transition-all relative ${
+                    isSelected ? 'bg-blue-600 text-white shadow scale-105' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
                   {letter}
                   {isSelected && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">{orderIndex + 1}</span>
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">
+                      {orderIndex + 1}
+                    </span>
                   )}
                 </button>
               )
             })}
           </div>
-          <button onClick={handleConfirm} disabled={selectedAnswers.length === 0}
-            className={`w-full py-3 rounded-lg font-medium transition-colors ${selectedAnswers.length > 0 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+          <button
+            onClick={handleConfirm}
+            disabled={selectedAnswers.length === 0}
+            className={`w-full py-1.5 rounded-lg font-medium text-sm transition-colors ${
+              selectedAnswers.length > 0 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
             Confirmar respuesta ({selectedAnswers.length} seleccionada{selectedAnswers.length > 1 ? 's' : ''})
           </button>
         </div>
@@ -267,8 +274,18 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
 
       {/* Confirmación de puntuación */}
       {showConfirmation && (
-        <div className={`rounded-lg p-4 text-center border ${isPractice ? 'bg-gray-50 border-gray-200' : scores[currentItem.num] === 2 ? 'bg-green-50 border-green-200' : scores[currentItem.num] === 1 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
-          <p className={`text-lg font-medium ${isPractice ? 'text-gray-600' : scores[currentItem.num] === 2 ? 'text-green-700' : scores[currentItem.num] === 1 ? 'text-yellow-700' : 'text-red-700'}`}>
+        <div className={`rounded-lg p-3 text-center border ${
+          isPractice ? 'bg-gray-50 border-gray-200' :
+          scores[currentItem.num] === 2 ? 'bg-green-50 border-green-200' :
+          scores[currentItem.num] === 1 ? 'bg-yellow-50 border-yellow-200' :
+          'bg-red-50 border-red-200'
+        }`}>
+          <p className={`text-sm font-medium ${
+            isPractice ? 'text-gray-600' :
+            scores[currentItem.num] === 2 ? 'text-green-700' :
+            scores[currentItem.num] === 1 ? 'text-yellow-700' :
+            'text-red-700'
+          }`}>
             {isPractice 
               ? 'Ítem de práctica (no suma puntos)' 
               : scores[currentItem.num] === 2 
@@ -278,17 +295,19 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
                   : '✗ 0 puntos (Incorrecto)'}
           </p>
           {!isPractice && scores[currentItem.num] < 2 && (
-            <p className="text-sm text-gray-600 mt-2"><strong>Correctas:</strong> {currentItem.correctAnswers.join(' → ')}</p>
+            <p className="text-xs text-gray-600 mt-1"><strong>Correctas:</strong> {currentItem.correctAnswers.join(' → ')}</p>
           )}
-          <button onClick={handleNext} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Continuar</button>
+          <button onClick={handleNext} className="mt-2 px-4 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+            Continuar
+          </button>
         </div>
       )}
 
       {/* Puntaje acumulado */}
-      <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">
+      <div className="bg-gray-50 rounded-lg p-2">
+        <p className="text-xs text-gray-600">
           Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 49
-          {consecutiveZeros > 0 && <span className="ml-2 text-xs text-orange-600">(Fallos consecutivos: {consecutiveZeros}/3)</span>}
+          {consecutiveZeros > 0 && <span className="ml-2 text-orange-600">(Fallos consecutivos: {consecutiveZeros}/3)</span>}
         </p>
       </div>
     </div>

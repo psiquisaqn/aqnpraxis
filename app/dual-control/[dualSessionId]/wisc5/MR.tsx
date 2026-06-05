@@ -103,6 +103,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   const [backtrackMode, setBacktrackMode] = useState(false)
   const [failedStartItem, setFailedStartItem] = useState<number | null>(null)
   const [consecutiveSuccessesInBacktrack, setConsecutiveSuccessesInBacktrack] = useState(0)
+  const [hasSentFirstItem, setHasSentFirstItem] = useState(false)
 
   const currentItem = MR_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
@@ -111,8 +112,12 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
 
-  useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+    onUpdatePatientRef.current = onUpdatePatient
+  }, [onComplete, onUpdatePatient])
 
+  // Enviar el estímulo actual al display (se ejecuta al montar y cada vez que cambia currentItem)
   useEffect(() => {
     if (currentItem && !isCompleted) {
       const imageName = isPractice 
@@ -128,10 +133,18 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     }
   }, [currentItem, isCompleted, isPractice])
 
+  // Efecto adicional para asegurar que el primer ítem se envíe incluso si el efecto anterior no se dispara por alguna razón
+  useEffect(() => {
+    if (!hasSentFirstItem && currentItem && !isCompleted) {
+      setHasSentFirstItem(true)
+      // El envío ya se hace en el efecto anterior, pero forzamos una re-ejecución si es necesario
+    }
+  }, [currentItem, hasSentFirstItem, isCompleted])
+
+  // Bonus
   useEffect(() => {
     if (!bonusApplied && checkBonusEligibility(scores)) {
       setBonusApplied(true)
-      console.log(`🎉 Bonus de +${getBonusPoints()} puntos aplicado`)
     }
   }, [scores, bonusApplied, firstStartItem, secondStartItem])
 
@@ -142,7 +155,6 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
     for (let i = toItem + 1; i < fromItem; i++) {
       if (updatedScores[i] === undefined && i >= 1 && !isNaN(i)) {
         updatedScores[i] = 1
-        console.log(`✓ Ítem ${i} no administrado - se asigna puntaje 1 automáticamente`)
       }
     }
     return updatedScores
@@ -249,9 +261,9 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   if (isCompleted) {
     const totalScore = Object.values(scores).reduce((a, b) => a + b, 0) + (bonusApplied ? getBonusPoints() : 0)
     return (
-      <div className="bg-green-50 rounded-lg p-4 text-center">
-        <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">
+      <div className="bg-green-50 rounded-lg p-3 text-center">
+        <p className="text-green-700 font-medium text-sm">Subprueba completada</p>
+        <p className="text-xs text-green-600 mt-1">
           Puntaje total: {totalScore} / {MR_ITEMS.filter(i => !i.isPractice).length}
           {bonusApplied && <span className="ml-2 text-blue-600">(incluye +{getBonusPoints()} puntos por bonus)</span>}
         </p>
@@ -260,12 +272,12 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   }
 
   return (
-    <div className="space-y-4">
-      {/* Barra de progreso con número de ítem grande */}
-      <div className="bg-gray-50 rounded-lg p-3">
+    <div className="space-y-3">
+      {/* Barra de progreso con número de ítem */}
+      <div className="bg-gray-50 rounded-lg p-2">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-gray-600 text-sm">Matrices de Razonamiento</span>
-          <span className="text-3xl font-bold text-gray-800">
+          <span className="text-gray-600 text-xs">Matrices de Razonamiento</span>
+          <span className="text-2xl font-bold text-gray-800">
             {isPractice ? 'Práctica' : currentItem.num}
           </span>
         </div>
@@ -273,7 +285,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
           <span>Ítem actual</span>
           <span>de {MR_ITEMS.filter(i => !i.isPractice).length}</span>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(Object.keys(scores).filter(k => !isNaN(Number(k))).length / MR_ITEMS.filter(i => !i.isPractice).length) * 100}%` }} />
         </div>
         {isGoingBack && <p className="text-xs text-orange-600 mt-1">↩️ Retrocediendo...</p>}
@@ -282,30 +294,35 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       </div>
 
       {/* Imagen de estímulo (miniatura) */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Estímulo (miniatura):</p>
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <p className="text-xs font-medium text-gray-700 mb-1 text-center">📷 Estímulo (miniatura):</p>
         <img 
           src={getCurrentImagePath()} 
           alt={`Matriz ${currentItem.num}`}
-          className="mx-auto max-h-40 object-contain border border-gray-200 rounded-lg"
+          className="mx-auto max-h-32 object-contain border border-gray-200 rounded-lg"
           onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
         />
-        <div className="mt-2 p-2 bg-blue-50 rounded text-center">
-          <p className="text-sm text-blue-700"><strong>Respuesta correcta: {currentItem.correctAnswer}</strong></p>
+        <div className="mt-2 p-1.5 bg-blue-50 rounded text-center">
+          <p className="text-xs text-blue-700"><strong>Respuesta correcta: {currentItem.correctAnswer}</strong></p>
         </div>
       </div>
 
       {/* Botones de respuesta */}
       {scores[currentItem.num] === undefined && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <p className="text-sm text-gray-600 mb-2">
             Respuesta del evaluado:
             {isPractice && <span className="ml-2 text-xs text-gray-400">(no suma puntos)</span>}
           </p>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-5 gap-2">
             {[1, 2, 3, 4, 5].map(num => (
-              <button key={num} onClick={() => handleAnswer(num)}
-                className={`py-3 rounded-lg text-lg font-medium transition-all ${selectedAnswer === num ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+              <button
+                key={num}
+                onClick={() => handleAnswer(num)}
+                className={`py-2 rounded-lg text-base font-medium transition-all ${
+                  selectedAnswer === num ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
                 {num}
               </button>
             ))}
@@ -314,16 +331,16 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       )}
 
       {scores[currentItem.num] !== undefined && (
-        <div className={`rounded-lg p-3 text-center ${scores[currentItem.num] === 1 ? 'bg-green-50' : 'bg-red-50'}`}>
-          <p className={`text-sm ${scores[currentItem.num] === 1 ? 'text-green-700' : 'text-red-700'}`}>
+        <div className={`rounded-lg p-2 text-center ${scores[currentItem.num] === 1 ? 'bg-green-50' : 'bg-red-50'}`}>
+          <p className={`text-xs ${scores[currentItem.num] === 1 ? 'text-green-700' : 'text-red-700'}`}>
             ✓ Ítem respondido - {scores[currentItem.num] === 1 ? 'Correcto' : 'Incorrecto'}
             {isPractice && <span className="ml-2 text-xs">(no suma al total)</span>}
           </p>
         </div>
       )}
 
-      <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">
+      <div className="bg-gray-50 rounded-lg p-2">
+        <p className="text-xs text-gray-600">
           Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / {MR_ITEMS.filter(i => !i.isPractice).length}
           {!bonusApplied && ((patientAge >= 9 && patientAge <= 11 && scores[firstStartItem] === 1 && scores[secondStartItem] !== 1) ||
             (patientAge >= 12 && scores[firstStartItem] === 1 && scores[secondStartItem] !== 1)) && (

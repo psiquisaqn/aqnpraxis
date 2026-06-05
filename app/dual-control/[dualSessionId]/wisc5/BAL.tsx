@@ -53,7 +53,7 @@ const BAL_ITEMS: BALItem[] = [
 ]
 
 // ============================================================
-// COMPONENTE DE CRONÓMETRO (30 SEGUNDOS)
+// COMPONENTE DE CRONÓMETRO POR ÍTEM (se reinicia con cada clave)
 // ============================================================
 
 interface StopwatchProps {
@@ -61,13 +61,20 @@ interface StopwatchProps {
   onTimeUpdate: (seconds: number) => void
   onTimeEnd: () => void
   onStart?: () => void
-  isRunning: boolean
-  onToggleRunning: () => void
+  resetKey: number  // Nueva prop para forzar reinicio
 }
 
-function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onToggleRunning }: StopwatchProps) {
+function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, resetKey }: StopwatchProps) {
   const [seconds, setSeconds] = useState(0)
+  const [isRunning, setIsRunning] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Reiniciar completamente cuando cambia resetKey (nuevo ítem)
+  useEffect(() => {
+    setSeconds(0)
+    setIsRunning(false)
+    if (intervalRef.current) clearInterval(intervalRef.current)
+  }, [resetKey])
 
   useEffect(() => {
     if (isRunning) {
@@ -75,33 +82,55 @@ function Stopwatch({ timeLimit, onTimeUpdate, onTimeEnd, onStart, isRunning, onT
         setSeconds(prev => {
           const newSeconds = prev + 1
           onTimeUpdate(newSeconds)
-          if (newSeconds >= timeLimit) { onToggleRunning(); onTimeEnd(); return timeLimit }
+          if (newSeconds >= timeLimit) {
+            setIsRunning(false)
+            onTimeEnd()
+            return timeLimit
+          }
           return newSeconds
         })
       }, 1000)
-    } else if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [isRunning, timeLimit, onTimeUpdate, onTimeEnd, onToggleRunning])
+  }, [isRunning, timeLimit, onTimeUpdate, onTimeEnd])
 
-  const startTimer = () => { setSeconds(0); onToggleRunning(); onStart?.() }
-  const formatTime = (t: number) => `${Math.floor(t/60).toString().padStart(2,'0')}:${(t%60).toString().padStart(2,'0')}`
-  const pct = Math.min((seconds / timeLimit) * 100, 100)
-  const critical = seconds >= timeLimit - 5
+  const startTimer = () => {
+    setSeconds(0)
+    setIsRunning(true)
+    onStart?.()
+  }
+
+  const formatTime = (totalSeconds: number): string => {
+    const mins = Math.floor(totalSeconds / 60)
+    const secs = totalSeconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const getProgressPercent = (): number => Math.min((seconds / timeLimit) * 100, 100)
 
   if (!isRunning && seconds === 0) {
     return (
       <div className="text-center">
-        <div className="text-3xl font-mono font-bold mb-2">{formatTime(0)}</div>
-        <button onClick={startTimer} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Iniciar tiempo</button>
-        <div className="text-xs text-gray-400 mt-2">Tiempo límite: {formatTime(timeLimit)}</div>
+        <div className="text-2xl font-mono font-bold mb-1">{formatTime(0)}</div>
+        <button onClick={startTimer} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+          Iniciar tiempo
+        </button>
+        <div className="text-xs text-gray-400 mt-1">Tiempo límite: {formatTime(timeLimit)}</div>
       </div>
     )
   }
 
+  const critical = seconds >= timeLimit - 5
   return (
     <div className="text-center">
-      <div className={`text-4xl font-mono font-bold mb-2 transition-colors ${critical ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>{formatTime(seconds)}</div>
-      <div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${critical ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: pct + '%' }} /></div>
+      <div className={`text-3xl font-mono font-bold mb-1 ${critical ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>
+        {formatTime(seconds)}
+      </div>
+      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full transition-all duration-1000 ${critical ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${getProgressPercent()}%` }} />
+      </div>
       <div className="text-xs text-gray-400 mt-1">Tiempo límite: {formatTime(timeLimit)}</div>
     </div>
   )
@@ -124,8 +153,8 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
   const [consecutiveZeros, setConsecutiveZeros] = useState(0)
   const [isCompleted, setIsCompleted] = useState(false)
   const [elapsedTime, setElapsedTime] = useState(0)
-  const [cronometroKey, setCronometroKey] = useState(0)
   const [timeEnded, setTimeEnded] = useState(false)
+  const [cronometroKey, setCronometroKey] = useState(0)
 
   const currentItem = BAL_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
@@ -135,11 +164,15 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
 
   useEffect(() => { onCompleteRef.current = onComplete; onUpdatePatientRef.current = onUpdatePatient }, [onComplete, onUpdatePatient])
 
+  // Enviar estímulo al display
   useEffect(() => {
     if (currentItem && !isCompleted) {
       const imageName = isPractice ? `bal${currentItem.num.toString().toLowerCase()}.png` : `bal${String(currentItem.num).padStart(3, '0')}.png`
       onUpdatePatientRef.current({
-        type: 'wisc5_bal', itemNum: currentItem.num, imagePath: `/wisc5/bal/${imageName}`, isPractice: currentItem.isPractice
+        type: 'wisc5_bal',
+        itemNum: currentItem.num,
+        imagePath: `/wisc5/bal/${imageName}`,
+        isPractice: currentItem.isPractice
       })
     }
   }, [currentItem, isCompleted])
@@ -166,34 +199,53 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
       if (effectiveScore === 0) {
         const newZeros = consecutiveZeros + 1
         setConsecutiveZeros(newZeros)
-        if (newZeros >= 3) { setIsCompleted(true); onCompleteRef.current(newScores, Object.values(newScores).reduce((a, b) => a + b, 0)); return }
-      } else { setConsecutiveZeros(0) }
+        if (newZeros >= 3) {
+          setIsCompleted(true)
+          onCompleteRef.current(newScores, Object.values(newScores).reduce((a, b) => a + b, 0))
+          return
+        }
+      } else {
+        setConsecutiveZeros(0)
+      }
     }
 
+    // Avanzar al siguiente ítem
     let nextIdx = currentIndex + 1
     while (nextIdx < BAL_ITEMS.length && newScores[BAL_ITEMS[nextIdx].num] !== undefined) nextIdx++
-    if (nextIdx >= BAL_ITEMS.length) { setIsCompleted(true); onCompleteRef.current(newScores, Object.values(newScores).reduce((a, b) => a + b, 0)) }
-    else { setCurrentIndex(nextIdx); setTimeEnded(false); setElapsedTime(0); setCronometroKey(prev => prev + 1) }
+    if (nextIdx >= BAL_ITEMS.length) {
+      setIsCompleted(true)
+      onCompleteRef.current(newScores, Object.values(newScores).reduce((a, b) => a + b, 0))
+    } else {
+      setCurrentIndex(nextIdx)
+      // Reiniciar cronómetro para el nuevo ítem
+      setTimeEnded(false)
+      setElapsedTime(0)
+      setCronometroKey(prev => prev + 1)
+      // Limpiar selección de respuesta
+      setSelectedAnswer(null)
+    }
   }
 
   if (!currentItem) return null
 
   if (isCompleted) {
+    const total = Object.values(scores).reduce((a, b) => a + b, 0)
+    const maxItems = BAL_ITEMS.filter(i => !i.isPractice).length
     return (
       <div className="bg-green-50 rounded-lg p-4 text-center">
         <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">Puntaje total: {Object.values(scores).reduce((a, b) => a + b, 0)} / {BAL_ITEMS.filter(i => !i.isPractice).length}</p>
+        <p className="text-sm text-green-600 mt-1">Puntaje total: {total} / {maxItems}</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {/* Barra de progreso con número de ítem grande */}
+      {/* Barra de progreso */}
       <div className="bg-gray-50 rounded-lg p-3">
         <div className="flex justify-between items-center mb-1">
           <span className="text-gray-600 text-sm">Balanzas</span>
-          <span className="text-3xl font-bold text-gray-800">
+          <span className="text-2xl font-bold text-gray-800">
             {isPractice ? currentItem.num : currentItem.num}
           </span>
         </div>
@@ -209,17 +261,22 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
 
       {/* Cronómetro */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <Stopwatch key={cronometroKey} timeLimit={currentItem.timeLimit} onTimeUpdate={handleTimeUpdate} onTimeEnd={handleTimeEnd}
-          isRunning={!timeEnded && scores[currentItem.num] === undefined} onToggleRunning={() => {}} />
+        <Stopwatch
+          key={cronometroKey}
+          timeLimit={currentItem.timeLimit}
+          onTimeUpdate={handleTimeUpdate}
+          onTimeEnd={handleTimeEnd}
+          resetKey={cronometroKey}
+        />
       </div>
 
       {/* Imagen de estímulo (miniatura) */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <p className="text-sm font-medium text-gray-700 mb-2 text-center">📷 Estímulo (miniatura):</p>
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <p className="text-xs font-medium text-gray-700 mb-1 text-center">📷 Estímulo (miniatura):</p>
         <img 
           src={getCurrentImagePath()} 
           alt={`Balanza ${currentItem.num}`}
-          className="mx-auto max-h-40 object-contain border border-gray-200 rounded-lg"
+          className="mx-auto max-h-32 object-contain border border-gray-200 rounded-lg"
           onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
         />
         <div className="mt-2 p-2 bg-blue-50 rounded text-center">
@@ -230,11 +287,21 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
       {/* Botones de respuesta */}
       {scores[currentItem.num] === undefined && !timeEnded && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-3">Respuesta del evaluado:{isPractice && <span className="ml-2 text-xs text-gray-400">(no suma puntos)</span>}</p>
-          <div className="grid grid-cols-5 gap-3">
+          <p className="text-sm text-gray-600 mb-2">
+            Respuesta del evaluado:
+            {isPractice && <span className="ml-2 text-xs text-gray-400">(no suma puntos)</span>}
+          </p>
+          <div className="grid grid-cols-5 gap-2">
             {[1, 2, 3, 4, 5].map(num => (
-              <button key={num} onClick={() => handleAnswer(num)}
-                className={`py-3 rounded-lg text-lg font-medium transition-all ${selectedAnswer === num ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{num}</button>
+              <button
+                key={num}
+                onClick={() => handleAnswer(num)}
+                className={`py-2 rounded-lg text-base font-medium transition-all ${
+                  selectedAnswer === num ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {num}
+              </button>
             ))}
           </div>
         </div>
@@ -242,8 +309,10 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
 
       {timeEnded && scores[currentItem.num] === undefined && (
         <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
-          <p className="text-yellow-700 text-sm mb-3">⏰ Tiempo finalizado. Respuesta incorrecta.</p>
-          <button onClick={() => handleAnswer(-1)} className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm">Registrar como incorrecto</button>
+          <p className="text-yellow-700 text-sm mb-2">⏰ Tiempo finalizado. Respuesta incorrecta.</p>
+          <button onClick={() => handleAnswer(-1)} className="px-4 py-1.5 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700">
+            Registrar como incorrecto
+          </button>
         </div>
       )}
 
@@ -257,7 +326,9 @@ export const BALInterface = React.memo(function BALInterface({ onComplete, onUpd
       )}
 
       <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / {BAL_ITEMS.filter(i => !i.isPractice).length}</p>
+        <p className="text-sm text-gray-600">
+          Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / {BAL_ITEMS.filter(i => !i.isPractice).length}
+        </p>
       </div>
     </div>
   )
