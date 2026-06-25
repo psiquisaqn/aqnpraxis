@@ -13,7 +13,10 @@ function formatTimeDisplay(totalSeconds: number): string {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
-// Componente de cronómetro independiente para cada parte
+// ============================================================
+// COMPONENTE DE CRONÓMETRO POR PARTE (INDEPENDIENTE)
+// ============================================================
+
 interface PartStopwatchProps {
   timeLimit: number
   onTimeEnd: () => void
@@ -45,6 +48,8 @@ function PartStopwatch({ timeLimit, onTimeEnd, onTimeUpdate }: PartStopwatchProp
           return next
         })
       }, 1000)
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -81,6 +86,10 @@ function PartStopwatch({ timeLimit, onTimeEnd, onTimeUpdate }: PartStopwatchProp
   )
 }
 
+// ============================================================
+// COMPONENTE PRINCIPAL CAN
+// ============================================================
+
 interface CANInterfaceProps {
   onComplete: (scores: Record<string, number>, rawTotal: number) => void
   onUpdatePatient: (content: any) => void
@@ -88,7 +97,7 @@ interface CANInterfaceProps {
 }
 
 export const CANInterface = React.memo(function CANInterface({ onComplete, onUpdatePatient, patientAge }: CANInterfaceProps) {
-  // Estado para cada parte
+  // Estado por cada parte
   const [parts, setParts] = useState(() => {
     const init: Record<string, { correct: number; incorrect: number; elapsed: number; ended: boolean }> = {}
     CAN_PARTS.forEach(part => {
@@ -151,6 +160,10 @@ export const CANInterface = React.memo(function CANInterface({ onComplete, onUpd
     setIsCompleted(true)
     onCompleteRef.current({ CAN: -1 }, -1)
   }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   if (isCompleted) {
     return (
@@ -215,7 +228,7 @@ export const CANInterface = React.memo(function CANInterface({ onComplete, onUpd
                       updatePart(part.id, { correct: val })
                     }}
                     disabled={state.ended}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
                 <div>
@@ -230,7 +243,7 @@ export const CANInterface = React.memo(function CANInterface({ onComplete, onUpd
                       updatePart(part.id, { incorrect: val })
                     }}
                     disabled={state.ended}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-400"
                   />
                 </div>
                 <div className="bg-blue-50 rounded p-2 text-center">

@@ -214,25 +214,54 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
+  // ============================================================
+  // CARGA DE ESTADO GUARDADO
+  // ============================================================
   useEffect(() => {
+    if (!sessionId) return
+
     const loadSavedState = async () => {
-      const { data } = await supabase.from('wisc5_scores')
+      const { data, error } = await supabase
+        .from('wisc5_scores')
         .select('status, substitution_used, completed_subtests, raw_scores, scaled_scores, composite_scores, report_type')
-        .eq('session_id', sessionId).single()
+        .eq('session_id', sessionId)
+        .maybeSingle()
+
+      if (error) {
+        console.error('❌ Error al cargar estado guardado:', error)
+        return
+      }
+
       if (data) {
+        console.log('📂 Estado guardado cargado:', data)
+
         if (data.substitution_used === 'RV') setSubstitutionUsed(true)
-        if (data.completed_subtests) setSubtestStatus(data.completed_subtests as any)
+        if (data.completed_subtests) setSubtestStatus(data.completed_subtests)
         if (data.raw_scores) setRawScores(data.raw_scores)
         if (data.scaled_scores) setScaledScores(data.scaled_scores)
-        if (data.status === 'completed_brief' || data.status === 'completed_extended') setShowSubtestPanel(false)
+
+        // Si ya hay una evaluación en curso o completada, mostrar el panel directamente
+        if (data.status === 'completed_brief' || data.status === 'completed_extended' || data.status === 'in_progress') {
+          setShowQuestionZero(false)
+          setShowSubtestPanel(true)
+        }
+      } else {
+        // No existe registro, mostrar formulario de fecha de nacimiento
+        setShowQuestionZero(true)
+        setShowSubtestPanel(false)
       }
     }
-    if (sessionId) loadSavedState()
+
+    loadSavedState()
   }, [sessionId, supabase])
 
+  // ============================================================
+  // CÁLCULO DE EDAD
+  // ============================================================
   useEffect(() => {
     if (birthDate && evalDate) {
-      const birth = new Date(birthDate); const evalDt = new Date(evalDate)
+      const birth = new Date(birthDate)
+      const evalDt = new Date(evalDate)
       if (birth && evalDt && !isNaN(birth.getTime()) && !isNaN(evalDt.getTime())) {
         const { years, months, totalMonths } = calculateAge(birth, evalDt)
         setAgeInfo({ years, months, group: getAgeGroup(totalMonths) })
@@ -240,31 +269,47 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     }
   }, [birthDate, evalDate])
 
+  // ============================================================
+  // FUNCIONES DE SUPABASE
+  // ============================================================
   const fetchScaledScore = async (code: string, raw: number, ageGroup: string) => {
-    const { data } = await supabase.from('wisc5_norms_subtest').select('scaled_score')
-      .eq('age_group', ageGroup).eq('subtest_code', code)
-      .lte('raw_score_min', raw).gte('raw_score_max', raw).single()
+    const { data } = await supabase
+      .from('wisc5_norms_subtest')
+      .select('scaled_score')
+      .eq('age_group', ageGroup)
+      .eq('subtest_code', code)
+      .lte('raw_score_min', raw)
+      .gte('raw_score_max', raw)
+      .single()
     return data ? (data as any).scaled_score : null
   }
 
   const saveState = async (status: string, reportType?: string) => {
-    await supabase.from('wisc5_scores').upsert({
-      session_id: sessionId,
-      status,
-      substitution_used: substitutionUsed ? 'RV' : null,
-      completed_subtests: subtestStatus as any,
-      raw_scores: rawScores,
-      scaled_scores: scaledScores,
-      report_type: reportType || null,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'session_id' })
+    if (!sessionId) return
+
+    await supabase
+      .from('wisc5_scores')
+      .upsert({
+        session_id: sessionId,
+        status,
+        substitution_used: substitutionUsed ? 'RV' : null,
+        completed_subtests: subtestStatus,
+        raw_scores: rawScores,
+        scaled_scores: scaledScores,
+        report_type: reportType || null,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'session_id' })
   }
 
   const saveCompositeScores = async (composite: any) => {
-    await supabase.from('wisc5_scores').update({
-      composite_scores: composite,
-      updated_at: new Date().toISOString()
-    }).eq('session_id', sessionId)
+    if (!sessionId) return
+    await supabase
+      .from('wisc5_scores')
+      .update({
+        composite_scores: composite,
+        updated_at: new Date().toISOString()
+      })
+      .eq('session_id', sessionId)
   }
 
   const calculateAndSaveIndices = async () => {
@@ -282,12 +327,17 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
         CIT: result.CIT
       }
       await saveCompositeScores(compositeScores)
+      console.log('📊 Índices compuestos guardados:', compositeScores)
     }
   }
 
+  // ============================================================
+  // MANEJO DE SUBPRUEBAS
+  // ============================================================
   const handleSubtestComplete = async (code: string, rawTotal: number) => {
     console.log('✅ Subprueba ' + code + ' completada. Puntaje bruto:', rawTotal)
-    
+
+    // Casos especiales
     if (rawTotal === -1) {
       setSubtestStatus(prev => ({ ...prev, [code]: 'pending_review' }))
       await saveState('in_progress')
@@ -302,11 +352,13 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       setShowSubtestPanel(true)
       return
     }
-    
+
+    // Actualizar raw scores
     const newRawScores = { ...rawScores, [code]: rawTotal }
     setRawScores(newRawScores)
+
+    // Calcular scaled score
     let newScaledScores = { ...scaledScores }
-    
     if (ageInfo?.group) {
       const scaled = await fetchScaledScore(code, rawTotal, ageInfo.group)
       if (scaled !== null) {
@@ -314,31 +366,47 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
         setScaledScores(newScaledScores)
       }
     }
-    
+
+    // Actualizar estado de subtestStatus (usando función de actualización para evitar problemas de tipos)
     setSubtestStatus(prev => ({ ...prev, [code]: 'completed' }))
-    await saveState('in_progress')
-    
-    // Verificar si ya se completaron las 7 primarias (considerando sustitución)
+
+    // Guardar en Supabase
+    await supabase
+      .from('wisc5_scores')
+      .upsert({
+        session_id: sessionId,
+        raw_scores: newRawScores,
+        scaled_scores: newScaledScores,
+        completed_subtests: { ...subtestStatus, [code]: 'completed' },
+        status: 'in_progress',
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'session_id' })
+
+    // Verificar si ya se completaron las 7 primarias
     const primaryCodes = WISC_SUBTESTS.filter(s => s.primary).map(s => s.code)
     const effectivePrimary = substitutionUsed ? primaryCodes.filter(c => c !== 'CC').concat(['RV']) : primaryCodes
-    setTimeout(async () => {
-      const updatedStatus = { ...subtestStatus, [code]: 'completed' }
-      const allPrimaryCompleted = effectivePrimary.every(c => updatedStatus[c] === 'completed')
-      if (allPrimaryCompleted) {
-        await calculateAndSaveIndices()
-      }
-    }, 100)
-    
+    const allPrimaryCompleted = effectivePrimary.every(c => ({ ...subtestStatus, [code]: 'completed' })[c] === 'completed')
+
+    if (allPrimaryCompleted) {
+      await calculateAndSaveIndices()
+    }
+
     setActiveSubtest(null)
     setShowSubtestPanel(true)
   }
 
   const handleSelectSubtest = (code: string) => {
     const status = subtestStatus[code] || 'pending'
-    if (status === 'completed') { alert('Esta subprueba ya fue completada.'); return }
+    if (status === 'completed') {
+      alert('Esta subprueba ya fue completada.')
+      return
+    }
     
-    if (code === 'CC' || (code === 'RV' && substitutionUsed)) setActiveSubtest('CC')
-    else setActiveSubtest(code)
+    if (code === 'CC' || (code === 'RV' && substitutionUsed)) {
+      setActiveSubtest('CC')
+    } else {
+      setActiveSubtest(code)
+    }
     setShowSubtestPanel(false)
   }
 
@@ -394,10 +462,20 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   }
 
   const handleStartTest = () => {
-    if (!birthDate) { setError('Por favor, ingresa la fecha de nacimiento del paciente'); return }
-    setShowQuestionZero(false); setError(null); setShowSubtestPanel(true)
+    if (!birthDate) {
+      setError('Por favor, ingresa la fecha de nacimiento del paciente')
+      return
+    }
+    setShowQuestionZero(false)
+    setError(null)
+    setShowSubtestPanel(true)
+    // Guardar estado inicial
+    saveState('in_progress')
   }
 
+  // ============================================================
+  // RENDER
+  // ============================================================
   if (showQuestionZero) {
     return (
       <div className="h-screen flex flex-col bg-gray-50">
@@ -406,13 +484,26 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
             <h2 className="text-lg font-semibold text-gray-800 mb-3">Evaluación WISC-V</h2>
             <div className="bg-blue-50 rounded-lg p-4 mb-4">
               <label className="block text-left text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
-              <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)}
+              <input
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                max={new Date().toISOString().split('T')[0]} />
-              {ageInfo && <p className="text-xs text-gray-500 mt-2">Edad: {ageInfo.years} años, {ageInfo.months} meses | Grupo: {ageInfo.group}</p>}
+                max={new Date().toISOString().split('T')[0]}
+              />
+              {ageInfo && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Edad: {ageInfo.years} años, {ageInfo.months} meses | Grupo: {ageInfo.group}
+                </p>
+              )}
             </div>
             {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-            <button onClick={handleStartTest} className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">Comenzar evaluación</button>
+            <button
+              onClick={handleStartTest}
+              className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+            >
+              Comenzar evaluación
+            </button>
           </div>
         </div>
       </div>
@@ -421,7 +512,11 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
 
   const renderSubtest = () => {
     if (!ageInfo) return null
-    const props = { onComplete: (s: any, t: number) => handleSubtestComplete(activeSubtest!, t), onUpdatePatient, patientAge: ageInfo.years }
+    const props = {
+      onComplete: (s: any, t: number) => handleSubtestComplete(activeSubtest!, t),
+      onUpdatePatient,
+      patientAge: ageInfo.years
+    }
     
     switch (activeSubtest) {
       case 'CC': return <CCInterface {...props} />
@@ -446,14 +541,22 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
   const wiscItemsList = Array.from({ length: 15 }, (_, i) => ({ num: i + 1 }))
 
   return (
-    <DualTestWrapper 
-      title="Evaluación WISC-V - Escala Wechsler" totalItems={15} currentItem={1} 
-      completed={Object.keys(rawScores).length} onItemSelect={() => {}} items={wiscItemsList} 
-      showQuestionZero={false} onStart={() => {}} hideNavigation={true}
+    <DualTestWrapper
+      title="Evaluación WISC-V - Escala Wechsler"
+      totalItems={15}
+      currentItem={1}
+      completed={Object.keys(rawScores).length}
+      onItemSelect={() => {}}
+      items={wiscItemsList}
+      showQuestionZero={false}
+      onStart={() => {}}
+      hideNavigation={true}
     >
       <div className="space-y-4">
         <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-sm text-gray-600">Edad: {ageInfo?.years} años, {ageInfo?.months} meses | Grupo: {ageInfo?.group}</p>
+          <p className="text-sm text-gray-600">
+            Edad: {ageInfo?.years} años, {ageInfo?.months} meses | Grupo: {ageInfo?.group}
+          </p>
         </div>
 
         {activeSubtest && renderSubtest()}
@@ -470,11 +573,15 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
         )}
 
         {showSubtestPanel && (
-          <SubtestPanel 
-            subtestStatus={subtestStatus} onSelectSubtest={handleSelectSubtest}
-            onToggleSubstitution={handleToggleSubstitution} substitutionUsed={substitutionUsed}
-            onGenerateBriefReport={generateBriefReport} onGenerateExtendedReport={generateExtendedReport}
-            canGenerateBrief={arePrimarySubtestsCompleted()} canGenerateExtended={areAllSubtestsCompleted()}
+          <SubtestPanel
+            subtestStatus={subtestStatus}
+            onSelectSubtest={handleSelectSubtest}
+            onToggleSubstitution={handleToggleSubstitution}
+            substitutionUsed={substitutionUsed}
+            onGenerateBriefReport={generateBriefReport}
+            onGenerateExtendedReport={generateExtendedReport}
+            canGenerateBrief={arePrimarySubtestsCompleted()}
+            canGenerateExtended={areAllSubtestsCompleted()}
           />
         )}
 
@@ -482,13 +589,16 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
           <h3 className="text-sm font-semibold text-gray-700 mb-2">Progreso</h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(subtestStatus).map(([code, status]) => (
-              <span key={code} className={`text-xs px-2 py-1 rounded-full ${
-                status === 'completed' ? 'bg-green-100 text-green-700' : 
-                status === 'pending_review' ? 'bg-orange-100 text-orange-700' :
-                status === 'interrupted' ? 'bg-purple-100 text-purple-700' :
-                status === 'not_administered' ? 'bg-gray-100 text-gray-400' : 
-                'bg-yellow-100 text-yellow-700'
-              }`}>
+              <span
+                key={code}
+                className={`text-xs px-2 py-1 rounded-full ${
+                  status === 'completed' ? 'bg-green-100 text-green-700' :
+                  status === 'pending_review' ? 'bg-orange-100 text-orange-700' :
+                  status === 'interrupted' ? 'bg-purple-100 text-purple-700' :
+                  status === 'not_administered' ? 'bg-gray-100 text-gray-400' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}
+              >
                 {code}: {status === 'completed' ? '✓' : status === 'pending_review' ? '⏳' : status === 'interrupted' ? '⏸' : status === 'not_administered' ? '✗' : '○'}
               </span>
             ))}

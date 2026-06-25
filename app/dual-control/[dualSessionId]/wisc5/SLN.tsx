@@ -23,7 +23,7 @@ const SLN_ITEMS: SLNItem[] = [
     correctAnswers: [['1,2,3'], ['A,B,C']],
     isPractice: true, isExample: true, type: 'qualifying'
   },
-  // Ejemplo A y Práctica A (1 número + 1 letra)
+  // Ejemplo A y Práctica A (1 número + 1 letra) – cada uno con 1 trial
   {
     num: 'EA',
     trials: [['A', '2']],
@@ -36,7 +36,7 @@ const SLN_ITEMS: SLNItem[] = [
     correctAnswers: [['1', 'B']],
     isPractice: true, isExample: false, type: 'simple'
   },
-  // Ítems 1-2 (1 número + 1 letra)
+  // Ítems 1-2 (1 número + 1 letra) – 3 trials cada uno
   {
     num: 1,
     trials: [['A', '3'], ['1', 'C'], ['B', '2']],
@@ -46,10 +46,10 @@ const SLN_ITEMS: SLNItem[] = [
   {
     num: 2,
     trials: [['5', 'E'], ['C', '4'], ['1', 'D']],
-    correctAnswers: [['5', 'E'], ['4', 'C'], ['1', 'D']], // <-- CORREGIDO: segundo trial ahora es ['4','C']
+    correctAnswers: [['5', 'E'], ['4', 'C'], ['1', 'D']],
     isPractice: false, isExample: false, type: 'simple'
   },
-  // Ejemplo B y Práctica B (varios números + letras)
+  // Ejemplo B y Práctica B (varios números + letras) – 1 trial cada uno
   {
     num: 'EB',
     trials: [['3', 'F', '2']],
@@ -62,7 +62,7 @@ const SLN_ITEMS: SLNItem[] = [
     correctAnswers: [['5', 'A', 'E']],
     isPractice: true, isExample: false, type: 'complex'
   },
-  // Ítems 3-10 (varios números + letras)
+  // Ítems 3-10 (varios números + letras) – 3 trials cada uno
   {
     num: 3,
     trials: [['A', '3', '2'], ['4', '1', 'C'], ['F', 'D', '5']],
@@ -137,7 +137,6 @@ function CharInput({ length, value, onChange, disabled = false, autoFocus = true
 
   const handleChange = (index: number, newValue: string) => {
     if (disabled) return
-    // Permitir letras mayúsculas y números
     const char = newValue.replace(/[^A-Za-z0-9]/g, '').slice(0, 1).toUpperCase()
     const newValues = [...value]
     newValues[index] = char
@@ -192,7 +191,6 @@ function CharInput({ length, value, onChange, disabled = false, autoFocus = true
 const validateResponse = (userInput: string[], correctAnswers: string[]): boolean => {
   const userAnswers = userInput.filter(s => s && s.trim().length > 0)
   if (userAnswers.length === 0) return false
-  // Comparar arrays (orden y contenido)
   return JSON.stringify(userAnswers) === JSON.stringify(correctAnswers)
 }
 
@@ -218,15 +216,15 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   const [countingOK, setCountingOK] = useState<boolean | null>(null)
   const [alphabetOK, setAlphabetOK] = useState<boolean | null>(null)
   const [qualifyingPassed, setQualifyingPassed] = useState<boolean | null>(null)
-  // Contador global de fallos consecutivos (se reinicia solo con acierto)
   const [globalConsecutiveZeros, setGlobalConsecutiveZeros] = useState(0)
   const [resultTimer, setResultTimer] = useState<NodeJS.Timeout | null>(null)
 
   const currentItem = SLN_ITEMS[currentIndex]
-  const currentTrialData = currentItem?.trials[currentTrial]
-  const currentCorrectAnswers = currentItem?.correctAnswers[currentTrial]
+  const currentTrialData = currentItem?.trials?.[currentTrial] ?? null
+  const currentCorrectAnswers = currentItem?.correctAnswers?.[currentTrial] ?? null
   const isPractice = currentItem?.isPractice || false
   const isExample = currentItem?.isExample || false
+  const totalTrials = currentItem?.trials?.length || 0
 
   const onCompleteRef = useRef(onComplete)
   const onUpdatePatientRef = useRef(onUpdatePatient)
@@ -267,8 +265,8 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
   const getScoreKey = (itemNum: number | string, trial: number): string => itemNum + '-trial' + trial
 
   const advanceToNext = (newScores: Record<string, number>) => {
-    // Avanzar al siguiente trial si existe
-    if (currentTrial < 2) {
+    // Si hay más trials en el ítem actual
+    if (currentTrial < totalTrials - 1) {
       setCurrentTrial((currentTrial + 1) as 0 | 1 | 2)
       return
     }
@@ -284,12 +282,15 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
     } else {
       setCurrentIndex(nextIdx)
       setCurrentTrial(0)
-      // No reiniciar globalConsecutiveZeros aquí (se reinicia solo con acierto)
     }
   }
 
   const handleSubmit = () => {
-    if (!currentCorrectAnswers) return
+    if (!currentCorrectAnswers) {
+      // Si no hay respuesta esperada, saltar
+      advanceToNext(scores)
+      return
+    }
     if (userInput.some(v => !v || v.trim().length === 0)) return
 
     const correct = validateResponse(userInput, currentCorrectAnswers)
@@ -308,7 +309,6 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
         const newZeros = globalConsecutiveZeros + 1
         setGlobalConsecutiveZeros(newZeros)
         if (newZeros >= 3) {
-          // Suspender subprueba
           setTimeout(() => {
             const total = Object.values(newScores).reduce((a, b) => a + b, 0)
             setIsCompleted(true)
@@ -317,7 +317,6 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
           return
         }
       } else {
-        // Acierto → reiniciar contador de fallos
         setGlobalConsecutiveZeros(0)
       }
     }
@@ -339,7 +338,6 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
       const finalPassed = finalCountingOK! && finalAlphabetOK!
       setQualifyingPassed(finalPassed)
       if (finalPassed) {
-        // Pasa a los ítems de ejemplo
         setTimeout(() => {
           const nextIdx = SLN_ITEMS.findIndex(i => i.num === 'EA')
           if (nextIdx >= 0) { setCurrentIndex(nextIdx); setCurrentTrial(0) }
@@ -350,6 +348,10 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
       }
     }
   }
+
+  // ──────────────────────────────────────────────────────────────
+  // RENDER
+  // ──────────────────────────────────────────────────────────────
 
   if (!currentItem) return null
 
@@ -389,34 +391,40 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
     const totalScore = Object.values(scores).reduce((a, b) => a + b, 0)
     const maxScore = 30
     return (
-      <div className="bg-green-50 rounded-lg p-4 text-center">
-        <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">Puntaje total: {totalScore} / {maxScore}</p>
+      <div className="bg-green-50 rounded-lg p-3 text-center">
+        <p className="text-green-700 font-medium text-sm">Subprueba completada</p>
+        <p className="text-xs text-green-600 mt-1">Puntaje total: {totalScore} / {maxScore}</p>
       </div>
     )
   }
 
-  // Validar que exista trial data (seguridad)
+  // Si el trial actual no tiene datos (error), mostrar opción para saltar
   if (!currentTrialData) {
     return (
-      <div className="bg-red-50 rounded-lg p-4 text-center">
-        <p className="text-red-700 font-medium">Error interno: No hay datos para este ítem/trial.</p>
-        <button onClick={() => advanceToNext(scores)} className="mt-2 px-4 py-2 bg-gray-600 text-white rounded">Omitir</button>
+      <div className="bg-yellow-50 rounded-lg p-4 text-center border border-yellow-200">
+        <p className="text-yellow-700 text-sm">⚠️ No hay datos para este ítem/trial.</p>
+        <p className="text-xs text-yellow-600 mt-1">Ítem {currentItem.num}, trial {currentTrial + 1}</p>
+        <button
+          onClick={() => advanceToNext(scores)}
+          className="mt-2 px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >
+          Saltar
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-gray-50 rounded-lg p-3">
+    <div className="space-y-3">
+      <div className="bg-gray-50 rounded-lg p-2">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">Secuenciación de Letras y Números</span>
-          <span className="text-gray-800 font-medium">
+          <span className="text-gray-800 font-medium text-xs">
             {isExample ? 'Ejemplo ' + currentItem.num : isPractice ? 'Práctica ' + currentItem.num : 'Ítem ' + currentItem.num}
-            {' - Intento ' + (currentTrial + 1) + '/3'}
+            {' - Intento ' + (currentTrial + 1) + '/' + totalTrials}
           </span>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div className="h-full bg-blue-500 rounded-full" style={{ width: (Object.keys(scores).length / 30) * 100 + '%' }} />
         </div>
         {isExample && <p className="text-xs text-gray-400 mt-1">Ítem de ejemplo (no suma puntos)</p>}
@@ -426,16 +434,15 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
         )}
       </div>
 
-      <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 text-center">
-        <p className="text-sm text-blue-700 mb-3">📢 Secuencia para leer al evaluado (1 por segundo):</p>
-        <p className="text-4xl font-mono font-bold tracking-wider text-gray-800">{currentTrialData.join(' - ')}</p>
-        {currentItem.type === 'simple' && <p className="text-xs text-blue-500 mt-3">El evaluado debe decir primero el número y luego la letra</p>}
-        {currentItem.type === 'complex' && <p className="text-xs text-blue-500 mt-3">El evaluado debe ordenar números de menor a mayor y letras en orden alfabético</p>}
+      <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 text-center">
+        <p className="text-xs text-blue-700 mb-2">📢 Secuencia para leer al evaluado (1 por segundo):</p>
+        <p className="text-3xl font-mono font-bold tracking-wider text-gray-800">{currentTrialData.join(' - ')}</p>
+        {currentItem.type === 'simple' && <p className="text-xs text-blue-500 mt-2">El evaluado debe decir primero el número y luego la letra</p>}
+        {currentItem.type === 'complex' && <p className="text-xs text-blue-500 mt-2">El evaluado debe ordenar números de menor a mayor y letras en orden alfabético</p>}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-3 text-center">✏️ Respuesta del evaluado:</label>
-        
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <label className="block text-xs font-medium text-gray-700 mb-2 text-center">✏️ Respuesta del evaluado:</label>
         <CharInput
           length={currentTrialData.length}
           value={userInput}
@@ -444,33 +451,30 @@ export const SLNInterface = React.memo(function SLNInterface({ onComplete, onUpd
           autoFocus={!showResult}
           onSubmit={handleSubmit}
         />
-        
-        <p className="text-xs text-gray-400 mt-3 text-center">
-          <strong>⏎ Presiona ENTER</strong> para confirmar y avanzar
-        </p>
+        <p className="text-xs text-gray-400 mt-2 text-center">⏎ Presiona ENTER para confirmar y avanzar</p>
       </div>
 
       {showResult && (
-        <div className={`rounded-lg p-4 text-center ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-          <p className={`font-medium text-lg ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+        <div className={`rounded-lg p-3 text-center ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <p className={`font-medium text-sm ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
             {isCorrect ? '✓ ¡Correcto!' : '✗ Incorrecto'}
           </p>
           {!isCorrect && currentCorrectAnswers && (
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-xs text-gray-600 mt-1">
               <strong>Respuesta esperada:</strong>{' '}
-              <span className="font-mono text-lg">{currentCorrectAnswers.join(' - ')}</span>
+              <span className="font-mono text-base">{currentCorrectAnswers.join(' - ')}</span>
             </p>
           )}
         </div>
       )}
 
-      <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 30</p>
+      <div className="bg-gray-50 rounded-lg p-2">
+        <p className="text-xs text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 30</p>
       </div>
 
-      <div className="bg-blue-50 rounded-lg p-3">
+      <div className="bg-blue-50 rounded-lg p-2">
         <p className="text-xs text-blue-700">
-          <strong>Importante:</strong> Lea cada ítem a un ritmo de un número o letra por segundo. 
+          <strong>Importante:</strong> Lea cada ítem a un ritmo de un número o letra por segundo.
           No repita ningún intento. Si el evaluado se autocorrige, registre la respuesta final.
         </p>
       </div>

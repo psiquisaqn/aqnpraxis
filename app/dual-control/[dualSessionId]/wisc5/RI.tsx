@@ -90,6 +90,7 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
   useEffect(() => { setSelectedAnswers([]); setPhase('ready'); setShowConfirmation(false) }, [currentIndex])
 
   // Enviar instrucciones y contenido al display según la fase
+  // Solo se envían las imágenes grandes al display; en el control solo se muestra la miniatura.
   useEffect(() => {
     if (currentItem && !isCompleted) {
       onUpdatePatientRef.current({
@@ -206,13 +207,13 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
 
       {/* Fase: Listo para mostrar */}
       {phase === 'ready' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="bg-blue-50 rounded-lg p-3 mb-3">
-            <p className="text-xs text-blue-700 font-medium mb-1">📋 Instrucciones:</p>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="bg-blue-50 rounded-lg p-2 mb-2">
+            <p className="text-xs text-blue-700 font-medium mb-0.5">📋 Instrucciones:</p>
             <p className="text-xs text-blue-600">Presiona el botón para mostrar los estímulos durante <strong>5 segundos</strong> al evaluado.</p>
           </div>
           <div className="text-center">
-            <button onClick={handleStartShow} className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow">
+            <button onClick={handleStartShow} className="px-5 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow">
               ▶ Mostrar estímulos (5 segundos)
             </button>
           </div>
@@ -222,7 +223,7 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
       {/* Fase: Mostrando estímulos - NO mostramos imagen grande aquí, solo el temporizador informativo */}
       {phase === 'showing' && (
         <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
-          <p className="text-sm text-gray-600 mb-1">📺 Mostrando estímulo al paciente...</p>
+          <p className="text-xs text-gray-600 mb-1">📺 Mostrando estímulo al paciente...</p>
           <div className="mt-1 p-2 bg-blue-50 rounded">
             <p className="text-3xl font-bold text-blue-700">{showTimer}</p>
             <p className="text-xs text-blue-600">segundos restantes</p>
@@ -233,12 +234,12 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
       {/* Fase: Respondiendo - NO mostramos imagen de opciones, solo los botones de selección */}
       {phase === 'answering' && !showConfirmation && (
         <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="bg-green-50 rounded-lg p-2 mb-3">
+          <div className="bg-green-50 rounded-lg p-2 mb-2">
             <p className="text-xs text-green-700">✅ El display ahora muestra las opciones.</p>
             <p className="text-xs text-green-600 mt-0.5">Selecciona {currentItem.correctAnswers.length === 1 ? 'la imagen correcta' : `las ${currentItem.correctAnswers.length} imágenes correctas`} en el orden indicado por el evaluado.</p>
           </div>
-          <p className="text-sm text-gray-600 mb-2">Respuestas ({currentItem.correctAnswers.length} de {currentItem.totalOptions}):</p>
-          <div className="grid grid-cols-4 md:grid-cols-6 gap-1.5 mb-3">
+          <p className="text-sm text-gray-600 mb-1.5">Respuestas ({currentItem.correctAnswers.length} de {currentItem.totalOptions}):</p>
+          <div className="grid grid-cols-4 md:grid-cols-6 gap-1.5 mb-2">
             {options.map(letter => {
               const orderIndex = selectedAnswers.indexOf(letter)
               const isSelected = orderIndex !== -1
@@ -297,7 +298,7 @@ export const RIInterface = React.memo(function RIInterface({ onComplete, onUpdat
           {!isPractice && scores[currentItem.num] < 2 && (
             <p className="text-xs text-gray-600 mt-1"><strong>Correctas:</strong> {currentItem.correctAnswers.join(' → ')}</p>
           )}
-          <button onClick={handleNext} className="mt-2 px-4 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+          <button onClick={handleNext} className="mt-1.5 px-4 py-1 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
             Continuar
           </button>
         </div>

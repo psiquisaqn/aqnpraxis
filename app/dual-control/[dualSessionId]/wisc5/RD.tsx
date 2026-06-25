@@ -333,10 +333,10 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
     const totalScore = Object.values(scores).reduce((a, b) => a + b, 0)
     const maxScore = 54
     return (
-      <div className="bg-green-50 rounded-lg p-4 text-center">
-        <p className="text-green-700 font-medium">Subprueba completada</p>
-        <p className="text-sm text-green-600 mt-1">Puntaje total: {totalScore} / {maxScore}</p>
-        <div className="text-xs text-gray-500 mt-2">
+      <div className="bg-green-50 rounded-lg p-3 text-center">
+        <p className="text-green-700 font-medium text-sm">Subprueba completada</p>
+        <p className="text-xs text-green-600 mt-1">Puntaje total: {totalScore} / {maxScore}</p>
+        <div className="text-xs text-gray-500 mt-1">
           RD-D: {Object.keys(scores).filter(k => k.startsWith('RD-D')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18 |
           RD-I: {Object.keys(scores).filter(k => k.startsWith('RD-I')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18 |
           RD-S: {Object.keys(scores).filter(k => k.startsWith('RD-S')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18
@@ -346,20 +346,20 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-gray-50 rounded-lg p-3">
+    <div className="space-y-3">
+      <div className="bg-gray-50 rounded-lg p-2">
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">
             {currentPart === 'RD-D' && '📋 Dígitos en orden directo'}
             {currentPart === 'RD-I' && '🔄 Dígitos en orden inverso'}
             {currentPart === 'RD-S' && '🔢 Dígitos en orden secuenciado'}
           </span>
-          <span className="text-gray-800 font-medium">
+          <span className="text-gray-800 font-medium text-xs">
             {isPractice ? 'Práctica' : `Ítem ${currentItem.num}`} / {partItems.filter(i => !i.isPractice).length}
             {!isPractice && ` (Intento ${currentTrial + 1}/2)`}
           </span>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(currentPartIndex / ALL_PARTS.length) * 100}%` }} />
         </div>
         <p className="text-xs text-gray-500 mt-1">Parte {currentPartIndex + 1} de {ALL_PARTS.length}</p>
@@ -368,14 +368,14 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
         )}
       </div>
 
-      <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 text-center">
-        <p className="text-sm text-blue-700 mb-3">📢 Dígitos para leer al paciente:</p>
-        <p className="text-5xl font-mono font-bold tracking-wider text-gray-800">{currentTrialDigits?.join(' - ')}</p>
-        {isPractice && <p className="text-xs text-blue-500 mt-3">Ítem de práctica (no suma puntos)</p>}
+      <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 text-center">
+        <p className="text-xs text-blue-700 mb-2">📢 Dígitos para leer al paciente:</p>
+        <p className="text-4xl font-mono font-bold tracking-wider text-gray-800">{currentTrialDigits?.join(' - ')}</p>
+        {isPractice && <p className="text-xs text-blue-500 mt-2">Ítem de práctica (no suma puntos)</p>}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-3 text-center">✏️ Dígitos que dijo el paciente:</label>
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
+        <label className="block text-xs font-medium text-gray-700 mb-2 text-center">✏️ Dígitos que dijo el paciente:</label>
         <DigitInput
           length={currentTrialDigits?.length || 0}
           value={digits}
@@ -384,18 +384,18 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
           autoFocus={!showResult}
           onSubmit={handleSubmit}
         />
-        <p className="text-xs text-gray-400 mt-3 text-center">⏎ Presiona ENTER para confirmar y avanzar</p>
+        <p className="text-xs text-gray-400 mt-2 text-center">⏎ Presiona ENTER para confirmar y avanzar</p>
       </div>
 
       {showResult && (
-        <div className={`rounded-lg p-4 text-center ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-          <p className={`font-medium text-lg ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+        <div className={`rounded-lg p-3 text-center ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <p className={`font-medium text-sm ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
             {isCorrect ? '✓ ¡Correcto!' : '✗ Incorrecto'}
           </p>
           {!isCorrect && currentTrialDigits && (
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-xs text-gray-600 mt-1">
               <strong>Respuesta esperada:</strong>{' '}
-              <span className="font-mono text-lg">
+              <span className="font-mono text-base">
                 {currentPart === 'RD-D' ? currentTrialDigits.join(' - ') :
                  currentPart === 'RD-I' ? reverseArray(currentTrialDigits).join(' - ') :
                  sortAscending(currentTrialDigits).join(' - ')}
@@ -406,12 +406,12 @@ export const RDInterface = React.memo(function RDInterface({ onComplete, onUpdat
       )}
 
       {isPractice && !showResult && (
-        <button onClick={skipPractice} className="w-full py-2 text-sm text-gray-500 hover:text-gray-700">Saltar práctica</button>
+        <button onClick={skipPractice} className="w-full py-1.5 text-sm text-gray-500 hover:text-gray-700 underline">Saltar práctica</button>
       )}
 
-      <div className="bg-gray-50 rounded-lg p-3">
-        <p className="text-sm text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 54</p>
-        <div className="flex gap-4 text-xs text-gray-500 mt-1">
+      <div className="bg-gray-50 rounded-lg p-2">
+        <p className="text-xs text-gray-600">Puntaje bruto acumulado: {Object.values(scores).reduce((a, b) => a + b, 0)} / 54</p>
+        <div className="flex gap-2 text-xs text-gray-500 mt-1">
           <span>RD-D: {Object.keys(scores).filter(k => k.startsWith('RD-D')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18</span>
           <span>RD-I: {Object.keys(scores).filter(k => k.startsWith('RD-I')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18</span>
           <span>RD-S: {Object.keys(scores).filter(k => k.startsWith('RD-S')).reduce((a, k) => a + (scores[k] || 0), 0)} / 18</span>

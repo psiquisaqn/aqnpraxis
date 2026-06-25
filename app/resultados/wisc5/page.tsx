@@ -117,11 +117,13 @@ function Wisc5ResultsContent() {
         }
 
         const { data: wiscData, error: wiscError } = await supabase
-          .from('wisc5_scores').select('*').eq('session_id', sessionId).single()
+          .from('wisc5_scores')
+          .select('*')
+          .eq('session_id', sessionId)
+          .single()
         if (wiscError || !wiscData) { setError('No se encontraron puntajes WISC-V'); setLoading(false); return }
         setData(wiscData)
 
-        // Obtener estado del plan
         const { data: plan } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
         setPlanStatus(plan)
         setLoading(false)
@@ -148,6 +150,7 @@ function Wisc5ResultsContent() {
 
   const scaledScores = data.scaled_scores || {}
   const compositeScores = data.composite_scores || {}
+  const rawScores = data.raw_scores || {}
   const completedSubtests = data.completed_subtests || {}
   const indexes: Record<string, any> = {}
   for (const code of ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']) {
@@ -231,12 +234,14 @@ function Wisc5ResultsContent() {
               <thead><tr className="border-b border-gray-200"><th className="text-left py-2 px-3">Subprueba</th><th className="text-center py-2 px-3">Código</th><th className="text-center py-2 px-3">Bruto</th><th className="text-center py-2 px-3">Escala</th><th className="text-center py-2 px-3">Clasificación</th></tr></thead>
               <tbody>
                 {PRIMARY_SUBTESTS.map(code => {
-                  const pe = scaledScores[code]; const rawScore = data.raw_scores?.[code]
+                  const pe = scaledScores[code]
+                  const rawScore = rawScores[code]
                   if (completedSubtests[code] === 'not_administered' && code === 'CC') return null
                   return (
                     <tr key={code} className="border-b border-gray-100">
-                      <td className="py-2 px-3">{SUBTEST_LABELS[code]}</td><td className="py-2 px-3 text-center text-gray-500">{code}</td>
-                      <td className="py-2 px-3 text-center">{rawScore ?? '-'}</td>
+                      <td className="py-2 px-3">{SUBTEST_LABELS[code]}</td>
+                      <td className="py-2 px-3 text-center text-gray-500">{code}</td>
+                      <td className="py-2 px-3 text-center">{rawScore != null ? rawScore : '-'}</td>
                       <td className="py-2 px-3 text-center">{pe != null ? <span className="font-mono font-bold">{pe}</span> : '-'}</td>
                       <td className="py-2 px-3 text-center">{pe != null ? <span className={`text-xs px-2 py-0.5 rounded-full ${getClassificationColor(pe)}`}>{getClassification(pe)}</span> : '-'}</td>
                     </tr>
@@ -253,12 +258,14 @@ function Wisc5ResultsContent() {
                   <thead><tr className="border-b border-gray-200"><th className="text-left py-2 px-3">Subprueba</th><th className="text-center py-2 px-3">Código</th><th className="text-center py-2 px-3">Bruto</th><th className="text-center py-2 px-3">Escala</th><th className="text-center py-2 px-3">Clasificación</th></tr></thead>
                   <tbody>
                     {SECONDARY_SUBTESTS.map(code => {
-                      const pe = scaledScores[code]; const rawScore = data.raw_scores?.[code]
+                      const pe = scaledScores[code]
+                      const rawScore = rawScores[code]
                       if (completedSubtests[code] !== 'completed' && pe == null) return null
                       return (
                         <tr key={code} className="border-b border-gray-100">
-                          <td className="py-2 px-3">{SUBTEST_LABELS[code]}</td><td className="py-2 px-3 text-center text-gray-500">{code}</td>
-                          <td className="py-2 px-3 text-center">{rawScore ?? '-'}</td>
+                          <td className="py-2 px-3">{SUBTEST_LABELS[code]}</td>
+                          <td className="py-2 px-3 text-center text-gray-500">{code}</td>
+                          <td className="py-2 px-3 text-center">{rawScore != null ? rawScore : '-'}</td>
                           <td className="py-2 px-3 text-center">{pe != null ? <span className="font-mono font-bold">{pe}</span> : '-'}</td>
                           <td className="py-2 px-3 text-center">{pe != null ? <span className={`text-xs px-2 py-0.5 rounded-full ${getClassificationColor(pe)}`}>{getClassification(pe)}</span> : '-'}</td>
                         </tr>
@@ -274,24 +281,29 @@ function Wisc5ResultsContent() {
         {/* Índices */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Índices Compuestos</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="border-b border-gray-200"><th className="text-left py-2 px-3">Índice</th><th className="text-center py-2 px-3">Puntaje</th><th className="text-center py-2 px-3">Percentil</th><th className="text-center py-2 px-3">Clasificación</th></tr></thead>
-              <tbody>
-                {['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT'].map(code => {
-                  const idx = indexes[code]; if (!idx) return null
-                  return (
-                    <tr key={code} className={`border-b border-gray-100 ${code === 'CIT' ? 'bg-blue-50' : ''}`}>
-                      <td className="py-3 px-3"><span className={`font-medium ${code === 'CIT' ? 'text-blue-700' : 'text-gray-800'}`}>{INDEX_COMPOSITION[code]?.name}</span><span className="text-xs text-gray-400 ml-1">({code})</span></td>
-                      <td className="py-3 px-3 text-center"><span className="text-lg font-bold font-mono">{idx.score}</span></td>
-                      <td className="py-3 px-3 text-center text-gray-700">{idx.percentile}</td>
-                      <td className="py-3 px-3 text-center"><span className={`text-xs px-2 py-0.5 rounded-full ${getClassificationColor(idx.score)}`}>{getClassification(idx.score)}</span></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          {Object.keys(indexes).length === 0 ? (
+            <p className="text-gray-500 text-sm">No hay índices calculados aún. Completa las subpruebas primarias.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-gray-200"><th className="text-left py-2 px-3">Índice</th><th className="text-center py-2 px-3">Puntaje</th><th className="text-center py-2 px-3">Percentil</th><th className="text-center py-2 px-3">Clasificación</th></tr></thead>
+                <tbody>
+                  {['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT'].map(code => {
+                    const idx = indexes[code]
+                    if (!idx) return null
+                    return (
+                      <tr key={code} className={`border-b border-gray-100 ${code === 'CIT' ? 'bg-blue-50' : ''}`}>
+                        <td className="py-3 px-3"><span className={`font-medium ${code === 'CIT' ? 'text-blue-700' : 'text-gray-800'}`}>{INDEX_COMPOSITION[code]?.name}</span><span className="text-xs text-gray-400 ml-1">({code})</span></td>
+                        <td className="py-3 px-3 text-center"><span className="text-lg font-bold font-mono">{idx.score}</span></td>
+                        <td className="py-3 px-3 text-center text-gray-700">{idx.percentile}</td>
+                        <td className="py-3 px-3 text-center"><span className={`text-xs px-2 py-0.5 rounded-full ${getClassificationColor(idx.score)}`}>{getClassification(idx.score)}</span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Botón para generar informe detallado */}
@@ -322,7 +334,7 @@ function Wisc5ResultsContent() {
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Interpretación de Resultados</h2>
               <div className="space-y-4">
                 <p className="text-sm text-gray-700">El Coeficiente Intelectual Total (CIT) obtenido es de {indexes.CIT?.score || 'N/A'}, clasificación "{getClassification(indexes.CIT?.score || 0)}", percentil {indexes.CIT?.percentile || 'N/A'}.</p>
-                {/* (resto de la interpretación) */}
+                {/* (resto de la interpretación se puede expandir) */}
               </div>
             </div>
 
@@ -330,7 +342,6 @@ function Wisc5ResultsContent() {
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Recomendaciones</h2>
               <ul className="space-y-3">
                 <li className="text-sm text-gray-700 flex gap-2"><span className="text-blue-500">•</span>Basado en los resultados, se sugiere continuar con el plan educativo regular y monitorear el progreso.</li>
-                {/* (resto de recomendaciones) */}
               </ul>
             </div>
           </>

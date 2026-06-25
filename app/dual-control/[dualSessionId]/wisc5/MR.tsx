@@ -103,7 +103,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
   const [backtrackMode, setBacktrackMode] = useState(false)
   const [failedStartItem, setFailedStartItem] = useState<number | null>(null)
   const [consecutiveSuccessesInBacktrack, setConsecutiveSuccessesInBacktrack] = useState(0)
-  const [hasSentFirstItem, setHasSentFirstItem] = useState(false)
+  const [initialItemSent, setInitialItemSent] = useState(false)
 
   const currentItem = MR_ITEMS[currentIndex]
   const isPractice = currentItem?.isPractice || false
@@ -130,16 +130,26 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
         imagePath: `/wisc5/mr/${imageName}`,
         isPractice: currentItem.isPractice
       })
+      setInitialItemSent(true)
     }
   }, [currentItem, isCompleted, isPractice])
 
   // Efecto adicional para asegurar que el primer ítem se envíe incluso si el efecto anterior no se dispara por alguna razón
   useEffect(() => {
-    if (!hasSentFirstItem && currentItem && !isCompleted) {
-      setHasSentFirstItem(true)
-      // El envío ya se hace en el efecto anterior, pero forzamos una re-ejecución si es necesario
+    if (!initialItemSent && currentItem && !isCompleted) {
+      const imageName = isPractice 
+        ? `matrices${currentItem.num.toString().toLowerCase()}.png`
+        : `matrices${String(currentItem.num).padStart(3, '0')}.png`
+      
+      onUpdatePatientRef.current({
+        type: 'wisc5_mr',
+        itemNum: currentItem.num,
+        imagePath: `/wisc5/mr/${imageName}`,
+        isPractice: currentItem.isPractice
+      })
+      setInitialItemSent(true)
     }
-  }, [currentItem, hasSentFirstItem, isCompleted])
+  }, [currentItem, isCompleted, isPractice, initialItemSent])
 
   // Bonus
   useEffect(() => {
@@ -294,7 +304,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
       </div>
 
       {/* Imagen de estímulo (miniatura) */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3">
+      <div className="bg-white rounded-lg border border-gray-200 p-2">
         <p className="text-xs font-medium text-gray-700 mb-1 text-center">📷 Estímulo (miniatura):</p>
         <img 
           src={getCurrentImagePath()} 
@@ -302,7 +312,7 @@ export const MRInterface = React.memo(function MRInterface({ onComplete, onUpdat
           className="mx-auto max-h-32 object-contain border border-gray-200 rounded-lg"
           onError={(e) => { e.currentTarget.src = '/placeholder-image.png' }}
         />
-        <div className="mt-2 p-1.5 bg-blue-50 rounded text-center">
+        <div className="mt-1 p-1.5 bg-blue-50 rounded text-center">
           <p className="text-xs text-blue-700"><strong>Respuesta correcta: {currentItem.correctAnswer}</strong></p>
         </div>
       </div>
