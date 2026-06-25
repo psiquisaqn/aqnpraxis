@@ -197,7 +197,13 @@ interface Wisc5ControlProps {
   displayReady?: boolean
 }
 
-export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse, displayReady = false }: Wisc5ControlProps) {
+export function Wisc5Control({
+  dualSessionId,
+  sessionId,
+  onUpdatePatient,
+  onSaveResponse,
+  displayReady = false
+}: Wisc5ControlProps) {
   const router = useRouter()
   const [ageInfo, setAgeInfo] = useState<{ years: number; months: number; group: string } | null>(null)
   const [patientName, setPatientName] = useState<string>('')
@@ -227,10 +233,10 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
       try {
         setLoading(true)
 
-        // 1. Obtener patient_id de la sesión
+        // 1. Obtener datos de la sesión (paciente)
         const { data: sessionData, error: sessionError } = await supabase
           .from('sessions')
-          .select('patient_id')
+          .select('patient_id, patients(full_name, birth_date)')
           .eq('id', sessionId)
           .single()
 
@@ -240,29 +246,17 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
           return
         }
 
-        const patientId = sessionData.patient_id
-        if (!patientId) {
-          setError('La sesión no tiene un paciente asociado.')
-          setLoading(false)
-          return
-        }
-
-        // 2. Obtener datos del paciente
-        const { data: patientData, error: patientError } = await supabase
-          .from('patients')
-          .select('full_name, birth_date')
-          .eq('id', patientId)
-          .single()
-
-        if (patientError || !patientData) {
+        // ✅ CORRECCIÓN: Usar 'as any' para evitar problemas de tipo con el objeto anidado
+        const patient = sessionData.patients as any
+        if (!patient) {
           setError('No se encontró el paciente asociado.')
           setLoading(false)
           return
         }
 
-        setPatientName(patientData.full_name || 'Paciente')
+        setPatientName(patient.full_name || 'Paciente')
 
-        const birthDate = patientData.birth_date
+        const birthDate = patient.birth_date
         if (!birthDate) {
           setError('El paciente no tiene fecha de nacimiento registrada.')
           setLoading(false)
@@ -275,7 +269,7 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
         const { years, months, totalMonths } = calculateAge(birth, evalDt)
         setAgeInfo({ years, months, group: getAgeGroup(totalMonths) })
 
-        // 3. Cargar estado guardado de wisc5_scores
+        // 2. Cargar estado guardado de wisc5_scores
         const { data: wiscData, error: wiscError } = await supabase
           .from('wisc5_scores')
           .select('status, substitution_used, completed_subtests, raw_scores, scaled_scores, composite_scores, report_type')
@@ -367,13 +361,16 @@ export function Wisc5Control({ dualSessionId, sessionId, onUpdatePatient, onSave
     if (!ageInfo) return
 
     // Obtener birth_date del paciente nuevamente
-    const { data: patientData } = await supabase
-      .from('patients')
-      .select('birth_date')
-      .eq('id', (await supabase.from('sessions').select('patient_id').eq('id', sessionId).single()).data?.patient_id)
+    const { data: sessionData } = await supabase
+      .from('sessions')
+      .select('patients(birth_date)')
+      .eq('id', sessionId)
       .single()
 
-    const birthDate = patientData?.birth_date
+    // ✅ CORRECCIÓN: Usar 'as any' para evitar problemas de tipo
+    const patient = sessionData?.patients as any
+    const birthDate = patient?.birth_date
+
     if (!birthDate) {
       console.error('❌ No se pudo obtener la fecha de nacimiento')
       return

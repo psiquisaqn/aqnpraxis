@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { getOrCreateDualSessionId } from '@/lib/dual-session'
 import Link from 'next/link'
 import { NewSessionModal } from '@/app/dashboard/components/NewSessionModal'
 
@@ -105,6 +106,23 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
     loadPatient()
   }, [patientId])
 
+  // ============================================================
+  // FUNCIÓN PARA ABRIR PANEL WISC‑V
+  // ============================================================
+  const handleOpenWiscPanel = async (sessionId: string) => {
+    try {
+      const dualId = await getOrCreateDualSessionId(sessionId, 'wisc5')
+      if (dualId) {
+        router.push(`/dual-control/${dualId}`)
+      } else {
+        alert('No se pudo abrir el panel WISC‑V. Intenta nuevamente.')
+      }
+    } catch (err) {
+      console.error('❌ Error al abrir panel WISC:', err)
+      alert('Error al abrir el panel. Revisa la consola para más detalles.')
+    }
+  }
+
   const handleUpdate = async () => {
     setEditing(false)
     const { error } = await supabase
@@ -163,16 +181,6 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
       wisc5_cl: 'WISC-V'
     }
     return tests[testId] || testId
-  }
-
-  const getContinueLink = (session: Session): string => {
-    if ((session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') && session.dual_session_id) {
-      return `/dual-control/${session.dual_session_id}`
-    }
-    if (session.test_id === 'wisc5' || session.test_id === 'wisc5_cl') {
-      return `/dashboard/paciente/${patientId}`
-    }
-    return `/session/${session.id}`
   }
 
   const getReportLink = (session: Session): string => {
@@ -259,55 +267,61 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
           <p className="text-gray-400 text-center py-8">No hay evaluaciones registradas</p>
         ) : (
           <div className="space-y-3">
-            {sessions.map((session) => (
-              <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <div>
-                  <div className="font-medium text-gray-800">{getTestName(session.test_id)}</div>
-                  <div className="text-xs text-gray-400">
-                    {new Date(session.created_at).toLocaleDateString()}
-                    {session.status === 'completed' && ' · Completada'}
-                    {session.status === 'in_progress' && ' · En curso'}
-                    {session.status === 'completed_brief' && ' · Finalizado (breve)'}
-                    {session.status === 'completed_extended' && ' · Finalizado (extendido)'}
+            {sessions.map((session) => {
+              const isWisc = session.test_id === 'wisc5' || session.test_id === 'wisc5_cl'
+              const isCompleted = session.status === 'completed' || session.status === 'completed_brief' || session.status === 'completed_extended'
+              const isInProgress = session.status === 'in_progress'
+              
+              return (
+                <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div>
+                    <div className="font-medium text-gray-800">{getTestName(session.test_id)}</div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(session.created_at).toLocaleDateString()}
+                      {session.status === 'completed' && ' · Completada'}
+                      {session.status === 'in_progress' && ' · En curso'}
+                      {session.status === 'completed_brief' && ' · Finalizado (breve)'}
+                      {session.status === 'completed_extended' && ' · Finalizado (extendido)'}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Para WISC‑V: siempre mostrar "Abrir panel" o "Continuar" que abren el panel */}
+                    {isWisc && (
+                      <button
+                        onClick={() => handleOpenWiscPanel(session.id)}
+                        className="inline-flex items-center justify-center px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                      >
+                        {isCompleted ? 'Abrir panel' : 'Continuar evaluación'}
+                      </button>
+                    )}
+                    {/* Para otros tests: mostrar continuar solo si está en progreso */}
+                    {!isWisc && isInProgress && (
+                      <Link
+                        href={`/session/${session.id}`}
+                        className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                      >
+                        Continuar
+                      </Link>
+                    )}
+                    {/* Ver informe (solo si está completado) */}
+                    {isCompleted && (
+                      <Link
+                        href={getReportLink(session)}
+                        className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                      >
+                        Ver informe
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => handleDeleteSession(session.id)}
+                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                    >
+                      Eliminar
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {/* Botón para abrir el panel de WISC-V (si existe sesión dual) */}
-                  {session.dual_session_id && (
-                    <Link
-                      href={`/dual-control/${session.dual_session_id}`}
-                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
-                    >
-                      Abrir panel
-                    </Link>
-                  )}
-                  {/* Ver informe (solo si está completado) */}
-                  {(session.status === 'completed' || session.status === 'completed_brief' || session.status === 'completed_extended') && (
-                    <Link
-                      href={getReportLink(session)}
-                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                    >
-                      Ver informe
-                    </Link>
-                  )}
-                  {/* Continuar (solo si está en progreso y no tiene sesión dual) */}
-                  {session.status === 'in_progress' && !session.dual_session_id && (
-                    <Link
-                      href={getContinueLink(session)}
-                      className="inline-flex items-center justify-center px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                    >
-                      Continuar
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => handleDeleteSession(session.id)}
-                    className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
