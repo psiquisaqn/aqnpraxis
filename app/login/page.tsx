@@ -125,6 +125,21 @@ export default function LoginPage() {
           </svg>
           Sala de Pacientes
         </Link>
+
+        {/* ⭐ NUEVO: Botón Calculadora WISC‑V (destacado) */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <Link
+            href="/wisc5-calculadora-publica"
+            className="flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-teal-600 hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
+          >
+            <span className="text-lg">📊</span>
+            Calculadora WISC‑V Gratuita
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">demo</span>
+          </Link>
+          <p className="text-xs text-gray-400 text-center mt-2">
+            Sin registro. Prueba la calculadora en tiempo real.
+          </p>
+        </div>
       </div>
     </div>
   )

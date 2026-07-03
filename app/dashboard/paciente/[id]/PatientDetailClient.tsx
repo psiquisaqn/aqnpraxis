@@ -254,10 +254,20 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
           </div>
         )}
 
-        <div className="mt-6 pt-4 border-t border-gray-100">
-          <button onClick={() => setShowNewSessionModal(true)} className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+        {/* Botones de acción principales */}
+        <div className="mt-6 pt-4 border-t border-gray-100 flex flex-wrap gap-3">
+          <button
+            onClick={() => setShowNewSessionModal(true)}
+            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
             + Nueva evaluación
           </button>
+          <Link
+            href={`/dashboard/paciente/${patientId}/wisc5-calculadora`}
+            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
+          >
+            📊 Calculadora WISC-V
+          </Link>
         </div>
       </div>
 
@@ -284,7 +294,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                       {session.status === 'completed_extended' && ' · Finalizado (extendido)'}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {/* Para WISC‑V: siempre mostrar "Abrir panel" o "Continuar" que abren el panel */}
                     {isWisc && (
                       <button
@@ -312,6 +322,7 @@ export function PatientDetailClient({ patientId }: PatientDetailClientProps) {
                         Ver informe
                       </Link>
                     )}
+                    {/* Botón de eliminación */}
                     <button
                       onClick={() => handleDeleteSession(session.id)}
                       className="inline-flex items-center justify-center px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
