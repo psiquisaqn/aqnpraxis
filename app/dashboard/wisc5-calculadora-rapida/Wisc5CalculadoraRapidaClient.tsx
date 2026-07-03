@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import { Wisc5Engine, type RawScores, type ScaledScores } from '@/lib/wisc5/engine'
-import Link from 'next/link'
 
 // ============================================================
 // CONFIGURACIÓN
@@ -27,13 +28,9 @@ const SUBTESTS_CONFIG = [
 ]
 
 // ============================================================
-// FUNCIONES DE CLASIFICACIÓN CON NOMBRES CHILENOS
+// FUNCIONES DE CLASIFICACIÓN (CHILENAS)
 // ============================================================
 
-/**
- * Clasificación cualitativa para puntajes compuestos (media 100, DE 15)
- * Rangos adaptados para la versión chilena del WISC-V
- */
 function getClassification(score: number): string {
   if (score >= 130) return 'Muy Superior'
   if (score >= 120) return 'Superior'
@@ -44,10 +41,6 @@ function getClassification(score: number): string {
   return 'Extremadamente Bajo'
 }
 
-/**
- * Clasificación cualitativa para puntajes escala (media 10, DE 3)
- * Se usa para subpruebas individuales
- */
 function getScaledClassification(score: number): string {
   if (score >= 16) return 'Muy Superior'
   if (score >= 14) return 'Superior'
@@ -72,21 +65,48 @@ function getClassificationColor(score: number, isScaled: boolean = false): strin
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function Wisc5CalculadoraPublicaClient() {
+export function Wisc5CalculadoraRapidaClient() {
+  const router = useRouter()
   const engine = new Wisc5Engine()
 
-  // Estados
-  const [name, setName] = useState('')
+  // Campos del evaluado
+  const [fullName, setFullName] = useState('')
   const [birthDate, setBirthDate] = useState('')
+  const [school, setSchool] = useState('')
   const [evalDate, setEvalDate] = useState(() => new Date().toISOString().split('T')[0])
+
+  // Estado de cálculos
   const [ageInfo, setAgeInfo] = useState<{ years: number; months: number; group: string } | null>(null)
   const [rawScores, setRawScores] = useState<RawScores>({})
   const [scaledScores, setScaledScores] = useState<ScaledScores>({})
   const [compositeScores, setCompositeScores] = useState<any>(null)
+  const [planStatus, setPlanStatus] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   // ============================================================
-  // CÁLCULO DE EDAD
+  // CARGAR PLAN DEL USUARIO
+  // ============================================================
+  useEffect(() => {
+    const loadPlan = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: plan } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+        setPlanStatus(plan)
+      }
+      setLoading(false)
+    }
+    loadPlan()
+  }, [supabase])
+
+  // ============================================================
+  // CALCULAR EDAD
   // ============================================================
   useEffect(() => {
     if (birthDate && evalDate) {
@@ -112,7 +132,6 @@ export function Wisc5CalculadoraPublicaClient() {
       const birth = new Date(birthDate)
       const now = new Date(evalDate)
 
-      // Calcular escalares
       const newScaled: ScaledScores = {}
       for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
         const raw = rawScores[code]
@@ -125,7 +144,6 @@ export function Wisc5CalculadoraPublicaClient() {
       }
       setScaledScores(newScaled)
 
-      // Calcular índices compuestos
       const result = await engine.score(birth, now, rawScores, {})
       if (result) {
         const composites = {
@@ -154,29 +172,155 @@ export function Wisc5CalculadoraPublicaClient() {
     setRawScores(prev => ({ ...prev, [code]: num }))
   }
 
-  const primarySubtests = SUBTESTS_CONFIG.filter(s => s.primary)
-  const secondarySubtests = SUBTESTS_CONFIG.filter(s => !s.primary)
+  // ============================================================
+  // GENERAR INFORME
+  // ============================================================
+  const generateReport = async (type: 'brief' | 'extended') => {
+    if (!fullName.trim()) {
+      setError('Ingresa el nombre del evaluado.')
+      return
+    }
+    if (!birthDate) {
+      setError('Ingresa la fecha de nacimiento.')
+      return
+    }
+    if (!ageInfo) {
+      setError('Edad no válida. Verifica la fecha de nacimiento.')
+      return
+    }
+
+    // Verificar límite de informes (solo para free)
+    const isFree = planStatus?.plan === 'free' || (!planStatus?.is_pro && !planStatus?.is_admin)
+    if (isFree && planStatus?.reports_used >= 3) {
+      alert('Has alcanzado el límite de 3 informes gratuitos. Actualiza a Premium para más.')
+      return
+    }
+
+    setGenerating(true)
+    setError(null)
+
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autenticado')
+
+      // 1. Buscar o crear paciente
+      let patientId: string
+      const { data: existingPatients } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('full_name', fullName.trim())
+        .eq('birth_date', birthDate)
+        .eq('psychologist_id', user.id)
+        .limit(1)
+
+      if (existingPatients && existingPatients.length > 0) {
+        patientId = existingPatients[0].id
+        console.log('✅ Paciente existente encontrado:', patientId)
+      } else {
+        const { data: newPatient, error: patientError } = await supabase
+          .from('patients')
+          .insert({
+            full_name: fullName.trim(),
+            birth_date: birthDate,
+            school: school.trim() || null,
+            psychologist_id: user.id
+          })
+          .select('id')
+          .single()
+
+        if (patientError) throw new Error('Error al crear paciente: ' + patientError.message)
+        patientId = newPatient.id
+        console.log('✅ Nuevo paciente creado:', patientId)
+      }
+
+      // 2. Crear sesión
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .insert({
+          patient_id: patientId,
+          test_id: 'wisc5',
+          status: 'in_progress',
+          psychologist_id: user.id
+        })
+        .select('id')
+        .single()
+
+      if (sessionError) throw new Error('Error al crear sesión: ' + sessionError.message)
+      const sessionId = session.id
+      console.log('✅ Sesión creada:', sessionId)
+
+      // 3. Guardar puntajes
+      const payload = {
+        session_id: sessionId,
+        raw_scores: rawScores,
+        scaled_scores: scaledScores,
+        composite_scores: compositeScores,
+        status: type === 'brief' ? 'completed_brief' : 'completed_extended',
+        updated_at: new Date().toISOString()
+      }
+
+      const { error: upsertError } = await supabase
+        .from('wisc5_scores')
+        .upsert(payload, { onConflict: 'session_id' })
+
+      if (upsertError) throw new Error('Error al guardar puntajes: ' + upsertError.message)
+      console.log('✅ Puntajes guardados')
+
+      // 4. Incrementar contador de informes (si free)
+      if (isFree) {
+        await supabase.rpc('increment_reports_used', { p_user_id: user.id })
+      }
+
+      // 5. Redirigir
+      router.push(`/resultados/wisc5?session=${sessionId}&type=${type}`)
+
+    } catch (err: any) {
+      console.error('❌ Error:', err)
+      setError(err.message || 'Error al generar informe')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   // ============================================================
   // RENDER
   // ============================================================
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const primarySubtests = SUBTESTS_CONFIG.filter(s => s.primary)
+  const secondarySubtests = SUBTESTS_CONFIG.filter(s => !s.primary)
+
   return (
     <div className="max-w-6xl mx-auto p-4">
       {/* Cabecera */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Calculadora WISC‑V</h1>
+        <h1 className="text-xl font-semibold text-gray-800">Calculadora WISC-V Rápida</h1>
         <p className="text-sm text-gray-500 mt-1">
           Ingresa los datos del evaluado y los puntajes brutos. Los resultados se actualizan en tiempo real.
         </p>
 
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del evaluado</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               placeholder="Ej: Juan Pérez"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
@@ -191,22 +335,35 @@ export function Wisc5CalculadoraPublicaClient() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de evaluación</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Establecimiento</label>
             <input
-              type="date"
-              value={evalDate}
-              onChange={(e) => setEvalDate(e.target.value)}
+              type="text"
+              value={school}
+              onChange={(e) => setSchool(e.target.value)}
+              placeholder="Colegio, consulta, etc."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
+        </div>
+
+        <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
+          <span>Fecha evaluación: <strong>{evalDate}</strong></span>
           {ageInfo && (
-            <div className="flex items-center">
-              <span className="text-sm text-gray-600">
-                Edad: <strong>{ageInfo.years} años, {ageInfo.months} meses</strong>
-                <span className="ml-2 text-gray-400">| Grupo: {ageInfo.group}</span>
-              </span>
-            </div>
+            <span>
+              Edad: <strong>{ageInfo.years} años, {ageInfo.months} meses</strong>
+              <span className="ml-2 text-gray-400">| Grupo: {ageInfo.group}</span>
+            </span>
           )}
+        </div>
+
+        <div className="mt-2 text-sm text-gray-500">
+          Plan: {planStatus?.is_admin ? 'Administrador' : planStatus?.is_pro ? 'Premium' : 'Gratuito'}
+          {!planStatus?.is_admin && !planStatus?.is_pro && (
+            <span className="ml-2">
+              | Informes usados: {planStatus?.reports_used || 0} / 3
+            </span>
+          )}
+          {planStatus?.is_pro && <span className="ml-2">| Informes ilimitados</span>}
         </div>
       </div>
 
@@ -259,7 +416,7 @@ export function Wisc5CalculadoraPublicaClient() {
         </div>
       </div>
 
-      {/* Resultados de índices */}
+      {/* Resultados */}
       {compositeScores && Object.keys(compositeScores).some(key => compositeScores[key]) ? (
         <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Índices Compuestos</h2>
@@ -300,29 +457,35 @@ export function Wisc5CalculadoraPublicaClient() {
         </div>
       )}
 
-      {/* Call to Action – Gancho publicitario */}
-      <div className="mt-8 bg-gradient-to-r from-blue-600 to-teal-600 rounded-2xl shadow-lg p-8 text-center text-white">
-        <h2 className="text-2xl font-bold mb-2">¿Quieres generar informes completos con rapidez y excelencia?</h2>
-        <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
-          Con AQN Praxis puedes administrar evaluaciones psicológicas, generar informes automáticos, guardar historiales y mucho más.
-        </p>
-        <Link
-          href="/register"
-          className="inline-block px-8 py-4 bg-white text-blue-700 font-bold rounded-xl text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
+      {/* Botones */}
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          onClick={() => generateReport('brief')}
+          disabled={generating || !compositeScores}
+          className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
-          🚀 Crear cuenta gratuita
-        </Link>
-        <p className="text-blue-200 text-sm mt-4">
-          ¿Ya tienes cuenta?{' '}
-          <Link href="/login" className="text-white underline font-medium hover:text-blue-100">
-            Inicia sesión
-          </Link>
-        </p>
+          {generating ? 'Generando...' : 'Generar informe breve (7 subpruebas)'}
+        </button>
+        <button
+          onClick={() => generateReport('extended')}
+          disabled={generating || !compositeScores}
+          className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+        >
+          {generating ? 'Generando...' : 'Generar informe extendido (15 subpruebas)'}
+        </button>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
+        >
+          Volver al dashboard
+        </button>
       </div>
 
-      <div className="mt-4 text-center text-xs text-gray-400">
-        <p>Esta es una versión demostrativa. Los datos no se guardan. Para guardar evaluaciones y generar informes, crea una cuenta.</p>
-      </div>
+      {error && (
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+          {error}
+        </div>
+      )}
     </div>
   )
 }

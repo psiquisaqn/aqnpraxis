@@ -78,15 +78,18 @@ export const INDEX_COMPOSITION: Record<IndexCode, SubtestCode[]> = {
 /** Subpruebas que pueden sustituir para obtener el CIT */
 export const CIT_SUBSTITUTES: SubtestCode[] = ['RV', 'RI', 'BS', 'IN', 'SLN', 'CAN', 'COM', 'ARI']
 
-/** Clasificación descriptiva según puntaje compuesto */
+/**
+ * Clasificación cualitativa según puntaje compuesto (media 100, DE 15)
+ * Rangos adaptados para la versión chilena del WISC-V
+ */
 export function getClassification(score: number): string {
-  if (score >= 130) return 'Muy superior'
+  if (score >= 130) return 'Muy Superior'
   if (score >= 120) return 'Superior'
-  if (score >= 110) return 'Promedio alto'
-  if (score >= 90)  return 'Promedio'
-  if (score >= 80)  return 'Promedio bajo'
-  if (score >= 70)  return 'Limítrofe'
-  return 'Extremadamente bajo'
+  if (score >= 110) return 'Normal Alto'
+  if (score >= 90) return 'Normal Promedio'
+  if (score >= 80) return 'Normal Lento'
+  if (score >= 70) return 'Funcionamiento Intelectual Limítrofe'
+  return 'Extremadamente Bajo'
 }
 
 // ─── Cálculo de grupo etario ────────────────────────────────
@@ -125,8 +128,6 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
 
 export class Wisc5Engine {
   private supabase: SupabaseClient = supabase
-
-
 
   /**
    * Paso 2 de la corrección: PD → PE para una subprueba y grupo etario.
@@ -360,4 +361,3 @@ export class Wisc5Engine {
 export function createWisc5Engine(): Wisc5Engine {
   return new Wisc5Engine()
 }
-
