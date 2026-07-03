@@ -90,12 +90,26 @@ function Wisc5ResultsContent() {
 
   useEffect(() => {
     const load = async () => {
-      if (!sessionId) { setError('No se especificó una sesión'); setLoading(false); return }
-      const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+      if (!sessionId) { 
+        setError('No se especificó una sesión')
+        setLoading(false)
+        return 
+      }
+      
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { setError('No autenticado'); setLoading(false); return }
+        if (!user) { 
+          setError('No autenticado')
+          setLoading(false)
+          return 
+        }
 
+        // 1. Obtener datos de la sesión y paciente
         const { data: sessionData, error: sessionError } = await supabase
           .from('sessions')
           .select('*, patients(full_name, birth_date)')
@@ -103,10 +117,16 @@ function Wisc5ResultsContent() {
           .eq('psychologist_id', user.id)
           .single()
 
-        if (sessionError || !sessionData) { setError('Sesión no encontrada o sin permiso'); setLoading(false); return }
+        if (sessionError || !sessionData) { 
+          setError('Sesión no encontrada o sin permiso')
+          setLoading(false)
+          return 
+        }
+        
         setPatientName(sessionData.patients?.full_name || 'Paciente')
         setPatientId(sessionData.patient_id || '')
         setEvalDate(sessionData.created_at ? new Date(sessionData.created_at).toLocaleDateString('es-CL') : '')
+        
         if (sessionData.patients?.birth_date) {
           const birth = new Date(sessionData.patients.birth_date)
           const now = new Date()
@@ -116,18 +136,40 @@ function Wisc5ResultsContent() {
           setPatientAge(`${years} años, ${months} meses`)
         }
 
+        // 2. Cargar puntajes WISC-V (usando maybeSingle para evitar error 406)
         const { data: wiscData, error: wiscError } = await supabase
           .from('wisc5_scores')
           .select('*')
           .eq('session_id', sessionId)
-          .single()
-        if (wiscError || !wiscData) { setError('No se encontraron puntajes WISC-V'); setLoading(false); return }
+          .maybeSingle()
+
+        if (wiscError) {
+          console.error('❌ Error al cargar wisc5_scores:', wiscError)
+          setError('Error al cargar los puntajes')
+          setLoading(false)
+          return
+        }
+
+        if (!wiscData) {
+          console.warn('⚠️ No hay datos para la sesión:', sessionId)
+          setError('No hay resultados disponibles para esta sesión')
+          setLoading(false)
+          return
+        }
+
+        console.log('📊 Datos WISC cargados:', wiscData)
         setData(wiscData)
 
+        // 3. Obtener estado del plan
         const { data: plan } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
         setPlanStatus(plan)
         setLoading(false)
-      } catch (err: any) { setError('Error: ' + err.message); setLoading(false) }
+        
+      } catch (err: any) { 
+        console.error('❌ Error en load:', err)
+        setError('Error: ' + err.message)
+        setLoading(false)
+      }
     }
     load()
   }, [sessionId])
@@ -143,15 +185,20 @@ function Wisc5ResultsContent() {
   if (error || !data) {
     return (
       <TestResultsLayout patientName="Error" testName="WISC-V" testCode="wisc5" evalDate="">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center"><p className="text-red-600">{error || 'Error'}</p><button onClick={() => router.push('/dashboard')} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">Volver</button></div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-600">{error || 'Error'}</p>
+          <button onClick={() => router.push('/dashboard')} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">Volver</button>
+        </div>
       </TestResultsLayout>
     )
   }
 
+  // Leer datos de las columnas JSONB
   const scaledScores = data.scaled_scores || {}
   const compositeScores = data.composite_scores || {}
   const rawScores = data.raw_scores || {}
   const completedSubtests = data.completed_subtests || {}
+  
   const indexes: Record<string, any> = {}
   for (const code of ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']) {
     if (compositeScores[code]) indexes[code] = compositeScores[code]

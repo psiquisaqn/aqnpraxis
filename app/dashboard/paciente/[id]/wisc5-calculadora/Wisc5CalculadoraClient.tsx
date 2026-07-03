@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { Wisc5Engine, type RawScores, type ScaledScores } from '@/lib/wisc5/engine'
-import { getOrCreateDualSessionId } from '@/lib/dual-session'
 
 // ============================================================
 // CONFIGURACIÓN
@@ -140,6 +139,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           CIT: result.CIT,
         }
         setCompositeScores(composites)
+        console.log('📊 Composite scores calculados:', composites)
+      } else {
+        console.warn('⚠️ No se pudieron calcular los índices compuestos')
+        setCompositeScores(null)
       }
     }
 
@@ -176,10 +179,20 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   }
 
   // ============================================================
-  // GENERAR INFORME
+  // GENERAR INFORME (función corregida dentro del componente)
   // ============================================================
   const generateReport = async (type: 'brief' | 'extended') => {
-    if (!patient || !ageInfo) return
+    if (!patient || !ageInfo) {
+      setError('Faltan datos del paciente o edad.')
+      return
+    }
+
+    // Verificar que haya puntajes ingresados
+    const hasScores = Object.values(rawScores).some(v => v !== undefined && v !== null)
+    if (!hasScores) {
+      setError('Ingresa al menos un puntaje bruto antes de generar el informe.')
+      return
+    }
 
     // Verificar límite de informes (solo para free)
     const isFree = planStatus?.plan === 'free' || (!planStatus?.is_pro && !planStatus?.is_admin)
@@ -200,9 +213,8 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      // 1. Obtener o crear una sesión para esta calculadora
-      // Buscar una sesión WISC-V en curso o completada reciente para este paciente
-      let { data: session } = await supabase
+      // 1. Buscar sesión existente o crear una nueva
+      let { data: session, error: sessionError } = await supabase
         .from('sessions')
         .select('id')
         .eq('patient_id', patientId)
@@ -213,41 +225,79 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         .maybeSingle()
 
       if (!session) {
-        // Crear una nueva sesión
-        const { data: newSession, error: sessionError } = await supabase
+        const { data: newSession, error: createError } = await supabase
           .from('sessions')
-          .insert({ patient_id: patientId, test_id: 'wisc5', status: 'in_progress', psychologist_id: user.id })
+          .insert({
+            patient_id: patientId,
+            test_id: 'wisc5',
+            status: 'in_progress',
+            psychologist_id: user.id
+          })
           .select('id')
           .single()
 
-        if (sessionError) throw new Error('Error al crear sesión')
+        if (createError) {
+          console.error('❌ Error al crear sesión:', createError)
+          throw new Error('Error al crear sesión: ' + createError.message)
+        }
         session = newSession
+        console.log('✅ Nueva sesión creada:', session.id)
+      } else {
+        console.log('✅ Sesión existente encontrada:', session.id)
       }
 
       const sessionId = session.id
 
-      // 2. Guardar los puntajes en wisc5_scores
-      await supabase
-        .from('wisc5_scores')
-        .upsert({
-          session_id: sessionId,
-          raw_scores: rawScores,
-          scaled_scores: scaledScores,
-          composite_scores: compositeScores,
-          status: type === 'brief' ? 'completed_brief' : 'completed_extended',
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'session_id' })
-
-      // 3. Actualizar el contador de informes usados (si es free)
-      if (isFree) {
-        await supabase.rpc('increment_reports_used', { p_user_id: user.id })
+      // 2. Guardar puntajes en wisc5_scores (usando JSONB)
+      const payload = {
+        session_id: sessionId,
+        raw_scores: rawScores,
+        scaled_scores: scaledScores,
+        composite_scores: compositeScores,
+        status: type === 'brief' ? 'completed_brief' : 'completed_extended',
+        updated_at: new Date().toISOString()
       }
 
-      // 4. Redirigir a la página de resultados
+      console.log('📤 Payload a guardar:', JSON.stringify(payload, null, 2))
+
+      const { error: upsertError } = await supabase
+        .from('wisc5_scores')
+        .upsert(payload, { onConflict: 'session_id' })
+
+      if (upsertError) {
+        console.error('❌ Error al guardar puntajes:', upsertError)
+        throw new Error('Error al guardar puntajes: ' + upsertError.message)
+      }
+      console.log('✅ Puntajes guardados correctamente')
+
+      // 3. Verificar que se guardó
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('wisc5_scores')
+        .select('raw_scores, scaled_scores, composite_scores')
+        .eq('session_id', sessionId)
+        .single()
+
+      if (verifyError || !verifyData) {
+        console.warn('⚠️ No se pudo verificar el guardado:', verifyError)
+      } else {
+        console.log('✅ Datos verificados en DB:', verifyData)
+      }
+
+      // 4. Incrementar contador de informes (solo free)
+      if (isFree) {
+        const { error: countError } = await supabase
+          .rpc('increment_reports_used', { p_user_id: user.id })
+        if (countError) {
+          console.warn('⚠️ Error al incrementar contador:', countError)
+          // No fallamos la operación completa por esto
+        }
+      }
+
+      // 5. Redirigir a la página de resultados
       router.push(`/resultados/wisc5?session=${sessionId}&type=${type}`)
 
     } catch (err: any) {
-      console.error(err)
+      console.error('❌ Error al generar informe:', err)
       setError(err.message || 'Error al generar informe')
     } finally {
       setGenerating(false)
@@ -357,7 +407,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       </div>
 
       {/* Resultados de índices */}
-      {compositeScores && (
+      {compositeScores && Object.keys(compositeScores).some(key => compositeScores[key]) ? (
         <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Índices Compuestos</h2>
           <div className="overflow-x-auto">
@@ -390,6 +440,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
               </tbody>
             </table>
           </div>
+        </div>
+      ) : (
+        <div className="mt-6 bg-gray-50 rounded-xl border border-gray-200 p-5 text-center text-gray-400 text-sm">
+          Ingresa al menos una subprueba primaria para ver los índices compuestos.
         </div>
       )}
 
