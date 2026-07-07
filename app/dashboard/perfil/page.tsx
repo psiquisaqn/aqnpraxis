@@ -33,6 +33,9 @@ export default function ProfilePage() {
 
   const isAdmin = plan?.plan === 'admin' || plan?.role === 'admin'
   const isPro = plan?.is_pro
+  const limit = plan?.reports_limit ?? 3
+  const used = plan?.reports_used ?? 0
+  const isUnlimited = limit >= 999999
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -56,12 +59,14 @@ export default function ProfilePage() {
         <div className="border-t pt-4 mt-4">
           <div className="flex justify-between text-sm">
             <span>Informes generados</span>
-            <span className="font-mono">{plan.reports_used} / {plan.reports_limit || '∞'}</span>
+            <span className="font-mono">
+              {used} / {isUnlimited ? '∞' : limit}
+            </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
             <div
               className="bg-blue-600 h-2 rounded-full"
-              style={{ width: `${plan.reports_limit ? (plan.reports_used / plan.reports_limit) * 100 : 0}%` }}
+              style={{ width: isUnlimited ? 100 : (used / limit) * 100 }}
             />
           </div>
         </div>

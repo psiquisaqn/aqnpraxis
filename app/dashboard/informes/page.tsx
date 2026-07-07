@@ -31,10 +31,19 @@ export default function InformesPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
 
-      // Obtener informes de la tabla informes (sin join complejo)
+      // 1. Obtener el usuario autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        console.error('Usuario no autenticado')
+        setLoading(false)
+        return
+      }
+
+      // 2. Obtener solo los informes del psicólogo autenticado
       const { data: informes, error } = await supabase
         .from('informes')
         .select('*')
+        .eq('psychologist_id', user.id)   // ← FILTRO CLAVE
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -43,7 +52,7 @@ export default function InformesPage() {
         return
       }
 
-      // Para cada informe, obtener el nombre del paciente por separado
+      // 3. Para cada informe, obtener el nombre del paciente por separado
       const formatted: Report[] = []
       for (const i of informes) {
         let patientName = 'Paciente'
