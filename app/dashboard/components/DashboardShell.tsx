@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { logout } from '@/app/auth/actions'
 
 interface Props {
@@ -86,6 +85,7 @@ const NAV = [
 
 export function DashboardShell({ profile, children }: Props) {
   const pathname = usePathname()
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -100,6 +100,11 @@ export function DashboardShell({ profile, children }: Props) {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  const handleNavigation = (href: string) => {
+    if (isMobile) setSidebarOpen(false)
+    router.push(href)
+  }
 
   const initials = profile?.full_name
     ?.split(' ')
@@ -151,16 +156,15 @@ export function DashboardShell({ profile, children }: Props) {
           )}
         </div>
 
-        {/* Navegación */}
+        {/* Navegación - ahora usando botones con router.push */}
         <nav className="flex-1 py-3 px-2 space-y-0.5">
           {NAV.map((item) => {
             const active = pathname === item.href
             return (
-              <Link
+              <button
                 key={item.href}
-                href={item.href}
-                onClick={() => isMobile && setSidebarOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+                onClick={() => handleNavigation(item.href)}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150 text-left"
                 style={{
                   color: active ? '#3B82F6' : '#6B7280',
                   background: active ? '#EFF6FF' : 'transparent',
@@ -168,7 +172,7 @@ export function DashboardShell({ profile, children }: Props) {
               >
                 <span className="shrink-0">{item.icon}</span>
                 <span>{item.label}</span>
-              </Link>
+              </button>
             )
           })}
         </nav>

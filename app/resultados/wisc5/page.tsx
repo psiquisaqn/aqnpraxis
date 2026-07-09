@@ -1,13 +1,6 @@
 'use client'
 // app/resultados/wisc5/page.tsx
-// Versión elegante con:
-// - Fondo blanco, tipografía Georgia
-// - Logo y firma configurables
-// - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
-// - Saltos de página controlados
-// - Botón Imprimir y Guardar PDF
-// - Gráfico de barras para índices compuestos
-// - Interpretación completa del WISC-V
+// Versión mejorada con tipado correcto
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -15,8 +8,22 @@ import { createBrowserClient } from '@supabase/ssr'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { ReporteHeader } from '@/components/ReporteHeader'
 import { ReporteFooter } from '@/components/ReporteFooter'
+import { useReportDocx } from '@/hooks/useReportDocx'
 
-// Estilos para impresión (mismos que PECA)
+// ============================================================
+// TIPOS
+// ============================================================
+
+interface WiscData {
+  scaled_scores: Record<string, number>
+  composite_scores: Record<string, { score: number; percentile: number; classification?: string }>
+  raw_scores: Record<string, number>
+}
+
+// ============================================================
+// ESTILOS DE IMPRESIÓN
+// ============================================================
+
 const printStyles = `
   @media print {
     body { margin: 0; padding: 0; background: white; }
@@ -24,12 +31,12 @@ const printStyles = `
     .reporte-container { padding: 1.5cm; width: 100%; }
     .page-break-before { page-break-before: always; }
     .page-break-inside { page-break-inside: avoid; }
-    h2, h3, .grafico-barras-container { page-break-inside: avoid; }
+    h2, h3, .grafico-container { page-break-inside: avoid; }
   }
 `
 
 // ============================================================
-// FUNCIONES DE CLASIFICACIÓN (CHILENAS)
+// FUNCIONES DE CLASIFICACIÓN
 // ============================================================
 
 function getClassification(score: number): string {
@@ -63,114 +70,70 @@ function getColorForScore(score: number, isScaled: boolean = false): string {
 }
 
 // ============================================================
-// GRÁFICO DE BARRAS PARA ÍNDICES COMPUESTOS
+// GRÁFICO DE BARRAS (genérico)
 // ============================================================
 
-function GraficoBarrasIndices({ data }: { data: Array<{ label: string; score: number; classification: string }> }) {
-  const maxVal = 160
-  const minVal = 40
-
+function GraficoBarras({ 
+  data, 
+  minVal = 40, 
+  maxVal = 160,
+  showValues = true
+}: { 
+  data: Array<{ label: string; score: number }>
+  minVal?: number
+  maxVal?: number
+  showValues?: boolean
+}) {
   return (
-    <div className="grafico-barras-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
+    <div className="grafico-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
       <div style={{ 
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'flex-end', 
-        minHeight: '220px',
+        minHeight: '200px',
         borderBottom: '1px solid #333',
         borderLeft: '1px solid #333',
         paddingLeft: '10px',
         paddingBottom: '10px',
-        gap: '8px',
+        gap: '6px',
         flexWrap: 'wrap'
       }}>
         {data.map((item, idx) => {
-          const alturaRelativa = ((item.score - minVal) / (maxVal - minVal)) * 160
-          const color = getColorForScore(item.score)
-          const isCIT = item.label === 'CIT'
+          const score = item.score
+          const alturaRelativa = ((score - minVal) / (maxVal - minVal)) * 150
+          const color = getColorForScore(score, maxVal <= 19)
           
           return (
-            <div key={idx} style={{ textAlign: 'center', width: '60px' }}>
+            <div key={idx} style={{ textAlign: 'center', width: '45px' }}>
               <div style={{ 
                 backgroundColor: color, 
-                width: '36px', 
+                width: '28px', 
                 margin: '0 auto', 
                 height: `${Math.max(alturaRelativa, 4)}px`,
-                marginBottom: '6px',
+                marginBottom: '4px',
                 borderRadius: '2px 2px 0 0',
-                opacity: isCIT ? 1 : 0.85,
-                border: isCIT ? '2px solid #1E3A5F' : 'none'
-              }} title={`${item.score} - ${item.classification}`} />
-              <div style={{ fontSize: '8px', fontWeight: isCIT ? 'bold' : 'normal', fontFamily: 'Georgia, Times New Roman, serif' }}>
+              }} />
+              <div style={{ fontSize: '7px', fontWeight: 'normal', fontFamily: 'Georgia, Times New Roman, serif' }}>
                 {item.label}
               </div>
-              <div style={{ fontSize: '9px', color: color, marginTop: '1px', fontWeight: 'bold' }}>
-                {item.score}
-              </div>
+              {showValues && (
+                <div style={{ fontSize: '8px', color: color, marginTop: '1px', fontWeight: 'bold' }}>
+                  {score}
+                </div>
+              )}
             </div>
           )
         })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7px', color: '#9ca3af', padding: '0 10px' }}>
-        <span>40</span>
-        <span>70</span>
-        <span>90</span>
-        <span>110</span>
-        <span>130</span>
-        <span>160</span>
+        <span>{minVal}</span>
+        <span>{(minVal + maxVal) / 4}</span>
+        <span>{(minVal + maxVal) / 2}</span>
+        <span>{((minVal + maxVal) * 3) / 4}</span>
+        <span>{maxVal}</span>
       </div>
     </div>
   )
-}
-
-// ============================================================
-// INTERPRETACIONES
-// ============================================================
-
-function getInterpretacionCIT(score: number): string {
-  if (score >= 130) return 'Capacidades excepcionales; alta eficiencia para resolver problemas complejos. El evaluado presenta un funcionamiento intelectual significativamente superior al promedio, con gran potencial para el aprendizaje y la resolución de problemas novedosos.'
-  if (score >= 120) return 'Desempeño significativamente superior a sus pares. Potencial académico elevado y buena capacidad para abordar tareas complejas con autonomía.'
-  if (score >= 110) return 'Desempeño por sobre el promedio. Buena base de recursos cognitivos que permite un aprendizaje eficiente y adaptación a demandas académicas moderadas.'
-  if (score >= 90) return 'Desarrollo acorde a la norma poblacional. Funcionamiento esperado para la edad, con recursos cognitivos adecuados para el desempeño en la vida diaria y escolar.'
-  if (score >= 80) return 'Desempeño levemente inferior al promedio. Puede requerir apoyos puntuales en áreas específicas, pero mantiene un funcionamiento general dentro de lo funcional.'
-  if (score >= 70) return 'Debilidad normativa significativa. Riesgo de dificultades en el aprendizaje que requieren intervención temprana y apoyo sistemático.'
-  return 'Limitación intelectual severa; requiere evaluación profunda de conducta adaptativa y apoyo integral.'
-}
-
-function getInterpretacionIndice(code: string, score: number): string {
-  const base = {
-    ICV: 'mide el razonamiento verbal, la formación de conceptos y el conocimiento léxico. Evalúa la capacidad para acceder y utilizar información almacenada en la memoria a largo plazo.',
-    IVE: 'evalúa la percepción de detalles visuales, la comprensión de relaciones espaciales y la integración visomotora.',
-    IRF: 'mide la capacidad de detectar reglas lógicas y relaciones conceptuales, así como el pensamiento abstracto.',
-    IMT: 'evalúa la capacidad de registrar, mantener y manipular información activa en la conciencia.',
-    IVP: 'mide la rapidez en identificación visual y toma de decisiones, así como la eficiencia en tareas de rastreo visual.'
-  }
-  const desc = base[code as keyof typeof base] || ''
-  if (score >= 110) return `Rendimiento superior o muy superior, indicando un desarrollo robusto en esta área. ${desc}`
-  if (score >= 90) return `Rendimiento dentro del promedio esperado para la edad. ${desc}`
-  return `Rendimiento por debajo del promedio, sugiriendo debilidades en este dominio cognitivo. ${desc}`
-}
-
-function getSubtestDescription(code: string, pe: number): string {
-  const desc: Record<string, Record<string, string>> = {
-    AN: { Bajo: 'Dificultades en la identificación de clases y en la síntesis de conceptos.', Suficiente: 'Nivel suficiente de desarrollo de la identificación de clases y la síntesis de conceptos.', Alto: 'Alto rendimiento en la identificación de clases y la síntesis de conceptos.' },
-    VOC: { Bajo: 'Bloqueo o desinterés en el manejo del repertorio léxico y semántico.', Suficiente: 'Manejo suficiente del repertorio léxico y semántico.', Alto: 'Alto nivel de manejo del repertorio léxico y semántico.' },
-    IN: { Bajo: 'Bloqueo o desinterés en el acceso a la información del medio cultural amplio.', Suficiente: 'Nivel suficiente de acceso a la información del medio cultural amplio.', Alto: 'Alto nivel de acceso a la información del medio cultural amplio.' },
-    COM: { Bajo: 'Poca densidad en la habilidad de análisis, reflexividad y descripción detallada.', Suficiente: 'Nivel suficiente de densidad en la habilidad de análisis, reflexividad y descripción detallada.', Alto: 'Alto nivel de desarrollo de la densidad en la habilidad de análisis, reflexividad y descripción detallada.' },
-    CC: { Bajo: 'Confusión o extravío en el mapeo visual de superficies y su división en coordenadas.', Suficiente: 'Nivel suficiente de desarrollo en el mapeo visual de superficies y su división en coordenadas.', Alto: 'Notable manejo en el mapeo visual de superficies y su división en coordenadas.' },
-    RV: { Bajo: 'Confusión o extravío en la división y rearticulación geométrica regular e irregular de elementos visuales.', Suficiente: 'Nivel suficiente de desarrollo en la división y rearticulación geométrica regular e irregular de elementos visuales.', Alto: 'Notable manejo en la división y rearticulación geométrica regular e irregular de elementos visuales.' },
-    MR: { Bajo: 'Confusión o extravío en la identificación de secuencias y series, así como en la ilación de elementos en ejes de sentido.', Suficiente: 'Manejo suficiente en la identificación de secuencias y series.', Alto: 'Alto nivel de desarrollo en la identificación de secuencias y series.' },
-    BAL: { Bajo: 'Dificultades significativas en la percepción visual de relaciones de equilibrio y equivalencia.', Suficiente: 'Rendimiento suficiente en la percepción visual de relaciones de equilibrio y equivalencia.', Alto: 'Notable manejo en la percepción visual de relaciones de equilibrio y equivalencia.' },
-    ARI: { Bajo: 'Dificultades en el cálculo mental inmediato y en el espacio disponible en la memoria de trabajo.', Suficiente: 'Desempeño suficiente en el cálculo mental inmediato y en el espacio disponible en la memoria de trabajo.', Alto: 'Notable manejo en el cálculo mental inmediato y en el espacio disponible en la memoria de trabajo.' },
-    RD: { Bajo: 'Confusión o bloqueo en el uso de la memoria de trabajo, con dificultades para aprovechar el total de su espacio disponible.', Suficiente: 'Manejo suficiente en el uso de la memoria de trabajo.', Alto: 'Alto nivel de desempeño en el uso de la memoria de trabajo.' },
-    RI: { Bajo: 'Dificultades en la memoria visual de corto plazo, con interferencia visual y baja capacidad de registro.', Suficiente: 'Capacidad suficiente de registro visual y reconocimiento.', Alto: 'Excelente capacidad de registro visual y reconocimiento, con buena resistencia a la interferencia.' },
-    SLN: { Bajo: 'Fallas en la flexibilidad cognitiva auditiva y en la manipulación mental compleja de estímulos auditivos.', Suficiente: 'Desempeño adecuado en el procesamiento secuencial y manipulación mental de estímulos auditivos.', Alto: 'Muy buena capacidad de procesamiento secuencial y flexibilidad cognitiva auditiva.' },
-    CLA: { Bajo: 'Desmedro de la velocidad de la operatoria mental, influyendo en la coordinación entre representación, percepción y movimiento.', Suficiente: 'Desempeño suficiente en la velocidad de la operatoria mental.', Alto: 'Notable manejo en la velocidad de la operatoria mental.' },
-    BS: { Bajo: 'Dificultades en la velocidad de la operatoria mental, la agudeza y organización de búsqueda y la concentración en tareas de esfuerzo visual.', Suficiente: 'Desempeño suficiente en la velocidad de la operatoria mental y agudeza de búsqueda.', Alto: 'Notable desarrollo en la velocidad de la operatoria mental y organización de búsqueda.' },
-    CAN: { Bajo: 'Dificultades de inhibición de respuesta o descontrol gráfico, afectando la atención selectiva y vigilancia visual.', Suficiente: 'Atención selectiva y vigilancia visual adecuadas.', Alto: 'Excelente atención selectiva, con rápida identificación de estímulos relevantes en ambientes estructurados y aleatorios.' }
-  }
-  const nivel = pe >= 12 ? 'Alto' : pe >= 8 ? 'Suficiente' : 'Bajo'
-  return desc[code]?.[nivel] || 'No disponible'
 }
 
 // ============================================================
@@ -187,7 +150,9 @@ function Wisc5ResultsPageInner() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<WiscData | null>(null)
+  const [plan, setPlan] = useState<any>(null)
+  const [patient, setPatient] = useState<any>(null)
   const [patientName, setPatientName] = useState('')
   const [patientId, setPatientId] = useState('')
   const [patientRut, setPatientRut] = useState('')
@@ -195,6 +160,8 @@ function Wisc5ResultsPageInner() {
   const [patientAge, setPatientAge] = useState<number | undefined>(undefined)
   const [patientSchool, setPatientSchool] = useState('')
   const [evalDate, setEvalDate] = useState('')
+
+  const { generateDocx } = useReportDocx()
 
   useEffect(() => {
     if (!sessionId) return
@@ -206,6 +173,7 @@ function Wisc5ResultsPageInner() {
 
     async function load() {
       try {
+        // 1. Obtener sesión y paciente
         const { data: sessionData, error: sessionError } = await supabase
           .from('sessions')
           .select('*, patients(id, full_name, rut, birth_date, school)')
@@ -219,6 +187,7 @@ function Wisc5ResultsPageInner() {
         }
 
         const p = sessionData.patients as any
+        setPatient(p)
         setPatientName(p?.full_name ?? '')
         setPatientId(p?.id ?? '')
         setPatientRut(p?.rut ?? '')
@@ -234,6 +203,7 @@ function Wisc5ResultsPageInner() {
           }))
         }
 
+        // 2. Obtener puntajes WISC-V
         const { data: wiscData, error: wiscError } = await supabase
           .from('wisc5_scores')
           .select('*')
@@ -246,7 +216,21 @@ function Wisc5ResultsPageInner() {
           return
         }
 
-        setData(wiscData)
+        // Tipar los datos
+        const typedData: WiscData = {
+          scaled_scores: wiscData.scaled_scores || {},
+          composite_scores: wiscData.composite_scores || {},
+          raw_scores: wiscData.raw_scores || {},
+        }
+        setData(typedData)
+
+        // 3. Obtener plan del usuario
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+          setPlan(planData)
+        }
+
         setLoading(false)
       } catch (err: any) {
         setError(err.message)
@@ -256,6 +240,25 @@ function Wisc5ResultsPageInner() {
 
     load()
   }, [sessionId])
+
+  const isPro = plan?.is_pro || false
+
+  // Handlers para descarga
+  const handleDownload = (type: 'docx' | 'odt') => {
+    if (!data) return
+    const meta = {
+      sessionId,
+      patientId,
+      testId: 'wisc5',
+      patientName,
+      content: {
+        indexes: data.composite_scores,
+        scaledScores: data.scaled_scores,
+        reportType,
+      }
+    }
+    generateDocx(contentRef, meta, type)
+  }
 
   if (loading) {
     return (
@@ -270,36 +273,35 @@ function Wisc5ResultsPageInner() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
         <div className="text-center">
           <p className="text-sm mb-3" style={{ color: '#4b5563' }}>{error || 'No se encontraron resultados'}</p>
-          <button onClick={() => router.back()} className="text-sm" style={{ color: '#4a4a4a' }}>← Volver</button>
+          <button onClick={() => router.push('/dashboard')} className="text-sm" style={{ color: '#4a4a4a' }}>← Volver al dashboard</button>
         </div>
       </div>
     )
   }
 
-  const scaledScores = data.scaled_scores || {}
-  const compositeScores = data.composite_scores || {}
-  const rawScores = data.raw_scores || {}
+  const scaledScores = data.scaled_scores
+  const compositeScores = data.composite_scores
+  const rawScores = data.raw_scores
 
-  const indexes: Record<string, any> = {}
-  for (const code of ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']) {
-    if (compositeScores[code]) indexes[code] = compositeScores[code]
+  // Datos para gráficos
+  const indexCodes = ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']
+  const indexLabels: Record<string, string> = {
+    ICV: 'Comprensión Verbal',
+    IVE: 'Visoespacial',
+    IRF: 'Razonamiento Fluido',
+    IMT: 'Memoria de Trabajo',
+    IVP: 'Velocidad de Procesamiento',
+    CIT: 'CIT'
   }
 
-  // Datos para el gráfico
-  const datosGrafico = ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT'].map(code => {
-    const idx = indexes[code]
-    return {
-      label: code,
-      score: idx?.score ?? 0,
-      classification: idx?.classification ?? ''
-    }
-  }).filter(d => d.score > 0)
+  const datosIndices = indexCodes
+    .map(code => ({
+      label: indexLabels[code] || code,
+      score: compositeScores[code]?.score || 0,
+    }))
+    .filter(d => d.score > 0)
 
-  // Subpruebas primarias y secundarias
-  const primaryCodes = ['CC', 'AN', 'MR', 'RD', 'CLA', 'VOC', 'BAL']
-  const secondaryCodes = ['RV', 'RI', 'BS', 'IN', 'SLN', 'CAN', 'COM', 'ARI']
-
-  const SUBTEST_LABELS: Record<string, string> = {
+  const subtestLabels: Record<string, string> = {
     CC: 'Construcción con Cubos',
     AN: 'Analogías',
     MR: 'Matrices de Razonamiento',
@@ -317,14 +319,13 @@ function Wisc5ResultsPageInner() {
     ARI: 'Aritmética'
   }
 
-  const INDEX_LABELS: Record<string, string> = {
-    ICV: 'Comprensión Verbal',
-    IVE: 'Visoespacial',
-    IRF: 'Razonamiento Fluido',
-    IMT: 'Memoria de Trabajo',
-    IVP: 'Velocidad de Procesamiento',
-    CIT: 'Coeficiente Intelectual Total'
-  }
+  const datosSubpruebas = Object.entries(scaledScores)
+    .filter(([_, pe]) => pe != null)
+    .map(([code, pe]) => ({
+      label: subtestLabels[code] || code,
+      score: pe,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 
   return (
     <div className="min-h-screen" style={{ background: 'white' }}>
@@ -335,6 +336,7 @@ function Wisc5ResultsPageInner() {
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>WISC-V</span>
         <span className="text-xs text-gray-400">{reportType === 'brief' ? 'Breve (7)' : 'Extendido (15)'}</span>
         <div className="flex-1" />
+        
         <button
           onClick={() => window.print()}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border"
@@ -342,17 +344,41 @@ function Wisc5ResultsPageInner() {
         >
           Imprimir
         </button>
+        
         <PdfDownloadButton
           contentRef={contentRef}
           meta={{
-            sessionId: sessionId,
+            sessionId,
             patientId,
             testId: 'wisc5',
-            patientName: patientName,
-            content: { indexes, scaledScores, reportType }
+            patientName,
+            content: {
+              indexes: compositeScores,
+              scaledScores,
+              reportType,
+            }
           }}
-          label="Guardar PDF"
+          label="PDF"
         />
+
+        {/* Botones DOCX y ODT solo para Premium */}
+        {isPro && (
+          <>
+            <button
+              onClick={() => handleDownload('docx')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-700 border-blue-200"
+            >
+              DOCX
+            </button>
+            <button
+              onClick={() => handleDownload('odt')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-green-50 text-green-700 border-green-200"
+            >
+              ODT
+            </button>
+          </>
+        )}
+
         <button
           onClick={() => router.push('/dashboard')}
           className="px-4 py-2 rounded-lg text-sm transition-colors"
@@ -365,7 +391,6 @@ function Wisc5ResultsPageInner() {
       {/* Contenido del informe */}
       <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
 
-        {/* Header con logo y datos del paciente */}
         <ReporteHeader
           patientName={patientName}
           patientRut={patientRut}
@@ -376,190 +401,148 @@ function Wisc5ResultsPageInner() {
           testName="WISC-V - Escala de Inteligencia de Wechsler para Niños"
         />
 
-        {/* Gráfico de índices */}
-        {datosGrafico.length > 0 && (
+        {/* GRÁFICO 1: SUBPRUEBAS */}
+        {datosSubpruebas.length > 0 && (
           <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
             <div className="border-b border-gray-300 pb-2 mb-3">
-              <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Índices Compuestos</h2>
+              <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Subpruebas</h2>
             </div>
-            <GraficoBarrasIndices data={datosGrafico} />
-          </div>
-        )}
-
-        {/* Tabla de Índices Compuestos */}
-        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
-          <div className="border-b border-gray-300 pb-2 mb-3">
-            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Índices Compuestos</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Índice</th>
-                  <th className="text-center py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Puntaje</th>
-                  <th className="text-center py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Percentil</th>
-                  <th className="text-center py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Clasificación</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT'].map(code => {
-                  const idx = indexes[code]
-                  if (!idx) return null
-                  return (
-                    <tr key={code} className={`border-b border-gray-100 ${code === 'CIT' ? 'bg-gray-50' : ''}`}>
-                      <td className="py-2 px-2 font-medium" style={{ color: code === 'CIT' ? '#1E3A5F' : '#1a1a1a' }}>
-                        {INDEX_LABELS[code]}
-                      </td>
-                      <td className="py-2 px-2 text-center font-mono font-bold">{idx.score}</td>
-                      <td className="py-2 px-2 text-center">{idx.percentile}</td>
-                      <td className="py-2 px-2 text-center">
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                          background: `${getColorForScore(idx.score)}20`,
-                          color: getColorForScore(idx.score)
-                        }}>
-                          {getClassification(idx.score)}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Interpretación del CIT */}
-        {indexes.CIT && (
-          <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
-            <div className="border-b border-gray-300 pb-2 mb-3">
-              <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación del CIT</h2>
-            </div>
-            <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
-              El Coeficiente Intelectual Total (CIT) obtenido es de <strong>{indexes.CIT.score}</strong>, lo que se clasifica como <strong>{getClassification(indexes.CIT.score)}</strong> y se ubica en el percentil <strong>{indexes.CIT.percentile}</strong>.
-              {' '}{getInterpretacionCIT(indexes.CIT.score)}
+            <GraficoBarras 
+              data={datosSubpruebas} 
+              minVal={0} 
+              maxVal={19}
+              showValues={true}
+            />
+            <p className="text-xs text-gray-400 mt-2 italic">
+              Gráfico de puntajes escalares (PE) por subprueba. Cada barra representa el desempeño en una subprueba específica.
             </p>
           </div>
         )}
 
-        {/* Interpretación de Índices */}
-        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
-          <div className="border-b border-gray-300 pb-2 mb-3">
-            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Índices</h2>
+        {/* GRÁFICO 2: ÍNDICES COMPUESTOS */}
+        {datosIndices.length > 0 && (
+          <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+            <div className="border-b border-gray-300 pb-2 mb-3">
+              <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Índices Compuestos</h2>
+            </div>
+            <GraficoBarras 
+              data={datosIndices} 
+              minVal={40} 
+              maxVal={160}
+              showValues={true}
+            />
+            <p className="text-xs text-gray-400 mt-2 italic">
+              Gráfico de índices compuestos del WISC-V. El CIT es el índice global.
+            </p>
           </div>
+        )}
+
+        {/* INTERPRETACIÓN EN PÁRRAFOS */}
+        <div className="mb-6">
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Resultados</h2>
+          </div>
+
+          {/* CIT */}
+          {compositeScores.CIT && (
+            <div className="mb-4">
+              <h3 className="text-md font-semibold" style={{ color: '#1a1a1a' }}>
+                Coeficiente Intelectual Total (CIT)
+              </h3>
+              <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
+                El evaluado obtuvo un CIT de <strong>{compositeScores.CIT.score}</strong>, 
+                clasificado como <strong>{getClassification(compositeScores.CIT.score)}</strong> 
+                (percentil {compositeScores.CIT.percentile}). 
+                {compositeScores.CIT.score >= 110 
+                  ? ' Este puntaje indica un desarrollo cognitivo superior al promedio, lo que sugiere buenas capacidades para el aprendizaje y la resolución de problemas complejos.' 
+                  : compositeScores.CIT.score >= 90 
+                    ? ' Este puntaje se encuentra dentro del rango esperado para la población general, indicando un funcionamiento cognitivo acorde a su edad.' 
+                    : ' Este puntaje se encuentra por debajo del promedio, lo que sugiere la necesidad de apoyos específicos en el ámbito académico y/o cognitivo.'}
+              </p>
+            </div>
+          )}
+
+          {/* Índices */}
           {['ICV', 'IVE', 'IRF', 'IMT', 'IVP'].map(code => {
-            const idx = indexes[code]
+            const idx = compositeScores[code]
             if (!idx) return null
+            const label = indexLabels[code] || code
             return (
               <div key={code} className="mb-3">
-                <div className="flex justify-between items-center mb-1">
-                  <h3 className="text-md font-semibold" style={{ color: '#1a1a1a' }}>{INDEX_LABELS[code]}</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                    background: `${getColorForScore(idx.score)}20`,
-                    color: getColorForScore(idx.score)
-                  }}>
-                    {idx.score} · {getClassification(idx.score)}
-                  </span>
-                </div>
+                <h3 className="text-md font-semibold" style={{ color: '#1a1a1a' }}>
+                  {label} ({idx.score})
+                </h3>
                 <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
-                  {getInterpretacionIndice(code, idx.score)}
+                  {idx.score >= 110 
+                    ? `El evaluado muestra un desempeño superior en el índice ${label}, lo que evidencia fortalezas en las habilidades cognitivas asociadas a este dominio.`
+                    : idx.score >= 90 
+                      ? `El desempeño en el índice ${label} se encuentra dentro de lo esperado para su edad, con un desarrollo adecuado de las habilidades cognitivas asociadas.`
+                      : `Se observan dificultades en el índice ${label}, lo que sugiere la necesidad de intervención o apoyo en las habilidades cognitivas relacionadas.`}
+                  {' '}{(() => {
+                    const desc: Record<string, string> = {
+                      ICV: 'Este índice evalúa la capacidad de razonamiento verbal, la formación de conceptos y el conocimiento léxico.',
+                      IVE: 'Este índice evalúa la percepción de detalles visuales, la comprensión de relaciones espaciales y la integración visomotora.',
+                      IRF: 'Este índice mide la capacidad de detectar reglas lógicas y relaciones conceptuales, así como el pensamiento abstracto.',
+                      IMT: 'Este índice evalúa la capacidad de registrar, mantener y manipular información activa en la conciencia.',
+                      IVP: 'Este índice mide la rapidez en identificación visual y toma de decisiones, así como la eficiencia en tareas de rastreo visual.'
+                    }
+                    return desc[code] || ''
+                  })()}
                 </p>
               </div>
             )
           })}
-        </div>
 
-        {/* Tabla de Subpruebas - salto de página antes */}
-        <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
-          <div className="border-b border-gray-300 pb-2 mb-3">
-            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Puntajes por Subprueba</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Subprueba</th>
-                  <th className="text-center py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Bruto</th>
-                  <th className="text-center py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Escala (PE)</th>
-                  <th className="text-center py-2 px-2 font-semibold" style={{ color: '#1a1a1a' }}>Clasificación</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...primaryCodes, ...secondaryCodes].map(code => {
-                  const pe = scaledScores[code]
-                  const raw = rawScores[code]
-                  if (pe == null && raw == null) return null
-                  return (
-                    <tr key={code} className="border-b border-gray-100">
-                      <td className="py-2 px-2">{SUBTEST_LABELS[code] || code}</td>
-                      <td className="py-2 px-2 text-center">{raw != null ? raw : '-'}</td>
-                      <td className="py-2 px-2 text-center font-mono font-bold">{pe != null ? pe : '-'}</td>
-                      <td className="py-2 px-2 text-center">
-                        {pe != null ? (
-                          <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                            background: `${getColorForScore(pe, true)}20`,
-                            color: getColorForScore(pe, true)
-                          }}>
-                            {getScaledClassification(pe)}
-                          </span>
-                        ) : '-'}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Interpretación de Subpruebas */}
-        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
-          <div className="border-b border-gray-300 pb-2 mb-3">
-            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Subpruebas</h2>
-          </div>
-          <div className="space-y-3">
-            {[...primaryCodes, ...secondaryCodes].map(code => {
-              const pe = scaledScores[code]
-              if (pe == null) return null
-              return (
-                <div key={code} className="pb-2" style={{ pageBreakInside: 'avoid' }}>
-                  <div className="flex justify-between items-center mb-1">
-                    <h3 className="text-sm font-semibold" style={{ color: '#1a1a1a' }}>{SUBTEST_LABELS[code] || code}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                      background: `${getColorForScore(pe, true)}20`,
-                      color: getColorForScore(pe, true)
-                    }}>
-                      PE {pe}
-                    </span>
-                  </div>
-                  <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
-                    {getSubtestDescription(code, pe)}
+          {/* Descripción cualitativa de subpruebas */}
+          <div className="mt-4">
+            <h3 className="text-md font-semibold" style={{ color: '#1a1a1a' }}>
+              Análisis Cualitativo por Subprueba
+            </h3>
+            {Object.entries(scaledScores)
+              .filter(([_, pe]) => pe != null)
+              .map(([code, pe]) => {
+                const label = subtestLabels[code] || code
+                const descripcion = pe >= 12 
+                  ? 'destaca positivamente, mostrando un desempeño sobresaliente.'
+                  : pe >= 8 
+                    ? 'se encuentra dentro del rango esperado, con un desarrollo adecuado.'
+                    : 'muestra dificultades significativas que podrían requerir atención específica.'
+                return (
+                  <p key={code} className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
+                    <strong>{label}:</strong> PE {pe} – {descripcion}
                   </p>
-                </div>
-              )
-            })}
+                )
+              })}
           </div>
         </div>
 
-        {/* Conclusión y Recomendaciones */}
+        {/* RECOMENDACIONES */}
         <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
-            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Recomendaciones</h2>
           </div>
-          <p className="text-sm leading-relaxed text-justify mb-3" style={{ color: '#4b5563' }}>
-            Basado en los resultados obtenidos en el WISC-V, {patientName || 'el evaluado'} presenta un perfil cognitivo que se caracteriza por:
+          <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
+            Con base en los resultados obtenidos, se sugieren las siguientes orientaciones:
           </p>
-          <ul className="text-sm leading-relaxed list-disc pl-5 space-y-1" style={{ color: '#4b5563' }}>
-            <li><strong>Áreas de Fortaleza:</strong> Se sugiere potenciar mediante actividades desafiantes que mantengan el interés y promuevan el desarrollo de habilidades superiores.</li>
-            <li><strong>Áreas de Debilidad:</strong> Se recomienda implementar apoyos específicos, como entrenamiento en memoria de trabajo, estrategias de organización visual o reducción de la velocidad de procesamiento en evaluaciones.</li>
-            <li><strong>Contexto Educativo:</strong> Adaptar el entorno escolar para reducir la carga cognitiva, proporcionar instrucciones claras y segmentadas, y utilizar materiales visuales que faciliten la comprensión.</li>
-            <li><strong>Seguimiento:</strong> Se recomienda una reevaluación en 12–18 meses para monitorear la evolución del perfil cognitivo y ajustar las intervenciones según sea necesario.</li>
+          <ul className="text-sm leading-relaxed list-disc pl-5 space-y-2 mt-2" style={{ color: '#4b5563' }}>
+            <li>
+              <strong>Áreas de Fortaleza:</strong> Se recomienda potenciar las habilidades destacadas mediante actividades desafiantes que mantengan el interés y promuevan el desarrollo de habilidades superiores. Por ejemplo, si el evaluado destaca en razonamiento verbal, se sugiere fomentar la lectura crítica y la discusión de textos complejos.
+            </li>
+            <li>
+              <strong>Áreas de Debilidad:</strong> Implementar apoyos específicos según los índices más bajos. Si hay debilidad en memoria de trabajo, se recomienda entrenamiento con ejercicios de retención y manipulación de información, así como el uso de ayudas visuales y organización de tareas.
+            </li>
+            <li>
+              <strong>Contexto Educativo:</strong> Adaptar el entorno escolar reduciendo la carga cognitiva en tareas que demanden memoria de trabajo o velocidad de procesamiento. Proporcionar instrucciones claras y segmentadas, y utilizar materiales visuales que faciliten la comprensión.
+            </li>
+            <li>
+              <strong>Seguimiento:</strong> Se sugiere una reevaluación en 12 a 18 meses para monitorear la evolución del perfil cognitivo y ajustar las intervenciones según sea necesario. Además, se recomienda una evaluación complementaria en áreas específicas si se identifican necesidades particulares.
+            </li>
           </ul>
           <p className="text-sm leading-relaxed text-justify mt-3" style={{ color: '#4b5563' }}>
-            Los resultados deben interpretarse en el contexto de la historia personal, educativa y familiar del evaluado.
+            Los resultados deben interpretarse en el contexto de la historia personal, educativa y familiar del evaluado. Se recomienda integrar esta información con otras fuentes de evaluación (observación, entrevistas, etc.) para una comprensión integral.
           </p>
         </div>
 
-        {/* Footer con firma e isotipo */}
         <ReporteFooter showFirma={true} />
       </div>
     </div>
