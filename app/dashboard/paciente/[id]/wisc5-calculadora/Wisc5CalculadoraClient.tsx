@@ -179,7 +179,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   }
 
   // ============================================================
-  // GENERAR INFORME (función corregida dentro del componente)
+  // GENERAR INFORME (CORREGIDO)
   // ============================================================
   const generateReport = async (type: 'brief' | 'extended') => {
     if (!patient || !ageInfo) {
@@ -213,12 +213,13 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      // 1. Buscar sesión existente o crear una nueva
+      // 1. Buscar sesión existente (SOLO del psicólogo actual)
       let { data: session, error: sessionError } = await supabase
         .from('sessions')
         .select('id')
         .eq('patient_id', patientId)
         .eq('test_id', 'wisc5')
+        .eq('psychologist_id', user.id)   // ← FILTRO CLAVE AGREGADO
         .in('status', ['in_progress', 'completed_brief', 'completed_extended'])
         .order('created_at', { ascending: false })
         .limit(1)
