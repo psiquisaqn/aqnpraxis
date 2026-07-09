@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { logout } from '@/app/auth/actions'
 
 interface Props {
@@ -85,14 +85,14 @@ const NAV = [
 
 export function DashboardShell({ profile, children }: Props) {
   const pathname = usePathname()
-  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-      if (window.innerWidth >= 768) {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (!mobile) {
         setSidebarOpen(false)
       }
     }
@@ -102,8 +102,10 @@ export function DashboardShell({ profile, children }: Props) {
   }, [])
 
   const handleNavigation = (href: string) => {
+    console.log('🔍 Navegando a:', href)  // ← Log para depuración
     if (isMobile) setSidebarOpen(false)
-    router.push(href)
+    // Usamos window.location para forzar la navegación y evitar problemas con el router de Next
+    window.location.href = href
   }
 
   const initials = profile?.full_name
@@ -134,6 +136,7 @@ export function DashboardShell({ profile, children }: Props) {
           ${isMobile && !sidebarOpen ? '-translate-x-full' : 'translate-x-0'}
           ${isMobile ? 'w-64 shadow-xl' : 'w-64'}
         `}
+        style={{ pointerEvents: 'auto' }} // ← Asegurar que el sidebar reciba eventos
       >
         {/* Header con logo */}
         <div className="flex items-center justify-between px-4 border-b border-gray-200 py-3">
@@ -156,7 +159,7 @@ export function DashboardShell({ profile, children }: Props) {
           )}
         </div>
 
-        {/* Navegación - ahora usando botones con router.push */}
+        {/* Navegación */}
         <nav className="flex-1 py-3 px-2 space-y-0.5">
           {NAV.map((item) => {
             const active = pathname === item.href
@@ -168,6 +171,8 @@ export function DashboardShell({ profile, children }: Props) {
                 style={{
                   color: active ? '#3B82F6' : '#6B7280',
                   background: active ? '#EFF6FF' : 'transparent',
+                  pointerEvents: 'auto', // ← Forzar eventos
+                  cursor: 'pointer',
                 }}
               >
                 <span className="shrink-0">{item.icon}</span>
