@@ -26,7 +26,12 @@ export default function ProfilePage() {
       console.log('📦 Datos de la RPC:', data)
       console.log('❌ Error de la RPC:', error)
 
-      if (data) setPlan(data)
+      // 🔧 FIX: La RPC devuelve un array, tomamos el primer elemento
+      if (data && data.length > 0) {
+        setPlan(data[0])
+      } else {
+        setPlan(null)
+      }
       setLoading(false)
     }
     load()
