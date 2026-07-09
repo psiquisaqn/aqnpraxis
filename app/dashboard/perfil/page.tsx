@@ -15,8 +15,17 @@ export default function ProfilePage() {
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.log('❌ No hay usuario autenticado')
+        setLoading(false)
+        return
+      }
+      console.log('🔑 Usuario ID:', user.id)
+
       const { data, error } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+      console.log('📦 Datos de la RPC:', data)
+      console.log('❌ Error de la RPC:', error)
+
       if (data) setPlan(data)
       setLoading(false)
     }
