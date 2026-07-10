@@ -65,7 +65,6 @@ export interface RealtimePrediction {
 
 // ─── Configuración de índices ────────────────────────────────
 
-/** Qué subpruebas componen cada índice */
 export const INDEX_COMPOSITION: Record<IndexCode, SubtestCode[]> = {
   ICV: ['AN', 'VOC'],
   IVE: ['CC', 'RV'],
@@ -75,7 +74,6 @@ export const INDEX_COMPOSITION: Record<IndexCode, SubtestCode[]> = {
   CIT: ['CC', 'AN', 'MR', 'RD', 'CLA', 'VOC', 'BAL'],
 }
 
-/** Subpruebas que pueden sustituir para obtener el CIT */
 export const CIT_SUBSTITUTES: SubtestCode[] = ['RV', 'RI', 'BS', 'IN', 'SLN', 'CAN', 'COM', 'ARI']
 
 /**
@@ -96,10 +94,6 @@ export function getClassification(score: number): string {
 
 // ─── Cálculo de grupo etario ────────────────────────────────
 
-/**
- * Determina el grupo etario para la Tabla A.1 a partir de la
- * fecha de nacimiento y la fecha de evaluación.
- */
 export function getAgeGroup(birthDate: Date, evalDate: Date): {
   years: number; months: number; days: number; group: string
 } {
@@ -115,9 +109,7 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
   if (months < 0) { years--; months += 12 }
 
   const totalMonths = years * 12 + months
-
-  // Grupos de 6 meses (6:0–6:5, 6:6–6:11, 7:0–7:5, ..., 16:6–16:11)
-  const groupIndex = Math.floor((totalMonths - 72) / 6) // 72 meses = 6 años
+  const groupIndex = Math.floor((totalMonths - 72) / 6)
   const groupYear  = 6 + Math.floor(groupIndex / 2)
   const groupHalf  = groupIndex % 2 === 0 ? '0' : '6'
   const groupEnd   = groupIndex % 2 === 0 ? '5' : '11'
@@ -133,11 +125,8 @@ export class Wisc5Engine {
   private normsSubtest: any[] = []
   private normsComposite: any[] = []
   private normsLoaded = false
+  private ageGroupsSet: Set<string> = new Set()
 
-  /**
-   * Carga todas las normas en memoria (una sola vez).
-   * Debe llamarse antes de cualquier cálculo.
-   */
   async loadNorms(): Promise<void> {
     if (this.normsLoaded) {
       console.log('✅ [Engine] Normas ya cargadas, omitiendo recarga.')
@@ -162,38 +151,48 @@ export class Wisc5Engine {
     this.normsSubtest = subtestRes.data || []
     this.normsComposite = compositeRes.data || []
     this.normsLoaded = true
+
+    // Guardar grupos de edad
+    this.normsSubtest.forEach((n: any) => {
+      if (n.age_group) this.ageGroupsSet.add(n.age_group)
+    })
+
     console.log(`✅ [Engine] Normas cargadas: ${this.normsSubtest.length} subtest, ${this.normsComposite.length} composite`)
+    console.log(`📋 [Engine] Grupos de edad disponibles (primeros 10):`, Array.from(this.ageGroupsSet).slice(0, 10))
   }
 
-  /**
-   * Paso 2 de la corrección: PD → PE (síncrono, usa cache)
-   */
+  private normalizeAgeGroup(ageGroup: string): string {
+    return ageGroup.trim().replace(/\s+/g, ' ')
+  }
+
   rawToScaled(ageGroup: string, subtest: SubtestCode, rawScore: number): number | null {
     if (!this.normsLoaded) {
       console.warn('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() primero.')
       return null
     }
 
-    const entry = this.normsSubtest.find(
+    const normalizedGroup = this.normalizeAgeGroup(ageGroup)
+
+    // Búsqueda exacta
+    let entry = this.normsSubtest.find(
       (n: any) =>
-        n.age_group === ageGroup &&
+        this.normalizeAgeGroup(n.age_group) === normalizedGroup &&
         n.subtest_code === subtest &&
         rawScore >= n.raw_score_min &&
         rawScore <= n.raw_score_max
     )
 
-    if (entry) {
-      // console.log(`✅ [Engine] ${subtest} raw=${rawScore} → PE=${entry.scaled_score}`)
-    } else {
+    // Si no se encuentra, mostrar grupos disponibles para depuración
+    if (!entry) {
+      const availableGroups = Array.from(this.ageGroupsSet).filter(g => g.includes('13')).join(', ')
       console.warn(`⚠️ [Engine] No se encontró norma para ${subtest} (raw=${rawScore}, group=${ageGroup})`)
+      console.warn(`   Grupos disponibles que contienen '13': ${availableGroups || 'ninguno'}`)
+      return null
     }
 
-    return entry?.scaled_score ?? null
+    return entry.scaled_score
   }
 
-  /**
-   * Paso 4: Suma PE → puntaje compuesto con percentil e IC (síncrono)
-   */
   sumToComposite(indexCode: IndexCode, sumScaled: number): Omit<CompositeResult, 'sumScaled'> | null {
     if (!this.normsLoaded) {
       console.warn('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() primero.')
@@ -221,9 +220,6 @@ export class Wisc5Engine {
     }
   }
 
-  /**
-   * Calcula todos los puntajes escala a partir de los puntajes brutos (síncrono)
-   */
   calculateScaledScores(ageGroup: string, rawScores: RawScores): ScaledScores {
     const results: ScaledScores = {}
     for (const code of Object.keys(rawScores) as SubtestCode[]) {
@@ -236,9 +232,6 @@ export class Wisc5Engine {
     return results
   }
 
-  /**
-   * Calcula un índice compuesto (síncrono)
-   */
   calculateIndex(
     indexCode: IndexCode,
     scaledScores: ScaledScores,
@@ -246,7 +239,6 @@ export class Wisc5Engine {
   ): CompositeResult | null {
     const subtests = [...INDEX_COMPOSITION[indexCode]]
 
-    // Si hay sustitución para CIT, reemplazar la subprueba faltante
     if (indexCode === 'CIT' && substitution) {
       const missing = subtests.find(s => scaledScores[s] === undefined)
       if (missing) {
@@ -265,9 +257,6 @@ export class Wisc5Engine {
     return { ...composite, sumScaled }
   }
 
-  /**
-   * Motor completo: recibe puntajes brutos, devuelve resultado total (síncrono)
-   */
   score(
     birthDate: Date,
     evalDate: Date,
@@ -278,13 +267,12 @@ export class Wisc5Engine {
       throw new Error('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() antes de score().')
     }
 
-    // Paso 1: grupo etario
     const { group } = getAgeGroup(birthDate, evalDate)
+    console.log(`📊 [Engine] Calculando para grupo: ${group}`)
 
-    // Paso 2: PD → PE
     const scaledScores = this.calculateScaledScores(group, rawScores)
+    console.log(`📊 [Engine] Escalares calculados:`, scaledScores)
 
-    // Paso 3 y 4: calcular cada índice
     const ICV = this.calculateIndex('ICV', scaledScores)
     const IVE = this.calculateIndex('IVE', scaledScores)
     const IRF = this.calculateIndex('IRF', scaledScores)
@@ -292,10 +280,9 @@ export class Wisc5Engine {
     const IVP = this.calculateIndex('IVP', scaledScores)
     const CIT = this.calculateIndex('CIT', scaledScores, options.substitution)
 
-    // Pronóstico en tiempo real
     const realtimePrediction = this.computeRealtimePrediction(scaledScores, CIT)
 
-    return {
+    const result = {
       ageGroup: group,
       scaledScores,
       ICV: ICV ?? undefined,
@@ -307,11 +294,11 @@ export class Wisc5Engine {
       substitutionUsed: options.substitution,
       realtimePrediction,
     }
+
+    console.log(`📊 [Engine] Resultado final:`, result)
+    return result
   }
 
-  /**
-   * Pronóstico en tiempo real (síncrono)
-   */
   computeRealtimePrediction(
     scaledScores: ScaledScores,
     completedCIT: CompositeResult | null | undefined
@@ -367,15 +354,10 @@ export class Wisc5Engine {
     return Math.max(40, Math.min(160, estimated))
   }
 
-  /**
-   * Prorrateo del CIT cuando solo hay 6 de 7 subpruebas (Tabla A.8).
-   */
   prorrateCITSum(sumOf6: number): number {
     return Math.round(sumOf6 * (7 / 6))
   }
 }
-
-// ─── Exportar instancia lista para usar ──────────────────────
 
 export function createWisc5Engine(): Wisc5Engine {
   return new Wisc5Engine()

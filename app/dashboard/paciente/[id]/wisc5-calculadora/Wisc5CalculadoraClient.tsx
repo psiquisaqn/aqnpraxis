@@ -9,7 +9,7 @@ import { Wisc5Engine, type RawScores, type ScaledScores, type SubtestCode, getCl
 // CONFIGURACIÓN
 // ============================================================
 
-const SUBTESTS_CONFIG: { code: SubtestCode; name: string; primary: boolean }[] = [
+const SUBTESTS_CONFIG = [
   { code: 'CC', name: 'Construcción con Cubos', primary: true },
   { code: 'AN', name: 'Analogías', primary: true },
   { code: 'MR', name: 'Matrices de Razonamiento', primary: true },
@@ -31,7 +31,6 @@ const SUBTESTS_CONFIG: { code: SubtestCode; name: string; primary: boolean }[] =
 // FUNCIONES AUXILIARES
 // ============================================================
 
-// Re-exportamos la clasificación del engine para mantener consistencia
 const getClassification = engineGetClassification
 
 function getAgeGroup(totalMonths: number): string {
@@ -195,8 +194,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       return
     }
 
-    // 🔹 CORRECCIÓN: Tipar requiredCodes como SubtestCode[]
-    const requiredCodes: SubtestCode[] = type === 'brief'
+    const requiredCodes = type === 'brief'
       ? SUBTESTS_CONFIG.filter(s => s.primary).map(s => s.code)
       : SUBTESTS_CONFIG.map(s => s.code)
 
@@ -229,10 +227,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       for (const code of requiredCodes) {
         const raw = rawScores[code]
         if (raw !== undefined && raw !== null) {
-          // 🔹 CORRECCIÓN: code ya es SubtestCode, no necesita casteo
-          const s = engine.rawToScaled(ageInfo.group, code, raw)
+          // Forzar el tipo a SubtestCode
+          const s = engine.rawToScaled(ageInfo.group, code as SubtestCode, raw)
           if (s !== null) {
-            scaled[code] = s
+            scaled[code as SubtestCode] = s
           } else {
             console.warn(`⚠️ [WISC] No se encontró norma para ${code} (raw=${raw}, group=${ageInfo.group})`)
           }
@@ -476,9 +474,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
                   onChange={(e) => handleRawChange(code, e.target.value)}
                   className="w-16 px-2 py-1 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                {calculatedScores?.scaled[code] !== undefined && (
+                {calculatedScores?.scaled[code as SubtestCode] !== undefined && (
                   <span className="text-sm font-medium text-blue-600 w-8 text-center">
-                    {calculatedScores.scaled[code]}
+                    {calculatedScores.scaled[code as SubtestCode]}
                   </span>
                 )}
               </div>
@@ -500,9 +498,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
                   onChange={(e) => handleRawChange(code, e.target.value)}
                   className="w-16 px-2 py-1 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                {calculatedScores?.scaled[code] !== undefined && (
+                {calculatedScores?.scaled[code as SubtestCode] !== undefined && (
                   <span className="text-sm font-medium text-blue-600 w-8 text-center">
-                    {calculatedScores.scaled[code]}
+                    {calculatedScores.scaled[code as SubtestCode]}
                   </span>
                 )}
               </div>
@@ -541,61 +539,61 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       )}
 
       {hasResults ? (
-        <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Índices Compuestos</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3">Índice</th>
-                  <th className="text-center py-2 px-3">Puntaje</th>
-                  <th className="text-center py-2 px-3">Percentil</th>
-                  <th className="text-center py-2 px-3">Clasificación</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT'].map((code) => {
-                  const idx = composites[code]
-                  if (!idx) return null
-                  return (
-                    <tr key={code} className={`border-b border-gray-100 ${code === 'CIT' ? 'bg-blue-50' : ''}`}>
-                      <td className="py-2 px-3 font-medium">{code}</td>
-                      <td className="py-2 px-3 text-center font-mono font-bold">{idx.score}</td>
-                      <td className="py-2 px-3 text-center">{idx.percentile}</td>
-                      <td className="py-2 px-3 text-center">
-                        <span className="text-xs px-2 py-0.5 rounded-full">
-                          {getClassification(idx.score)}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        <>
+          <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">Índices Compuestos</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-3">Índice</th>
+                    <th className="text-center py-2 px-3">Puntaje</th>
+                    <th className="text-center py-2 px-3">Percentil</th>
+                    <th className="text-center py-2 px-3">Clasificación</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT'].map((code) => {
+                    const idx = composites[code]
+                    if (!idx) return null
+                    return (
+                      <tr key={code} className={`border-b border-gray-100 ${code === 'CIT' ? 'bg-blue-50' : ''}`}>
+                        <td className="py-2 px-3 font-medium">{code}</td>
+                        <td className="py-2 px-3 text-center font-mono font-bold">{idx.score}</td>
+                        <td className="py-2 px-3 text-center">{idx.percentile}</td>
+                        <td className="py-2 px-3 text-center">
+                          <span className="text-xs px-2 py-0.5 rounded-full">
+                            {getClassification(idx.score)}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              onClick={() => generateReport('brief')}
+              disabled={generating}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {generating ? 'Generando...' : 'Generar informe breve (7 subpruebas)'}
+            </button>
+            <button
+              onClick={() => generateReport('extended')}
+              disabled={generating}
+              className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              {generating ? 'Generando...' : 'Generar informe extendido (15 subpruebas)'}
+            </button>
+          </div>
+        </>
       ) : (
         <div className="mt-6 bg-gray-50 rounded-xl border border-gray-200 p-5 text-center text-gray-400 text-sm">
           {calculating ? 'Calculando...' : 'Ingresa los puntajes y presiona "Calcular" para ver los resultados.'}
-        </div>
-      )}
-
-      {hasResults && (
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            onClick={() => generateReport('brief')}
-            disabled={generating}
-            className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {generating ? 'Generando...' : 'Generar informe breve (7 subpruebas)'}
-          </button>
-          <button
-            onClick={() => generateReport('extended')}
-            disabled={generating}
-            className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-          >
-            {generating ? 'Generando...' : 'Generar informe extendido (15 subpruebas)'}
-          </button>
         </div>
       )}
 
