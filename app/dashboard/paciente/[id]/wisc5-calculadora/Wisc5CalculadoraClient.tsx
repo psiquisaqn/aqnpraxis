@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { Wisc5Engine, type RawScores, type ScaledScores } from '@/lib/wisc5/engine'
@@ -79,7 +79,13 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   const [generating, setGenerating] = useState(false)
   const [engineReady, setEngineReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const engine = new Wisc5Engine()
+
+  // 🔹 Usar useRef para que el engine persista entre renders
+  const engineRef = useRef<Wisc5Engine | null>(null)
+  if (!engineRef.current) {
+    engineRef.current = new Wisc5Engine()
+  }
+  const engine = engineRef.current
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -184,6 +190,8 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         console.error('❌ [WISC] Error en loadData:', err)
         setError('Error al cargar datos.')
         setLoading(false)
+        // Asegurar que engineReady sea false si algo falla
+        setEngineReady(false)
       }
     }
 
@@ -194,27 +202,31 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   // CÁLCULO EN TIEMPO REAL (optimizado con debounce y síncrono)
   // ============================================================
   useEffect(() => {
-    if (!engineReady || !patient?.birth_date || !ageInfo) return
+    // 🔹 Verificar que el engine esté listo ANTES de hacer cualquier cálculo
+    if (!engineReady || !patient?.birth_date || !ageInfo) {
+      console.log('⏳ [WISC] Esperando datos o engine... engineReady=', engineReady)
+      return
+    }
 
     const timer = setTimeout(() => {
-      const birth = new Date(patient.birth_date)
-      const now = new Date()
+      try {
+        const birth = new Date(patient.birth_date)
+        const now = new Date()
 
-      // Calcular escalares (síncrono)
-      const newScaled: ScaledScores = {}
-      for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
-        const raw = rawScores[code]
-        if (raw !== undefined && raw !== null) {
-          const scaled = engine.rawToScaled(ageInfo.group, code, raw)
-          if (scaled !== null) {
-            newScaled[code] = scaled
+        // Calcular escalares (síncrono)
+        const newScaled: ScaledScores = {}
+        for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
+          const raw = rawScores[code]
+          if (raw !== undefined && raw !== null) {
+            const scaled = engine.rawToScaled(ageInfo.group, code, raw)
+            if (scaled !== null) {
+              newScaled[code] = scaled
+            }
           }
         }
-      }
-      setScaledScores(newScaled)
+        setScaledScores(newScaled)
 
-      // Calcular índices compuestos (síncrono)
-      try {
+        // Calcular índices compuestos (síncrono)
         const result = engine.score(birth, now, rawScores, {})
         if (result) {
           setCompositeScores({
@@ -229,10 +241,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           setCompositeScores(null)
         }
       } catch (err) {
-        console.error('Error calculando scores:', err)
+        console.error('❌ [WISC] Error calculando scores:', err)
         setCompositeScores(null)
       }
-    }, 150) // ← 150ms de debounce
+    }, 150) // 150ms de debounce
 
     return () => clearTimeout(timer)
   }, [rawScores, ageInfo, patient, engine, engineReady])
