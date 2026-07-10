@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Wisc5Engine, type RawScores, type ScaledScores } from '@/lib/wisc5/engine'
+import { Wisc5Engine, type RawScores, type ScaledScores, type SubtestCode, getClassification as engineGetClassification } from '@/lib/wisc5/engine'
 
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
 
-const SUBTESTS_CONFIG = [
+const SUBTESTS_CONFIG: { code: SubtestCode; name: string; primary: boolean }[] = [
   { code: 'CC', name: 'Construcción con Cubos', primary: true },
   { code: 'AN', name: 'Analogías', primary: true },
   { code: 'MR', name: 'Matrices de Razonamiento', primary: true },
@@ -31,15 +31,8 @@ const SUBTESTS_CONFIG = [
 // FUNCIONES AUXILIARES
 // ============================================================
 
-function getClassification(score: number): string {
-  if (score >= 130) return 'Muy superior'
-  if (score >= 120) return 'Superior'
-  if (score >= 110) return 'Normal alto'
-  if (score >= 90) return 'Normal promedio'
-  if (score >= 80) return 'Normal bajo'
-  if (score >= 70) return 'Limítrofe'
-  return 'Extremadamente bajo'
-}
+// Re-exportamos la clasificación del engine para mantener consistencia
+const getClassification = engineGetClassification
 
 function getAgeGroup(totalMonths: number): string {
   const groups = [
@@ -72,17 +65,22 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   const [patient, setPatient] = useState<any>(null)
   const [ageInfo, setAgeInfo] = useState<{ years: number; months: number; group: string } | null>(null)
   const [rawScores, setRawScores] = useState<RawScores>({})
-  const [scaledScores, setScaledScores] = useState<ScaledScores>({})
-  const [compositeScores, setCompositeScores] = useState<any>(null)
+  const [calculatedScores, setCalculatedScores] = useState<{
+    scaled: ScaledScores
+    composites: any
+  } | null>(null)
   const [planStatus, setPlanStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [engineReady, setEngineReady] = useState(false)
+  const [calculating, setCalculating] = useState<'brief' | 'extended' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   const engineRef = useRef<Wisc5Engine | null>(null)
   if (!engineRef.current) {
     engineRef.current = new Wisc5Engine()
+    console.log('🔄 [WISC] Nueva instancia del engine creada.')
   }
   const engine = engineRef.current
 
@@ -99,12 +97,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       try {
         console.log('🔍 [WISC] Iniciando carga de datos...')
 
-        // 0. Cargar normas en memoria
         await engine.loadNorms()
         setEngineReady(true)
-        console.log('✅ [WISC] Normas cargadas en memoria')
+        console.log('✅ [WISC] Normas cargadas en memoria.')
 
-        // 1. Paciente
         const { data: patientData, error: patientError } = await supabase
           .from('patients')
           .select('*')
@@ -121,7 +117,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         setPatient(patientData)
         console.log('✅ [WISC] Paciente cargado:', patientData.full_name)
 
-        // 2. Edad
         const birthDate = patientData.birth_date
         if (birthDate) {
           const birth = new Date(birthDate)
@@ -135,29 +130,25 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           console.log('✅ [WISC] Edad calculada:', { years, months, group })
         }
 
-        // 3. Plan
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('🔑 [WISC] Usuario autenticado:', user?.id)
-
         if (user) {
           const { data: rpcPlanRaw, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
           console.log('📦 [WISC] RPC get_plan_status (raw):', rpcPlanRaw)
-          console.log('❌ [WISC] Error de RPC:', rpcError)
+          if (rpcError) console.error('❌ [WISC] Error de RPC:', rpcError)
 
           const rpcPlan = Array.isArray(rpcPlanRaw) ? rpcPlanRaw[0] : rpcPlanRaw
           if (rpcPlan) {
             setPlanStatus(rpcPlan)
-            console.log('✅ [WISC] Plan establecido desde RPC (objeto):', rpcPlan)
+            console.log('✅ [WISC] Plan establecido desde RPC:', rpcPlan)
           } else {
-            // Fallback con perfil
-            const { data: profile, error: profileError } = await supabase
+            console.warn('⚠️ [WISC] RPC devolvió null, usando fallback desde profiles.')
+            const { data: profile } = await supabase
               .from('profiles')
               .select('plan, role')
               .eq('id', user.id)
               .single()
             const basePlan = profile?.plan || 'free'
-            const baseRole = profile?.role || null
-            const isPro = basePlan === 'premium' || basePlan === 'pro' || baseRole === 'admin'
+            const isPro = basePlan === 'premium' || basePlan === 'pro' || profile?.role === 'admin'
             const { count: reportsCount } = await supabase
               .from('informes')
               .select('*', { count: 'exact', head: true })
@@ -168,17 +159,17 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
               reports_used: reportsCount || 0,
               reports_limit: isPro ? 999999 : 3,
               plan_expires_at: null,
-              role: baseRole,
+              role: profile?.role || null,
             }
             setPlanStatus(fallbackPlan)
             console.log('✅ [WISC] Plan establecido desde fallback:', fallbackPlan)
           }
         } else {
-          console.warn('⚠️ [WISC] No hay usuario autenticado')
+          console.warn('⚠️ [WISC] No hay usuario autenticado.')
         }
 
         setLoading(false)
-        console.log('✅ [WISC] Carga de datos completada')
+        console.log('✅ [WISC] Carga de datos completada.')
       } catch (err) {
         console.error('❌ [WISC] Error en loadData:', err)
         setError('Error al cargar datos.')
@@ -191,39 +182,67 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   }, [patientId, supabase])
 
   // ============================================================
-  // CÁLCULO EN TIEMPO REAL (SIN DEBOUNCE PARA PRUEBA)
+  // CALCULAR (CUANDO EL USUARIO PRESIONA EL BOTÓN)
   // ============================================================
-  useEffect(() => {
-    console.log('🔄 [WISC] useEffect de cálculo disparado. engineReady:', engineReady, 'patient:', !!patient, 'ageInfo:', !!ageInfo)
+  const handleCalculate = (type: 'brief' | 'extended') => {
+    console.log(`🔍 [WISC] handleCalculate llamado con type=${type}`)
+    setValidationError(null)
+    setCalculatedScores(null)
 
     if (!engineReady || !patient?.birth_date || !ageInfo) {
-      console.log('⏳ [WISC] Condiciones no cumplidas, retornando.')
+      console.warn('⚠️ [WISC] engineReady:', engineReady, 'patient:', !!patient, 'ageInfo:', !!ageInfo)
+      setValidationError('Esperando datos del paciente. Por favor recarga la página.')
       return
     }
 
-    console.log('🔍 [WISC] Ejecutando cálculo con rawScores:', rawScores)
+    // 🔹 CORRECCIÓN: Tipar requiredCodes como SubtestCode[]
+    const requiredCodes: SubtestCode[] = type === 'brief'
+      ? SUBTESTS_CONFIG.filter(s => s.primary).map(s => s.code)
+      : SUBTESTS_CONFIG.map(s => s.code)
+
+    console.log(`📋 [WISC] Subpruebas requeridas (${type}):`, requiredCodes)
+
+    const missing = requiredCodes.filter(code => rawScores[code] === undefined || rawScores[code] === null)
+    if (missing.length > 0) {
+      const names = missing.map(code => SUBTESTS_CONFIG.find(s => s.code === code)?.name || code)
+      const msg = `Faltan subpruebas: ${names.join(', ')}. Completa todos los puntajes para calcular.`
+      console.warn('⚠️ [WISC]', msg)
+      setValidationError(msg)
+      return
+    }
+
+    const invalid = requiredCodes.filter(code => isNaN(Number(rawScores[code])))
+    if (invalid.length > 0) {
+      console.warn('⚠️ [WISC] Puntajes inválidos:', invalid)
+      setValidationError('Algunos puntajes no son válidos. Revisa los campos.')
+      return
+    }
+
+    setCalculating(type)
 
     try {
       const birth = new Date(patient.birth_date)
       const now = new Date()
+      console.log(`📊 [WISC] Calculando para grupo ${ageInfo.group}...`)
 
-      // Calcular escalares
-      const newScaled: ScaledScores = {}
-      for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
+      const scaled: ScaledScores = {}
+      for (const code of requiredCodes) {
         const raw = rawScores[code]
         if (raw !== undefined && raw !== null) {
-          const scaled = engine.rawToScaled(ageInfo.group, code, raw)
-          if (scaled !== null) {
-            newScaled[code] = scaled
+          // 🔹 CORRECCIÓN: code ya es SubtestCode, no necesita casteo
+          const s = engine.rawToScaled(ageInfo.group, code, raw)
+          if (s !== null) {
+            scaled[code] = s
+          } else {
+            console.warn(`⚠️ [WISC] No se encontró norma para ${code} (raw=${raw}, group=${ageInfo.group})`)
           }
         }
       }
-      console.log('📊 [WISC] Escalares calculados:', newScaled)
-      setScaledScores(newScaled)
+      console.log('📊 [WISC] Escalares calculados:', scaled)
 
-      // Calcular índices compuestos
       const result = engine.score(birth, now, rawScores, {})
       console.log('📊 [WISC] Resultado de engine.score:', result)
+
       if (result) {
         const composites = {
           ICV: result.ICV,
@@ -234,16 +253,20 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           CIT: result.CIT,
         }
         console.log('📊 [WISC] Composite scores a setear:', composites)
-        setCompositeScores(composites)
+        setCalculatedScores({ scaled, composites })
+        setValidationError(null)
+        console.log('✅ [WISC] Cálculo completado exitosamente.')
       } else {
-        console.warn('⚠️ [WISC] engine.score devolvió null/undefined')
-        setCompositeScores(null)
+        console.warn('⚠️ [WISC] engine.score devolvió null/undefined.')
+        setValidationError('El motor no pudo calcular los índices. Verifica que las normas estén cargadas.')
       }
-    } catch (err) {
-      console.error('❌ [WISC] Error calculando scores:', err)
-      setCompositeScores(null)
+    } catch (err: any) {
+      console.error('❌ [WISC] Error calculando:', err)
+      setValidationError(err.message || 'Error al calcular')
+    } finally {
+      setCalculating(null)
     }
-  }, [rawScores, ageInfo, patient, engine, engineReady])
+  }
 
   // ============================================================
   // HANDLERS
@@ -252,20 +275,23 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
     const num = value === '' ? undefined : parseInt(value, 10)
     if (num !== undefined && isNaN(num)) return
     setRawScores(prev => ({ ...prev, [code]: num }))
+    setCalculatedScores(null)
+    setValidationError(null)
   }
 
   // ============================================================
   // GENERAR INFORME
   // ============================================================
   const generateReport = async (type: 'brief' | 'extended') => {
+    console.log(`📄 [WISC] generateReport llamado con type=${type}`)
+
     if (!patient || !ageInfo) {
       setError('Faltan datos del paciente o edad.')
       return
     }
 
-    const hasScores = Object.values(rawScores).some(v => v !== undefined && v !== null)
-    if (!hasScores) {
-      setError('Ingresa al menos un puntaje bruto antes de generar el informe.')
+    if (!calculatedScores) {
+      setError('Primero debes calcular los puntajes.')
       return
     }
 
@@ -311,13 +337,13 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           .single()
 
         if (createError) {
-          console.error('❌ Error al crear sesión:', createError)
+          console.error('❌ [WISC] Error al crear sesión:', createError)
           throw new Error('Error al crear sesión: ' + createError.message)
         }
         session = newSession
-        console.log('✅ Nueva sesión creada:', session.id)
+        console.log('✅ [WISC] Nueva sesión creada:', session.id)
       } else {
-        console.log('✅ Sesión existente encontrada:', session.id)
+        console.log('✅ [WISC] Sesión existente encontrada:', session.id)
       }
 
       const sessionId = session.id
@@ -325,8 +351,8 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       const payload = {
         session_id: sessionId,
         raw_scores: rawScores,
-        scaled_scores: scaledScores,
-        composite_scores: compositeScores,
+        scaled_scores: calculatedScores.scaled,
+        composite_scores: calculatedScores.composites,
         status: type === 'brief' ? 'completed_brief' : 'completed_extended',
         updated_at: new Date().toISOString()
       }
@@ -336,12 +362,12 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         .upsert(payload, { onConflict: 'session_id' })
 
       if (upsertError) {
-        console.error('❌ Error al guardar puntajes:', upsertError)
+        console.error('❌ [WISC] Error al guardar puntajes:', upsertError)
         throw new Error('Error al guardar puntajes: ' + upsertError.message)
       }
-      console.log('✅ Puntajes guardados correctamente')
+      console.log('✅ [WISC] Puntajes guardados correctamente.')
 
-      const citScore = compositeScores?.CIT?.score || 0
+      const citScore = calculatedScores.composites?.CIT?.score || 0
       const citClassification = getClassification(citScore)
 
       const { error: informesError } = await supabase
@@ -358,9 +384,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         })
 
       if (informesError) {
-        console.warn('⚠️ Error al insertar en informes:', informesError)
+        console.warn('⚠️ [WISC] Error al insertar en informes:', informesError)
       } else {
-        console.log('✅ Registro insertado en informes')
+        console.log('✅ [WISC] Registro insertado en informes.')
       }
 
       if (isFree) {
@@ -370,7 +396,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       router.push(`/resultados/wisc5?session=${sessionId}&type=${type}`)
 
     } catch (err: any) {
-      console.error('❌ Error al generar informe:', err)
+      console.error('❌ [WISC] Error al generar informe:', err)
       setError(err.message || 'Error al generar informe')
     } finally {
       setGenerating(false)
@@ -380,6 +406,8 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   // ============================================================
   // RENDER
   // ============================================================
+  console.log(`🖥️ [WISC] Render con calculatedScores:`, calculatedScores?.composites || 'null')
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -406,9 +434,8 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
 
   const primarySubtests = SUBTESTS_CONFIG.filter(s => s.primary)
   const secondarySubtests = SUBTESTS_CONFIG.filter(s => !s.primary)
-  const primaryKeys = primarySubtests.map(s => s.code)
-  const filledPrimary = primaryKeys.filter(code => rawScores[code] !== undefined && rawScores[code] !== null)
-  const isCITCalculable = filledPrimary.length === primaryKeys.length
+  const composites = calculatedScores?.composites || null
+  const hasResults = composites && Object.keys(composites).some(key => composites[key])
 
   return (
     <div className="max-w-6xl mx-auto p-4">
@@ -449,8 +476,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
                   onChange={(e) => handleRawChange(code, e.target.value)}
                   className="w-16 px-2 py-1 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                {scaledScores[code] !== undefined && (
-                  <span className="text-sm font-medium text-blue-600 w-8 text-center">{scaledScores[code]}</span>
+                {calculatedScores?.scaled[code] !== undefined && (
+                  <span className="text-sm font-medium text-blue-600 w-8 text-center">
+                    {calculatedScores.scaled[code]}
+                  </span>
                 )}
               </div>
             ))}
@@ -471,8 +500,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
                   onChange={(e) => handleRawChange(code, e.target.value)}
                   className="w-16 px-2 py-1 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                {scaledScores[code] !== undefined && (
-                  <span className="text-sm font-medium text-blue-600 w-8 text-center">{scaledScores[code]}</span>
+                {calculatedScores?.scaled[code] !== undefined && (
+                  <span className="text-sm font-medium text-blue-600 w-8 text-center">
+                    {calculatedScores.scaled[code]}
+                  </span>
                 )}
               </div>
             ))}
@@ -480,7 +511,36 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       </div>
 
-      {compositeScores && Object.keys(compositeScores).some(key => compositeScores[key]) ? (
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          onClick={() => handleCalculate('brief')}
+          disabled={calculating !== null || generating}
+          className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {calculating === 'brief' ? 'Calculando...' : 'Calcular versión breve (7 subpruebas)'}
+        </button>
+        <button
+          onClick={() => handleCalculate('extended')}
+          disabled={calculating !== null || generating}
+          className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {calculating === 'extended' ? 'Calculando...' : 'Calcular versión extendida (15 subpruebas)'}
+        </button>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
+        >
+          Volver
+        </button>
+      </div>
+
+      {validationError && (
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700">
+          ⚠️ {validationError}
+        </div>
+      )}
+
+      {hasResults ? (
         <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Índices Compuestos</h2>
           <div className="overflow-x-auto">
@@ -495,13 +555,13 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
               </thead>
               <tbody>
                 {['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT'].map((code) => {
-                  const idx = compositeScores[code]
+                  const idx = composites[code]
                   if (!idx) return null
                   return (
                     <tr key={code} className={`border-b border-gray-100 ${code === 'CIT' ? 'bg-blue-50' : ''}`}>
                       <td className="py-2 px-3 font-medium">{code}</td>
                       <td className="py-2 px-3 text-center font-mono font-bold">{idx.score}</td>
-                      <td className="py-2 px-3 text-center text-gray-600">{idx.percentile}</td>
+                      <td className="py-2 px-3 text-center">{idx.percentile}</td>
                       <td className="py-2 px-3 text-center">
                         <span className="text-xs px-2 py-0.5 rounded-full">
                           {getClassification(idx.score)}
@@ -516,38 +576,28 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       ) : (
         <div className="mt-6 bg-gray-50 rounded-xl border border-gray-200 p-5 text-center text-gray-400 text-sm">
-          {filledPrimary.length === 0 
-            ? 'Ingresa al menos una subprueba primaria para ver los índices compuestos.'
-            : filledPrimary.length < primaryKeys.length 
-              ? `Faltan subpruebas primarias para calcular los índices. Completa al menos 7 subpruebas primarias (faltan: ${primaryKeys.filter(k => !filledPrimary.includes(k)).join(', ')}).`
-              : 'Completa todas las subpruebas primarias para ver los índices compuestos.'}
+          {calculating ? 'Calculando...' : 'Ingresa los puntajes y presiona "Calcular" para ver los resultados.'}
         </div>
       )}
 
-      <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          onClick={() => generateReport('brief')}
-          disabled={generating || !compositeScores || !isCITCalculable}
-          className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={!isCITCalculable ? 'Completa las 7 subpruebas primarias para generar un informe' : ''}
-        >
-          {generating ? 'Generando...' : 'Generar informe breve (7 subpruebas)'}
-        </button>
-        <button
-          onClick={() => generateReport('extended')}
-          disabled={generating || !compositeScores || !isCITCalculable}
-          className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={!isCITCalculable ? 'Completa las 7 subpruebas primarias para generar un informe' : ''}
-        >
-          {generating ? 'Generando...' : 'Generar informe extendido (15 subpruebas)'}
-        </button>
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
-        >
-          Volver al dashboard
-        </button>
-      </div>
+      {hasResults && (
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            onClick={() => generateReport('brief')}
+            disabled={generating}
+            className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {generating ? 'Generando...' : 'Generar informe breve (7 subpruebas)'}
+          </button>
+          <button
+            onClick={() => generateReport('extended')}
+            disabled={generating}
+            className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+          >
+            {generating ? 'Generando...' : 'Generar informe extendido (15 subpruebas)'}
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">

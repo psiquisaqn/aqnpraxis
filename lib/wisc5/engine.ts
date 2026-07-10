@@ -81,15 +81,17 @@ export const CIT_SUBSTITUTES: SubtestCode[] = ['RV', 'RI', 'BS', 'IN', 'SLN', 'C
 /**
  * Clasificación cualitativa según puntaje compuesto (media 100, DE 15)
  * Rangos adaptados para la versión chilena del WISC-V
+ * Corregido: 55-69 = Discapacidad Intelectual Leve, <=54 = Discapacidad Intelectual Moderada
  */
 export function getClassification(score: number): string {
   if (score >= 130) return 'Muy Superior'
   if (score >= 120) return 'Superior'
   if (score >= 110) return 'Normal Alto'
   if (score >= 90) return 'Normal Promedio'
-  if (score >= 80) return 'Normal Lento'
-  if (score >= 70) return 'Funcionamiento Intelectual Limítrofe'
-  return 'Extremadamente Bajo'
+  if (score >= 80) return 'Normal Bajo'
+  if (score >= 70) return 'Limítrofe'
+  if (score >= 55) return 'Discapacidad Intelectual Leve'
+  return 'Discapacidad Intelectual Moderada'
 }
 
 // ─── Cálculo de grupo etario ────────────────────────────────
@@ -137,19 +139,30 @@ export class Wisc5Engine {
    * Debe llamarse antes de cualquier cálculo.
    */
   async loadNorms(): Promise<void> {
-    if (this.normsLoaded) return
+    if (this.normsLoaded) {
+      console.log('✅ [Engine] Normas ya cargadas, omitiendo recarga.')
+      return
+    }
 
+    console.log('📥 [Engine] Cargando normas desde Supabase...')
     const [subtestRes, compositeRes] = await Promise.all([
       this.supabase.from('wisc5_norms_subtest').select('*'),
       this.supabase.from('wisc5_norms_composite').select('*'),
     ])
 
-    if (subtestRes.error) throw new Error(`Error cargando normas subtest: ${subtestRes.error.message}`)
-    if (compositeRes.error) throw new Error(`Error cargando normas composite: ${compositeRes.error.message}`)
+    if (subtestRes.error) {
+      console.error('❌ [Engine] Error cargando normas subtest:', subtestRes.error)
+      throw new Error(`Error cargando normas subtest: ${subtestRes.error.message}`)
+    }
+    if (compositeRes.error) {
+      console.error('❌ [Engine] Error cargando normas composite:', compositeRes.error)
+      throw new Error(`Error cargando normas composite: ${compositeRes.error.message}`)
+    }
 
     this.normsSubtest = subtestRes.data || []
     this.normsComposite = compositeRes.data || []
     this.normsLoaded = true
+    console.log(`✅ [Engine] Normas cargadas: ${this.normsSubtest.length} subtest, ${this.normsComposite.length} composite`)
   }
 
   /**
@@ -157,7 +170,7 @@ export class Wisc5Engine {
    */
   rawToScaled(ageGroup: string, subtest: SubtestCode, rawScore: number): number | null {
     if (!this.normsLoaded) {
-      console.warn('⚠️ Normas no cargadas. Llamar a loadNorms() primero.')
+      console.warn('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() primero.')
       return null
     }
 
@@ -169,6 +182,12 @@ export class Wisc5Engine {
         rawScore <= n.raw_score_max
     )
 
+    if (entry) {
+      // console.log(`✅ [Engine] ${subtest} raw=${rawScore} → PE=${entry.scaled_score}`)
+    } else {
+      console.warn(`⚠️ [Engine] No se encontró norma para ${subtest} (raw=${rawScore}, group=${ageGroup})`)
+    }
+
     return entry?.scaled_score ?? null
   }
 
@@ -177,7 +196,7 @@ export class Wisc5Engine {
    */
   sumToComposite(indexCode: IndexCode, sumScaled: number): Omit<CompositeResult, 'sumScaled'> | null {
     if (!this.normsLoaded) {
-      console.warn('⚠️ Normas no cargadas. Llamar a loadNorms() primero.')
+      console.warn('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() primero.')
       return null
     }
 
@@ -188,7 +207,10 @@ export class Wisc5Engine {
         sumScaled <= n.sum_scaled_max
     )
 
-    if (!entry) return null
+    if (!entry) {
+      console.warn(`⚠️ [Engine] No se encontró norma compuesta para ${indexCode} (sum=${sumScaled})`)
+      return null
+    }
 
     return {
       score: entry.composite_score,
@@ -253,7 +275,7 @@ export class Wisc5Engine {
     options: { substitution?: SubtestCode; confidenceLevel?: 90 | 95 } = {}
   ): WiscScoringResult {
     if (!this.normsLoaded) {
-      throw new Error('⚠️ Normas no cargadas. Llamar a loadNorms() antes de score().')
+      throw new Error('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() antes de score().')
     }
 
     // Paso 1: grupo etario
