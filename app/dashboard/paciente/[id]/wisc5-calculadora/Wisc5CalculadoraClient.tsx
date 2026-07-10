@@ -77,6 +77,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   const [planStatus, setPlanStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [engineReady, setEngineReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const engine = new Wisc5Engine()
 
@@ -86,12 +87,17 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   )
 
   // ============================================================
-  // CARGA DATOS DEL PACIENTE Y PLAN
+  // CARGA DE NORMAS, DATOS DEL PACIENTE Y PLAN
   // ============================================================
   useEffect(() => {
     const loadData = async () => {
       try {
         console.log('🔍 [WISC] Iniciando carga de datos...')
+
+        // 0. Cargar normas en memoria (una sola vez)
+        await engine.loadNorms()
+        setEngineReady(true)
+        console.log('✅ [WISC] Normas cargadas en memoria')
 
         // 1. Paciente
         const { data: patientData, error: patientError } = await supabase
@@ -185,19 +191,21 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   }, [patientId, supabase])
 
   // ============================================================
-  // CÁLCULO EN TIEMPO REAL
+  // CÁLCULO EN TIEMPO REAL (optimizado con debounce y síncrono)
   // ============================================================
   useEffect(() => {
-    const calculate = async () => {
-      if (!patient?.birth_date || !ageInfo) return
+    if (!engineReady || !patient?.birth_date || !ageInfo) return
+
+    const timer = setTimeout(() => {
       const birth = new Date(patient.birth_date)
       const now = new Date()
 
+      // Calcular escalares (síncrono)
       const newScaled: ScaledScores = {}
       for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
         const raw = rawScores[code]
         if (raw !== undefined && raw !== null) {
-          const scaled = await engine.rawToScaled(ageInfo.group, code, raw)
+          const scaled = engine.rawToScaled(ageInfo.group, code, raw)
           if (scaled !== null) {
             newScaled[code] = scaled
           }
@@ -205,26 +213,29 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       }
       setScaledScores(newScaled)
 
-      const result = await engine.score(birth, now, rawScores, {})
-      if (result) {
-        const composites = {
-          ICV: result.ICV,
-          IVE: result.IVE,
-          IRF: result.IRF,
-          IMT: result.IMT,
-          IVP: result.IVP,
-          CIT: result.CIT,
+      // Calcular índices compuestos (síncrono)
+      try {
+        const result = engine.score(birth, now, rawScores, {})
+        if (result) {
+          setCompositeScores({
+            ICV: result.ICV,
+            IVE: result.IVE,
+            IRF: result.IRF,
+            IMT: result.IMT,
+            IVP: result.IVP,
+            CIT: result.CIT,
+          })
+        } else {
+          setCompositeScores(null)
         }
-        setCompositeScores(composites)
-        console.log('📊 Composite scores calculados:', composites)
-      } else {
-        console.warn('⚠️ No se pudieron calcular los índices compuestos')
+      } catch (err) {
+        console.error('Error calculando scores:', err)
         setCompositeScores(null)
       }
-    }
+    }, 150) // ← 150ms de debounce
 
-    calculate()
-  }, [rawScores, ageInfo, patient, engine])
+    return () => clearTimeout(timer)
+  }, [rawScores, ageInfo, patient, engine, engineReady])
 
   // ============================================================
   // HANDLERS
@@ -324,9 +335,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       }
       console.log('✅ Puntajes guardados correctamente')
 
-      // ============================================================
       // 3. Insertar en la tabla 'informes'
-      // ============================================================
       const citScore = compositeScores?.CIT?.score || 0
       const citClassification = getClassification(citScore)
 

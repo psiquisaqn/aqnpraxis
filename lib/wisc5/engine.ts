@@ -1,5 +1,5 @@
 /**
- * PsyEval — Motor de scoring WISC-V Chile
+ * PsyEval — Motor de scoring WISC-V Chile (versión optimizada con cache)
  * Convierte puntajes directos (PD) a puntajes escala (PE),
  * calcula índices compuestos, intervalos de confianza y
  * emite diagnósticos descriptivos.
@@ -124,91 +124,104 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
   return { years, months, days, group }
 }
 
-// ─── Motor principal ─────────────────────────────────────────
+// ─── Motor principal con cache ──────────────────────────────
 
 export class Wisc5Engine {
   private supabase: SupabaseClient = supabase
+  private normsSubtest: any[] = []
+  private normsComposite: any[] = []
+  private normsLoaded = false
 
   /**
-   * Paso 2 de la corrección: PD → PE para una subprueba y grupo etario.
-   * Consulta la tabla wisc5_norms_subtest en Supabase.
+   * Carga todas las normas en memoria (una sola vez).
+   * Debe llamarse antes de cualquier cálculo.
    */
-  async rawToScaled(
-    ageGroup: string,
-    subtest: SubtestCode,
-    rawScore: number
-  ): Promise<number | null> {
-    const { data, error } = await this.supabase
-      .from('wisc5_norms_subtest')
-      .select('scaled_score')
-      .eq('age_group', ageGroup)
-      .eq('subtest_code', subtest)
-      .lte('raw_score_min', rawScore)
-      .gte('raw_score_max', rawScore)
-      .single()
+  async loadNorms(): Promise<void> {
+    if (this.normsLoaded) return
 
-    if (error || !data) return null
-    return (data as any).scaled_score
+    const [subtestRes, compositeRes] = await Promise.all([
+      this.supabase.from('wisc5_norms_subtest').select('*'),
+      this.supabase.from('wisc5_norms_composite').select('*'),
+    ])
+
+    if (subtestRes.error) throw new Error(`Error cargando normas subtest: ${subtestRes.error.message}`)
+    if (compositeRes.error) throw new Error(`Error cargando normas composite: ${compositeRes.error.message}`)
+
+    this.normsSubtest = subtestRes.data || []
+    this.normsComposite = compositeRes.data || []
+    this.normsLoaded = true
   }
 
   /**
-   * Paso 4: Suma PE → puntaje compuesto con percentil e IC.
+   * Paso 2 de la corrección: PD → PE (síncrono, usa cache)
    */
-  async sumToComposite(
-    indexCode: IndexCode,
-    sumScaled: number
-  ): Promise<Omit<CompositeResult, 'sumScaled'> | null> {
-    const { data, error } = await this.supabase
-      .from('wisc5_norms_composite')
-      .select('composite_score, percentile, ci90_lo, ci90_hi, ci95_lo, ci95_hi')
-      .eq('index_code', indexCode)
-      .lte('sum_scaled_min', sumScaled)
-      .gte('sum_scaled_max', sumScaled)
-      .single()
+  rawToScaled(ageGroup: string, subtest: SubtestCode, rawScore: number): number | null {
+    if (!this.normsLoaded) {
+      console.warn('⚠️ Normas no cargadas. Llamar a loadNorms() primero.')
+      return null
+    }
 
-    if (error || !data) return null
-    const d = data as any
+    const entry = this.normsSubtest.find(
+      (n: any) =>
+        n.age_group === ageGroup &&
+        n.subtest_code === subtest &&
+        rawScore >= n.raw_score_min &&
+        rawScore <= n.raw_score_max
+    )
+
+    return entry?.scaled_score ?? null
+  }
+
+  /**
+   * Paso 4: Suma PE → puntaje compuesto con percentil e IC (síncrono)
+   */
+  sumToComposite(indexCode: IndexCode, sumScaled: number): Omit<CompositeResult, 'sumScaled'> | null {
+    if (!this.normsLoaded) {
+      console.warn('⚠️ Normas no cargadas. Llamar a loadNorms() primero.')
+      return null
+    }
+
+    const entry = this.normsComposite.find(
+      (n: any) =>
+        n.index_code === indexCode &&
+        sumScaled >= n.sum_scaled_min &&
+        sumScaled <= n.sum_scaled_max
+    )
+
+    if (!entry) return null
 
     return {
-      score: d.composite_score,
-      percentile: d.percentile,
-      ci90: [d.ci90_lo, d.ci90_hi],
-      ci95: [d.ci95_lo, d.ci95_hi],
-      classification: getClassification(d.composite_score),
+      score: entry.composite_score,
+      percentile: entry.percentile,
+      ci90: [entry.ci90_lo, entry.ci90_hi],
+      ci95: [entry.ci95_lo, entry.ci95_hi],
+      classification: getClassification(entry.composite_score),
     }
   }
 
   /**
-   * Calcula todos los puntajes escala a partir de los puntajes brutos.
+   * Calcula todos los puntajes escala a partir de los puntajes brutos (síncrono)
    */
-  async calculateScaledScores(
-    ageGroup: string,
-    rawScores: RawScores
-  ): Promise<ScaledScores> {
-    const subtests = Object.keys(rawScores) as SubtestCode[]
+  calculateScaledScores(ageGroup: string, rawScores: RawScores): ScaledScores {
     const results: ScaledScores = {}
-
-    await Promise.all(
-      subtests.map(async (subtest) => {
-        const raw = rawScores[subtest]
-        if (raw !== undefined && raw !== null) {
-          results[subtest] = await this.rawToScaled(ageGroup, subtest, raw) ?? undefined
-        }
-      })
-    )
-
+    for (const code of Object.keys(rawScores) as SubtestCode[]) {
+      const raw = rawScores[code]
+      if (raw !== undefined && raw !== null) {
+        const scaled = this.rawToScaled(ageGroup, code, raw)
+        if (scaled !== null) results[code] = scaled
+      }
+    }
     return results
   }
 
   /**
-   * Calcula un índice compuesto a partir de los puntajes escala.
-   * Maneja sustituciones para el CIT.
+   * Calcula un índice compuesto (síncrono)
    */
-  async calculateIndex(
+  calculateIndex(
     indexCode: IndexCode,
     scaledScores: ScaledScores,
     substitution?: SubtestCode
-  ): Promise<CompositeResult | null> {
+  ): CompositeResult | null {
     const subtests = [...INDEX_COMPOSITION[indexCode]]
 
     // Si hay sustitución para CIT, reemplazar la subprueba faltante
@@ -224,37 +237,38 @@ export class Wisc5Engine {
     if (scores.some(s => s === undefined)) return null
 
     const sumScaled = scores.reduce((acc, s) => acc! + s!, 0) as number
-    const composite = await this.sumToComposite(indexCode, sumScaled)
+    const composite = this.sumToComposite(indexCode, sumScaled)
     if (!composite) return null
 
     return { ...composite, sumScaled }
   }
 
   /**
-   * Motor completo: recibe puntajes brutos, devuelve resultado total.
-   * Paso a paso según el protocolo WISC-V.
+   * Motor completo: recibe puntajes brutos, devuelve resultado total (síncrono)
    */
-  async score(
+  score(
     birthDate: Date,
     evalDate: Date,
     rawScores: RawScores,
     options: { substitution?: SubtestCode; confidenceLevel?: 90 | 95 } = {}
-  ): Promise<WiscScoringResult> {
+  ): WiscScoringResult {
+    if (!this.normsLoaded) {
+      throw new Error('⚠️ Normas no cargadas. Llamar a loadNorms() antes de score().')
+    }
+
     // Paso 1: grupo etario
-    const { years, months, days, group } = getAgeGroup(birthDate, evalDate)
+    const { group } = getAgeGroup(birthDate, evalDate)
 
     // Paso 2: PD → PE
-    const scaledScores = await this.calculateScaledScores(group, rawScores)
+    const scaledScores = this.calculateScaledScores(group, rawScores)
 
     // Paso 3 y 4: calcular cada índice
-    const [ICV, IVE, IRF, IMT, IVP, CIT] = await Promise.all([
-      this.calculateIndex('ICV', scaledScores),
-      this.calculateIndex('IVE', scaledScores),
-      this.calculateIndex('IRF', scaledScores),
-      this.calculateIndex('IMT', scaledScores),
-      this.calculateIndex('IVP', scaledScores),
-      this.calculateIndex('CIT', scaledScores, options.substitution),
-    ])
+    const ICV = this.calculateIndex('ICV', scaledScores)
+    const IVE = this.calculateIndex('IVE', scaledScores)
+    const IRF = this.calculateIndex('IRF', scaledScores)
+    const IMT = this.calculateIndex('IMT', scaledScores)
+    const IVP = this.calculateIndex('IVP', scaledScores)
+    const CIT = this.calculateIndex('CIT', scaledScores, options.substitution)
 
     // Pronóstico en tiempo real
     const realtimePrediction = this.computeRealtimePrediction(scaledScores, CIT)
@@ -274,11 +288,7 @@ export class Wisc5Engine {
   }
 
   /**
-   * Pronóstico en tiempo real: estima el CIT probable a medida que
-   * el psicólogo va ingresando puntajes subprueba por subprueba.
-   *
-   * Estrategia: promedio ponderado de las subpruebas CIT completadas,
-   * interpolado hacia media esperada (10) para las faltantes.
+   * Pronóstico en tiempo real (síncrono)
    */
   computeRealtimePrediction(
     scaledScores: ScaledScores,
@@ -289,7 +299,6 @@ export class Wisc5Engine {
     const missingSubtests   = citSubtests.filter(s => scaledScores[s] === undefined) as SubtestCode[]
     const progressPercent   = Math.round((completedSubtests.length / citSubtests.length) * 100)
 
-    // Si tenemos el CIT completo, úsalo directamente
     if (completedCIT) {
       return {
         estimatedCIT: completedCIT.score,
@@ -312,12 +321,8 @@ export class Wisc5Engine {
       }
     }
 
-    // Estimación: suma de PE conocidas + media (10) para las desconocidas
     const knownSum  = completedSubtests.reduce((acc, s) => acc + (scaledScores[s] ?? 10), 0)
     const totalSumEstimated = knownSum + missingSubtests.length * 10
-
-    // Aproximación lineal: CIT ≈ 40 + (sumCIT / 70) * 60 (rango 40–100 para sumas 7–70)
-    // Más preciso: usar la tabla compuesta si sum está en rango
     const estimatedCIT = this.approximateCITFromSum(totalSumEstimated)
 
     const confidence: RealtimePrediction['confidence'] =
@@ -335,14 +340,7 @@ export class Wisc5Engine {
     }
   }
 
-  /**
-   * Aproximación del CIT a partir de la suma de puntajes escala.
-   * Usa regresión lineal ajustada a los datos reales de la Tabla A.7.
-   * Rango real: suma 7–133 → CIT 40–160
-   */
   private approximateCITFromSum(sum: number): number {
-    // Regresión lineal aproximada derivada de la Tabla A.7:
-    // CIT ≈ 1.117 * sum + 32.5 (R² ≈ 0.999)
     const estimated = Math.round(1.117 * sum + 32.5)
     return Math.max(40, Math.min(160, estimated))
   }
@@ -351,7 +349,6 @@ export class Wisc5Engine {
    * Prorrateo del CIT cuando solo hay 6 de 7 subpruebas (Tabla A.8).
    */
   prorrateCITSum(sumOf6: number): number {
-    // Tabla A.8: suma_6 × 7/6, redondeado
     return Math.round(sumOf6 * (7 / 6))
   }
 }
