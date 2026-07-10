@@ -1,147 +1,103 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-
-const ALL_TESTS = [
-  { id: 'coopersmith', name: 'Coopersmith SEI', full: 'Inventario de Autoestima de Coopersmith', time: '~15 min', age: '≥ 8 años', color: '#0369a1' },
-  { id: 'bdi2', name: 'BDI-II', full: 'Inventario de Depresión de Beck — 2ª Ed.', time: '~10 min', age: '≥ 13 años', color: '#b45309' },
-  { id: 'peca', name: 'PECA', full: 'Prueba de Evaluación de Conducta Adaptativa', time: '~30-45 min', age: 'Edad escolar', color: '#7c3aed' },
-  { id: 'wisc5', name: 'WISC-V', full: 'Escala de Inteligencia de Wechsler para Niños — 5ª Ed.', time: '~65-80 min', age: '6 a 16 años 11 meses', color: '#0d9488' },
-]
 
 interface Props {
   patientId: string | null
   onClose: () => void
 }
 
+const TESTS = [
+  { id: 'bdi2', label: 'BDI-II - Depresión' },
+  { id: 'coopersmith', label: 'Coopersmith SEI - Autoestima' },
+  { id: 'peca', label: 'PECA - Conducta Adaptativa' },
+  // WISC-V eliminado
+]
+
 export function NewSessionModal({ patientId, onClose }: Props) {
   const router = useRouter()
-  const [selected, setSelected] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tests, setTests] = useState(ALL_TESTS)
-
-  useEffect(() => {
-    const checkPlan = async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, plan, plan_expires_at')
-        .eq('id', user.id)
-        .single()
-      const isAdmin = profile?.role === 'admin'
-      const isPro = profile?.plan === 'pro' && new Date(profile.plan_expires_at) > new Date()
-      if (isAdmin || isPro) {
-        setTests(ALL_TESTS)
-      } else {
-        // Plan free: excluir Coopersmith
-        setTests(ALL_TESTS.filter(t => t.id !== 'coopersmith'))
-      }
-    }
-    checkPlan()
-  }, [])
 
   if (!patientId) return null
 
-  const generateRoomCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
-    let code = ''
-    for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length))
-    return code
-  }
-
-  const handleStart = () => {
-    if (!selected) return
+  const handleCreate = async (testId: string) => {
+    setLoading(true)
     setError(null)
-    startTransition(async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
+
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setError('No autenticado'); return }
-      const { data: session, error: sessionError } = await supabase
+      if (!user) throw new Error('No autenticado')
+
+      const { data: session, error: createError } = await supabase
         .from('sessions')
-        .insert({ psychologist_id: user.id, patient_id: patientId, test_id: selected, status: 'in_progress' })
-        .select()
+        .insert({
+          patient_id: patientId,
+          test_id: testId,
+          status: 'in_progress',
+          psychologist_id: user.id,
+        })
+        .select('id')
         .single()
-      if (sessionError) { setError(sessionError.message); return }
-      const roomCode = generateRoomCode()
-      const { data: dualSession, error: dualError } = await supabase
-        .from('dual_sessions')
-        .insert({ session_id: session.id, psychologist_id: user.id, room_code: roomCode, is_active: true })
-        .select()
-        .single()
-      if (dualError) { setError(dualError.message); return }
+
+      if (createError) throw createError
+
       onClose()
-      router.push(`/dual-control/${dualSession.id}`)
-    })
+      // Redirigir a la página del test correspondiente
+      const testRoutes: Record<string, string> = {
+        bdi2: `/bdi2/${session.id}`,
+        coopersmith: `/coopersmith/${session.id}`,
+        peca: `/peca/${session.id}`,
+      }
+      const route = testRoutes[testId]
+      if (route) {
+        router.push(route)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al crear sesión')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40"
-      style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg rounded-2xl shadow-2xl flex flex-col"
-        style={{ background: 'white', maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: '#e5e5e0' }}>
-          <h2 className="text-base font-semibold" style={{ color: '#1a1a1a', fontFamily: 'Georgia, Times New Roman, serif' }}>
-            Nueva evaluación
-          </h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: '#9ca3af', background: '#f5f5f0' }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Nueva sesión</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Selecciona el test a aplicar:
+        </p>
+
+        <div className="space-y-2">
+          {TESTS.map((test) => (
+            <button
+              key={test.id}
+              onClick={() => handleCreate(test.id)}
+              disabled={loading}
+              className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <span className="font-medium text-gray-800">{test.label}</span>
+            </button>
+          ))}
         </div>
-        <div className="px-6 py-5 overflow-y-auto">
-          <p className="text-sm mb-4" style={{ color: '#6b7280' }}>Selecciona el instrumento de evaluación:</p>
-          <div className="space-y-2">
-            {tests.map((t) => (
-              <button key={t.id} type="button" onClick={() => setSelected(t.id)}
-                className="w-full text-left rounded-xl p-4 border transition-all duration-150"
-                style={{
-                  borderColor: selected === t.id ? t.color : '#e5e5e0',
-                  background: selected === t.id ? t.color + '08' : 'white',
-                  outline: selected === t.id ? '2px solid ' + t.color : 'none',
-                  outlineOffset: '-1px',
-                }}>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold text-white" style={{ background: t.color }}>
-                    {t.name.charAt(0)}
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold" style={{ color: '#1a1a1a' }}>{t.name}</span>
-                    <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>{t.full}</p>
-                    <div className="flex gap-3 mt-1.5">
-                      <span className="text-xs" style={{ color: '#9ca3af' }}>{'⏱ ' + t.time}</span>
-                      <span className="text-xs" style={{ color: '#9ca3af' }}>{'· ' + t.age}</span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-          {error && (
-            <div className="mt-3 rounded-lg px-4 py-3 text-sm" style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' }}>
-              {error}
-            </div>
-          )}
-          <div className="flex gap-3 mt-5">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm border font-medium" style={{ borderColor: '#e5e5e0', color: '#6b7280', background: 'white' }}>Cancelar</button>
-            <button type="button" onClick={handleStart} disabled={!selected || isPending} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-all" style={{ background: (!selected || isPending) ? '#9ca3af' : '#2563eb', cursor: (!selected || isPending) ? 'not-allowed' : 'pointer' }}>{isPending ? 'Iniciando...' : 'Comenzar evaluación'}</button>
-          </div>
-        </div>
+
+        {error && (
+          <p className="mt-3 text-sm text-red-600">{error}</p>
+        )}
+
+        <button
+          onClick={onClose}
+          className="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          Cancelar
+        </button>
       </div>
     </div>
   )

@@ -28,6 +28,38 @@ const SUBTESTS_CONFIG = [
 ]
 
 // ============================================================
+// FUNCIONES AUXILIARES
+// ============================================================
+
+function getClassification(score: number): string {
+  if (score >= 130) return 'Muy superior'
+  if (score >= 120) return 'Superior'
+  if (score >= 110) return 'Normal alto'
+  if (score >= 90) return 'Normal promedio'
+  if (score >= 80) return 'Normal bajo'
+  if (score >= 70) return 'Limítrofe'
+  return 'Extremadamente bajo'
+}
+
+function getAgeGroup(totalMonths: number): string {
+  const groups = [
+    { min: 72, max: 77, label: '6:0-6:5' }, { min: 78, max: 83, label: '6:6-6:11' },
+    { min: 84, max: 89, label: '7:0-7:5' }, { min: 90, max: 95, label: '7:6-7:11' },
+    { min: 96, max: 101, label: '8:0-8:5' }, { min: 102, max: 107, label: '8:6-8:11' },
+    { min: 108, max: 113, label: '9:0-9:5' }, { min: 114, max: 119, label: '9:6-9:11' },
+    { min: 120, max: 125, label: '10:0-10:5' }, { min: 126, max: 131, label: '10:6-10:11' },
+    { min: 132, max: 137, label: '11:0-11:5' }, { min: 138, max: 143, label: '11:6-11:11' },
+    { min: 144, max: 149, label: '12:0-12:5' }, { min: 150, max: 155, label: '12:6-12:11' },
+    { min: 156, max: 161, label: '13:0-13:5' }, { min: 162, max: 167, label: '13:6-13:11' },
+    { min: 168, max: 173, label: '14:0-14:5' }, { min: 174, max: 179, label: '14:6-14:11' },
+    { min: 180, max: 185, label: '15:0-15:5' }, { min: 186, max: 191, label: '15:6-15:11' },
+    { min: 192, max: 197, label: '16:0-16:5' }, { min: 198, max: 203, label: '16:6-16:11' }
+  ]
+  const group = groups.find(g => totalMonths >= g.min && totalMonths <= g.max)
+  return group?.label || '6:0-6:5'
+}
+
+// ============================================================
 // COMPONENTE PRINCIPAL
 // ============================================================
 
@@ -97,29 +129,44 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         console.log('🔑 [WISC] Usuario autenticado:', user?.id)
 
         if (user) {
-          const { data: planData, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-          console.log('📦 [WISC] Datos de RPC get_plan_status:', planData)
+          const { data: plan, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+          console.log('📦 [WISC] Datos de RPC get_plan_status:', plan)
           console.log('❌ [WISC] Error de RPC:', rpcError)
 
-          // La RPC devuelve un ARRAY con un objeto dentro → tomar el primer elemento
-          let plan = null
-          if (planData && Array.isArray(planData) && planData.length > 0) {
-            plan = planData[0]
+          if (plan) {
             setPlanStatus(plan)
-            console.log('✅ [WISC] Plan establecido desde RPC (primer elemento):', plan)
+            console.log('✅ [WISC] Plan establecido desde RPC:', plan)
           } else {
-            // Fallback si no hay datos
-            console.warn('⚠️ [WISC] RPC no devolvió datos válidos, usando fallback')
-            const fallbackPlan = {
-              plan: 'free',
-              is_pro: false,
-              reports_used: 0,
-              reports_limit: 3,
-              plan_expires_at: null,
-              role: null
+            // Fallback
+            console.warn('⚠️ [WISC] RPC devolvió null, intentando fallback desde profiles')
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('plan, role')
+              .eq('id', user.id)
+              .single()
+
+            if (profile) {
+              const fallbackPlan = {
+                plan: profile.plan || 'free',
+                is_pro: profile.plan === 'premium' || profile.plan === 'pro' || profile.role === 'admin',
+                reports_used: 0,
+                reports_limit: profile.plan === 'premium' || profile.plan === 'pro' || profile.role === 'admin' ? 999999 : 3,
+                plan_expires_at: null,
+                role: profile.role || null
+              }
+              setPlanStatus(fallbackPlan)
+              console.log('✅ [WISC] Plan establecido desde fallback:', fallbackPlan)
+            } else {
+              console.error('❌ [WISC] No se pudo obtener plan desde profiles:', profileError)
+              setPlanStatus({
+                plan: 'free',
+                is_pro: false,
+                reports_used: 0,
+                reports_limit: 3,
+                plan_expires_at: null,
+                role: null
+              })
             }
-            setPlanStatus(fallbackPlan)
-            console.log('✅ [WISC] Plan establecido desde fallback:', fallbackPlan)
           }
         } else {
           console.warn('⚠️ [WISC] No hay usuario autenticado')
@@ -146,7 +193,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       const birth = new Date(patient.birth_date)
       const now = new Date()
 
-      // Calcular escalares
       const newScaled: ScaledScores = {}
       for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
         const raw = rawScores[code]
@@ -159,7 +205,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       }
       setScaledScores(newScaled)
 
-      // Calcular índices compuestos
       const result = await engine.score(birth, now, rawScores, {})
       if (result) {
         const composites = {
@@ -190,26 +235,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
     setRawScores(prev => ({ ...prev, [code]: num }))
   }
 
-  const getClassification = (score: number): string => {
-    if (score >= 130) return 'Muy superior'
-    if (score >= 120) return 'Superior'
-    if (score >= 110) return 'Promedio alto'
-    if (score >= 90) return 'Promedio'
-    if (score >= 80) return 'Promedio bajo'
-    if (score >= 70) return 'Limítrofe'
-    return 'Extremadamente bajo'
-  }
-
-  const getClassificationColor = (score: number): string => {
-    if (score >= 130) return 'text-purple-700 bg-purple-50'
-    if (score >= 120) return 'text-blue-700 bg-blue-50'
-    if (score >= 110) return 'text-green-700 bg-green-50'
-    if (score >= 90) return 'text-gray-700 bg-gray-50'
-    if (score >= 80) return 'text-yellow-700 bg-yellow-50'
-    if (score >= 70) return 'text-orange-700 bg-orange-50'
-    return 'text-red-700 bg-red-50'
-  }
-
   // ============================================================
   // GENERAR INFORME
   // ============================================================
@@ -219,14 +244,12 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       return
     }
 
-    // Verificar que haya puntajes ingresados
     const hasScores = Object.values(rawScores).some(v => v !== undefined && v !== null)
     if (!hasScores) {
       setError('Ingresa al menos un puntaje bruto antes de generar el informe.')
       return
     }
 
-    // Verificar límite de informes (solo para free)
     const isFree = planStatus?.plan === 'free' || (!planStatus?.is_pro && !planStatus?.is_admin)
     if (isFree && planStatus?.reports_used >= 3) {
       alert('Has alcanzado el límite de 3 informes gratuitos. Actualiza a Premium para más.')
@@ -281,7 +304,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
 
       const sessionId = session.id
 
-      // 2. Guardar puntajes en wisc5_scores (usando JSONB)
+      // 2. Guardar puntajes en wisc5_scores
       const payload = {
         session_id: sessionId,
         raw_scores: rawScores,
@@ -290,8 +313,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         status: type === 'brief' ? 'completed_brief' : 'completed_extended',
         updated_at: new Date().toISOString()
       }
-
-      console.log('📤 Payload a guardar:', JSON.stringify(payload, null, 2))
 
       const { error: upsertError } = await supabase
         .from('wisc5_scores')
@@ -303,7 +324,32 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       }
       console.log('✅ Puntajes guardados correctamente')
 
-      // 3. Incrementar contador de informes (solo free)
+      // ============================================================
+      // 3. Insertar en la tabla 'informes'
+      // ============================================================
+      const citScore = compositeScores?.CIT?.score || 0
+      const citClassification = getClassification(citScore)
+
+      const { error: informesError } = await supabase
+        .from('informes')
+        .insert({
+          patient_id: patientId,
+          psychologist_id: user.id,
+          session_id: sessionId,
+          test_id: 'wisc5',
+          puntaje_total: citScore,
+          nivel: citClassification,
+          recomendaciones: `Informe WISC-V generado automáticamente. Tipo: ${type === 'brief' ? 'Breve (7 subpruebas)' : 'Extendido (15 subpruebas)'}.`,
+          created_at: new Date().toISOString(),
+        })
+
+      if (informesError) {
+        console.warn('⚠️ Error al insertar en informes:', informesError)
+      } else {
+        console.log('✅ Registro insertado en informes')
+      }
+
+      // 4. Incrementar contador de informes (solo free)
       if (isFree) {
         const { error: countError } = await supabase
           .rpc('increment_reports_used', { p_user_id: user.id })
@@ -312,7 +358,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         }
       }
 
-      // 4. Redirigir a la página de resultados
+      // 5. Redirigir a la página de resultados
       router.push(`/resultados/wisc5?session=${sessionId}&type=${type}`)
 
     } catch (err: any) {
@@ -342,7 +388,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       <div className="max-w-2xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
           <p className="text-red-600 text-sm">{error || 'Paciente no encontrado'}</p>
-          <button onClick={() => router.back()} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">Volver</button>
+          <button onClick={() => router.push('/dashboard')} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">
+            Volver al dashboard
+          </button>
         </div>
       </div>
     )
@@ -378,7 +426,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
 
       {/* Formulario en grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Subpruebas primarias */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Subpruebas primarias</h2>
           <div className="space-y-2">
@@ -401,7 +448,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           </div>
         </div>
 
-        {/* Subpruebas secundarias */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Subpruebas secundarias</h2>
           <div className="space-y-2">
@@ -449,7 +495,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
                       <td className="py-2 px-3 text-center font-mono font-bold">{idx.score}</td>
                       <td className="py-2 px-3 text-center text-gray-600">{idx.percentile}</td>
                       <td className="py-2 px-3 text-center">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${getClassificationColor(idx.score)}`}>
+                        <span className="text-xs px-2 py-0.5 rounded-full">
                           {getClassification(idx.score)}
                         </span>
                       </td>
@@ -466,7 +512,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       )}
 
-      {/* Botones de informe y errores */}
+      {/* Botones */}
       <div className="mt-6 flex flex-wrap gap-3">
         <button
           onClick={() => generateReport('brief')}
@@ -483,10 +529,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           {generating ? 'Generando...' : 'Generar informe extendido (15 subpruebas)'}
         </button>
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push('/dashboard')}
           className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
         >
-          Volver
+          Volver al dashboard
         </button>
       </div>
 
@@ -497,26 +543,4 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       )}
     </div>
   )
-}
-
-// ============================================================
-// FUNCIÓN AUXILIAR
-// ============================================================
-
-function getAgeGroup(totalMonths: number): string {
-  const groups = [
-    { min: 72, max: 77, label: '6:0-6:5' }, { min: 78, max: 83, label: '6:6-6:11' },
-    { min: 84, max: 89, label: '7:0-7:5' }, { min: 90, max: 95, label: '7:6-7:11' },
-    { min: 96, max: 101, label: '8:0-8:5' }, { min: 102, max: 107, label: '8:6-8:11' },
-    { min: 108, max: 113, label: '9:0-9:5' }, { min: 114, max: 119, label: '9:6-9:11' },
-    { min: 120, max: 125, label: '10:0-10:5' }, { min: 126, max: 131, label: '10:6-10:11' },
-    { min: 132, max: 137, label: '11:0-11:5' }, { min: 138, max: 143, label: '11:6-11:11' },
-    { min: 144, max: 149, label: '12:0-12:5' }, { min: 150, max: 155, label: '12:6-12:11' },
-    { min: 156, max: 161, label: '13:0-13:5' }, { min: 162, max: 167, label: '13:6-13:11' },
-    { min: 168, max: 173, label: '14:0-14:5' }, { min: 174, max: 179, label: '14:6-14:11' },
-    { min: 180, max: 185, label: '15:0-15:5' }, { min: 186, max: 191, label: '15:6-15:11' },
-    { min: 192, max: 197, label: '16:0-16:5' }, { min: 198, max: 203, label: '16:6-16:11' }
-  ]
-  const group = groups.find(g => totalMonths >= g.min && totalMonths <= g.max)
-  return group?.label || '6:0-6:5'
 }
