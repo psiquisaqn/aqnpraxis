@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 
-interface Props {
+interface PatientCardProps {
   patient: {
     id: string
     full_name: string
@@ -24,7 +24,7 @@ interface Props {
   onNewSession: (patientId: string) => void
 }
 
-export default function PatientCard({ patient, onNewSession }: Props) {
+export default function PatientCard({ patient, onNewSession }: PatientCardProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-shadow">
       <div className="flex flex-wrap items-start justify-between gap-3">

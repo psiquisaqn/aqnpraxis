@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { PatientCard } from './PatientCard'
+import PatientCard from './PatientCard'  // ← IMPORTACIÓN DEFAULT (sin llaves)
 import { NewPatientModal } from './NewPatientModal'
 import { NewSessionModal } from './NewSessionModal'
 import { calcAge } from '@/lib/utils'
@@ -13,6 +13,7 @@ interface LocalSession {
   id: string
   test_id: string
   status: string
+  created_at: string
   completed_at?: string | null
 }
 
