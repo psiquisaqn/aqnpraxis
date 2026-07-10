@@ -80,7 +80,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   const [engineReady, setEngineReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 🔹 Usar useRef para que el engine persista entre renders
   const engineRef = useRef<Wisc5Engine | null>(null)
   if (!engineRef.current) {
     engineRef.current = new Wisc5Engine()
@@ -136,52 +135,64 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           console.log('✅ [WISC] Edad calculada:', { years, months, group })
         }
 
-        // 3. Plan
+        // 3. Plan - Mejorado
         const { data: { user } } = await supabase.auth.getUser()
         console.log('🔑 [WISC] Usuario autenticado:', user?.id)
 
         if (user) {
-          const { data: plan, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-          console.log('📦 [WISC] Datos de RPC get_plan_status:', plan)
+          // Primero obtener el perfil para el plan (como fallback)
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('plan, role')
+            .eq('id', user.id)
+            .single()
+
+          if (profileError) {
+            console.warn('⚠️ [WISC] Error obteniendo perfil:', profileError)
+          }
+
+          // Luego obtener la RPC para el límite
+          const { data: rpcPlan, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+          console.log('📦 [WISC] RPC get_plan_status:', rpcPlan)
           console.log('❌ [WISC] Error de RPC:', rpcError)
 
-          if (plan) {
-            setPlanStatus(plan)
-            console.log('✅ [WISC] Plan establecido desde RPC:', plan)
+          if (rpcPlan) {
+            // Si la RPC funcionó, usarla completa
+            setPlanStatus(rpcPlan)
+            console.log('✅ [WISC] Plan establecido desde RPC:', rpcPlan)
           } else {
-            // Fallback
-            console.warn('⚠️ [WISC] RPC devolvió null, intentando fallback desde profiles')
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('plan, role')
-              .eq('id', user.id)
-              .single()
+            // Fallback: usar perfil + contar informes
+            const basePlan = profile?.plan || 'free'
+            const baseRole = profile?.role || null
+            const isPro = basePlan === 'premium' || basePlan === 'pro' || baseRole === 'admin'
 
-            if (profile) {
-              const fallbackPlan = {
-                plan: profile.plan || 'free',
-                is_pro: profile.plan === 'premium' || profile.plan === 'pro' || profile.role === 'admin',
-                reports_used: 0,
-                reports_limit: profile.plan === 'premium' || profile.plan === 'pro' || profile.role === 'admin' ? 999999 : 3,
-                plan_expires_at: null,
-                role: profile.role || null
-              }
-              setPlanStatus(fallbackPlan)
-              console.log('✅ [WISC] Plan establecido desde fallback:', fallbackPlan)
-            } else {
-              console.error('❌ [WISC] No se pudo obtener plan desde profiles:', profileError)
-              setPlanStatus({
-                plan: 'free',
-                is_pro: false,
-                reports_used: 0,
-                reports_limit: 3,
-                plan_expires_at: null,
-                role: null
-              })
+            // Contar informes del usuario
+            const { count: reportsCount, error: countError } = await supabase
+              .from('informes')
+              .select('*', { count: 'exact', head: true })
+              .eq('psychologist_id', user.id)
+
+            const fallbackPlan = {
+              plan: basePlan,
+              is_pro: isPro,
+              reports_used: countError ? 0 : (reportsCount || 0),
+              reports_limit: isPro ? 999999 : 3,
+              plan_expires_at: null,
+              role: baseRole,
             }
+            setPlanStatus(fallbackPlan)
+            console.log('✅ [WISC] Plan establecido desde fallback:', fallbackPlan)
           }
         } else {
           console.warn('⚠️ [WISC] No hay usuario autenticado')
+          setPlanStatus({
+            plan: 'free',
+            is_pro: false,
+            reports_used: 0,
+            reports_limit: 3,
+            plan_expires_at: null,
+            role: null,
+          })
         }
 
         setLoading(false)
@@ -190,7 +201,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         console.error('❌ [WISC] Error en loadData:', err)
         setError('Error al cargar datos.')
         setLoading(false)
-        // Asegurar que engineReady sea false si algo falla
         setEngineReady(false)
       }
     }
@@ -199,10 +209,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   }, [patientId, supabase])
 
   // ============================================================
-  // CÁLCULO EN TIEMPO REAL (optimizado con debounce y síncrono)
+  // CÁLCULO EN TIEMPO REAL (optimizado con debounce y logs)
   // ============================================================
   useEffect(() => {
-    // 🔹 Verificar que el engine esté listo ANTES de hacer cualquier cálculo
     if (!engineReady || !patient?.birth_date || !ageInfo) {
       console.log('⏳ [WISC] Esperando datos o engine... engineReady=', engineReady)
       return
@@ -210,10 +219,11 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
 
     const timer = setTimeout(() => {
       try {
+        console.log('🔍 [WISC] Ejecutando cálculo con rawScores:', rawScores)
         const birth = new Date(patient.birth_date)
         const now = new Date()
 
-        // Calcular escalares (síncrono)
+        // Calcular escalares
         const newScaled: ScaledScores = {}
         for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
           const raw = rawScores[code]
@@ -226,28 +236,37 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         }
         setScaledScores(newScaled)
 
-        // Calcular índices compuestos (síncrono)
+        // Calcular índices compuestos
         const result = engine.score(birth, now, rawScores, {})
+        console.log('📊 [WISC] Resultado de engine.score:', result)
         if (result) {
-          setCompositeScores({
+          const composites = {
             ICV: result.ICV,
             IVE: result.IVE,
             IRF: result.IRF,
             IMT: result.IMT,
             IVP: result.IVP,
             CIT: result.CIT,
-          })
+          }
+          console.log('📊 [WISC] Composite scores a setear:', composites)
+          setCompositeScores(composites)
         } else {
+          console.warn('⚠️ [WISC] engine.score devolvió null/undefined')
           setCompositeScores(null)
         }
       } catch (err) {
         console.error('❌ [WISC] Error calculando scores:', err)
         setCompositeScores(null)
       }
-    }, 150) // 150ms de debounce
+    }, 150)
 
     return () => clearTimeout(timer)
   }, [rawScores, ageInfo, patient, engine, engineReady])
+
+  // ============================================================
+  // LOG DE RENDER (para depurar)
+  // ============================================================
+  console.log('🖥️ [WISC] Render con compositeScores:', compositeScores)
 
   // ============================================================
   // HANDLERS
@@ -291,7 +310,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      // 1. Buscar sesión existente (SOLO del psicólogo actual)
+      // 1. Buscar sesión existente
       let { data: session, error: sessionError } = await supabase
         .from('sessions')
         .select('id')
@@ -347,7 +366,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       }
       console.log('✅ Puntajes guardados correctamente')
 
-      // 3. Insertar en la tabla 'informes'
+      // 3. Insertar en informes
       const citScore = compositeScores?.CIT?.score || 0
       const citClassification = getClassification(citScore)
 
@@ -370,7 +389,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         console.log('✅ Registro insertado en informes')
       }
 
-      // 4. Incrementar contador de informes (solo free)
+      // 4. Incrementar contador (solo free)
       if (isFree) {
         const { error: countError } = await supabase
           .rpc('increment_reports_used', { p_user_id: user.id })
@@ -379,7 +398,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         }
       }
 
-      // 5. Redirigir a la página de resultados
+      // 5. Redirigir
       router.push(`/resultados/wisc5?session=${sessionId}&type=${type}`)
 
     } catch (err: any) {
@@ -529,7 +548,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       ) : (
         <div className="mt-6 bg-gray-50 rounded-xl border border-gray-200 p-5 text-center text-gray-400 text-sm">
-          Ingresa al menos una subprueba primaria para ver los índices compuestos.
+          {Object.keys(rawScores).length === 0 
+            ? 'Ingresa al menos una subprueba primaria para ver los índices compuestos.'
+            : 'Faltan subpruebas primarias para calcular los índices. Completa al menos 7 subpruebas primarias.'}
         </div>
       )}
 
