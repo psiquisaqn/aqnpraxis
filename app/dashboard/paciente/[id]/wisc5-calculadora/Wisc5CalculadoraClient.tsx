@@ -135,49 +135,37 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           console.log('✅ [WISC] Edad calculada:', { years, months, group })
         }
 
-        // 3. Plan - CORREGIDO
+        // 3. Plan
         const { data: { user } } = await supabase.auth.getUser()
         console.log('🔑 [WISC] Usuario autenticado:', user?.id)
 
         if (user) {
-          // Primero obtener el perfil (fallback)
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('plan, role')
-            .eq('id', user.id)
-            .single()
-
-          if (profileError) {
-            console.warn('⚠️ [WISC] Error obteniendo perfil:', profileError)
-          }
-
-          // Obtener RPC
           const { data: rpcPlanRaw, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
           console.log('📦 [WISC] RPC get_plan_status (raw):', rpcPlanRaw)
           console.log('❌ [WISC] Error de RPC:', rpcError)
 
-          // Extraer el primer elemento si es un array
           const rpcPlan = Array.isArray(rpcPlanRaw) ? rpcPlanRaw[0] : rpcPlanRaw
-
           if (rpcPlan) {
             setPlanStatus(rpcPlan)
             console.log('✅ [WISC] Plan establecido desde RPC (objeto):', rpcPlan)
           } else {
             // Fallback con perfil
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('plan, role')
+              .eq('id', user.id)
+              .single()
             const basePlan = profile?.plan || 'free'
             const baseRole = profile?.role || null
             const isPro = basePlan === 'premium' || basePlan === 'pro' || baseRole === 'admin'
-
-            // Contar informes
-            const { count: reportsCount, error: countError } = await supabase
+            const { count: reportsCount } = await supabase
               .from('informes')
               .select('*', { count: 'exact', head: true })
               .eq('psychologist_id', user.id)
-
             const fallbackPlan = {
               plan: basePlan,
               is_pro: isPro,
-              reports_used: countError ? 0 : (reportsCount || 0),
+              reports_used: reportsCount || 0,
               reports_limit: isPro ? 999999 : 3,
               plan_expires_at: null,
               role: baseRole,
@@ -187,14 +175,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           }
         } else {
           console.warn('⚠️ [WISC] No hay usuario autenticado')
-          setPlanStatus({
-            plan: 'free',
-            is_pro: false,
-            reports_used: 0,
-            reports_limit: 3,
-            plan_expires_at: null,
-            role: null,
-          })
         }
 
         setLoading(false)
@@ -211,53 +191,58 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   }, [patientId, supabase])
 
   // ============================================================
-  // CÁLCULO EN TIEMPO REAL
+  // CÁLCULO EN TIEMPO REAL (SIN DEBOUNCE PARA PRUEBA)
   // ============================================================
   useEffect(() => {
+    console.log('🔄 [WISC] useEffect de cálculo disparado. engineReady:', engineReady, 'patient:', !!patient, 'ageInfo:', !!ageInfo)
+
     if (!engineReady || !patient?.birth_date || !ageInfo) {
+      console.log('⏳ [WISC] Condiciones no cumplidas, retornando.')
       return
     }
 
-    const timer = setTimeout(() => {
-      try {
-        const birth = new Date(patient.birth_date)
-        const now = new Date()
+    console.log('🔍 [WISC] Ejecutando cálculo con rawScores:', rawScores)
 
-        // Calcular escalares
-        const newScaled: ScaledScores = {}
-        for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
-          const raw = rawScores[code]
-          if (raw !== undefined && raw !== null) {
-            const scaled = engine.rawToScaled(ageInfo.group, code, raw)
-            if (scaled !== null) {
-              newScaled[code] = scaled
-            }
+    try {
+      const birth = new Date(patient.birth_date)
+      const now = new Date()
+
+      // Calcular escalares
+      const newScaled: ScaledScores = {}
+      for (const code of Object.keys(rawScores) as (keyof RawScores)[]) {
+        const raw = rawScores[code]
+        if (raw !== undefined && raw !== null) {
+          const scaled = engine.rawToScaled(ageInfo.group, code, raw)
+          if (scaled !== null) {
+            newScaled[code] = scaled
           }
         }
-        setScaledScores(newScaled)
+      }
+      console.log('📊 [WISC] Escalares calculados:', newScaled)
+      setScaledScores(newScaled)
 
-        // Calcular índices compuestos
-        const result = engine.score(birth, now, rawScores, {})
-        if (result) {
-          const composites = {
-            ICV: result.ICV,
-            IVE: result.IVE,
-            IRF: result.IRF,
-            IMT: result.IMT,
-            IVP: result.IVP,
-            CIT: result.CIT,
-          }
-          setCompositeScores(composites)
-        } else {
-          setCompositeScores(null)
+      // Calcular índices compuestos
+      const result = engine.score(birth, now, rawScores, {})
+      console.log('📊 [WISC] Resultado de engine.score:', result)
+      if (result) {
+        const composites = {
+          ICV: result.ICV,
+          IVE: result.IVE,
+          IRF: result.IRF,
+          IMT: result.IMT,
+          IVP: result.IVP,
+          CIT: result.CIT,
         }
-      } catch (err) {
-        console.error('❌ [WISC] Error calculando scores:', err)
+        console.log('📊 [WISC] Composite scores a setear:', composites)
+        setCompositeScores(composites)
+      } else {
+        console.warn('⚠️ [WISC] engine.score devolvió null/undefined')
         setCompositeScores(null)
       }
-    }, 150)
-
-    return () => clearTimeout(timer)
+    } catch (err) {
+      console.error('❌ [WISC] Error calculando scores:', err)
+      setCompositeScores(null)
+    }
   }, [rawScores, ageInfo, patient, engine, engineReady])
 
   // ============================================================
@@ -302,7 +287,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      // 1. Buscar sesión existente
       let { data: session, error: sessionError } = await supabase
         .from('sessions')
         .select('id')
@@ -338,7 +322,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
 
       const sessionId = session.id
 
-      // 2. Guardar puntajes en wisc5_scores
       const payload = {
         session_id: sessionId,
         raw_scores: rawScores,
@@ -358,7 +341,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       }
       console.log('✅ Puntajes guardados correctamente')
 
-      // 3. Insertar en informes
       const citScore = compositeScores?.CIT?.score || 0
       const citClassification = getClassification(citScore)
 
@@ -381,16 +363,10 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         console.log('✅ Registro insertado en informes')
       }
 
-      // 4. Incrementar contador (solo free)
       if (isFree) {
-        const { error: countError } = await supabase
-          .rpc('increment_reports_used', { p_user_id: user.id })
-        if (countError) {
-          console.warn('⚠️ Error al incrementar contador:', countError)
-        }
+        await supabase.rpc('increment_reports_used', { p_user_id: user.id })
       }
 
-      // 5. Redirigir
       router.push(`/resultados/wisc5?session=${sessionId}&type=${type}`)
 
     } catch (err: any) {
@@ -430,15 +406,12 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
 
   const primarySubtests = SUBTESTS_CONFIG.filter(s => s.primary)
   const secondarySubtests = SUBTESTS_CONFIG.filter(s => !s.primary)
-
-  // Verificar cuántas subpruebas primarias tienen puntaje
   const primaryKeys = primarySubtests.map(s => s.code)
   const filledPrimary = primaryKeys.filter(code => rawScores[code] !== undefined && rawScores[code] !== null)
   const isCITCalculable = filledPrimary.length === primaryKeys.length
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      {/* Cabecera */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
         <h1 className="text-xl font-semibold text-gray-800">Calculadora WISC-V</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -461,7 +434,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       </div>
 
-      {/* Formulario en grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Subpruebas primarias</h2>
@@ -508,7 +480,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       </div>
 
-      {/* Resultados de índices */}
       {compositeScores && Object.keys(compositeScores).some(key => compositeScores[key]) ? (
         <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Índices Compuestos</h2>
@@ -553,7 +524,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       )}
 
-      {/* Botones */}
       <div className="mt-6 flex flex-wrap gap-3">
         <button
           onClick={() => generateReport('brief')}
