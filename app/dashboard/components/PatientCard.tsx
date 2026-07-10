@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 
-// Definir la interfaz aquí mismo (sin importar de otro lugar)
-interface PatientCardProps {
+interface Props {
   patient: {
     id: string
     full_name: string
@@ -25,7 +24,7 @@ interface PatientCardProps {
   onNewSession: (patientId: string) => void
 }
 
-export function PatientCard({ patient, onNewSession }: PatientCardProps) {
+export default function PatientCard({ patient, onNewSession }: Props) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-shadow">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -49,7 +48,6 @@ export function PatientCard({ patient, onNewSession }: PatientCardProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Botón "Ingresar WISC-V" */}
           <Link
             href={`/dashboard/paciente/${patient.id}/wisc5-calculadora`}
             className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
