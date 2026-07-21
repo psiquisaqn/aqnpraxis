@@ -1,6 +1,11 @@
 'use client'
 // app/resultados/wisc5/page.tsx
-// Versión mejorada con tipado correcto
+// Versión final con todas las correcciones solicitadas:
+// - Título: "Informe de Evaluación de Funcionamiento Cognitivo"
+// - Interpretaciones de subpruebas ampliadas
+// - Recomendaciones en párrafo
+// - Gráficos con etiquetas en el eje X
+// - Corrección de plan Premium para mostrar DOCX y ODT
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -11,13 +16,20 @@ import { ReporteFooter } from '@/components/ReporteFooter'
 import { useReportDocx } from '@/hooks/useReportDocx'
 
 // ============================================================
-// TIPOS
+// TIPOS (agregado para mayor seguridad)
 // ============================================================
 
-interface WiscData {
+interface Wisc5Data {
+  composite_scores: {
+    CIT?: { score: number; percentile: number }
+    ICV?: { score: number; percentile: number }
+    IVE?: { score: number; percentile: number }
+    IRF?: { score: number; percentile: number }
+    IMT?: { score: number; percentile: number }
+    IVP?: { score: number; percentile: number }
+  }
   scaled_scores: Record<string, number>
-  composite_scores: Record<string, { score: number; percentile: number; classification?: string }>
-  raw_scores: Record<string, number>
+  raw_scores: Record<string, any>
 }
 
 // ============================================================
@@ -70,15 +82,15 @@ function getColorForScore(score: number, isScaled: boolean = false): string {
 }
 
 // ============================================================
-// GRÁFICO DE BARRAS (genérico)
+// GRÁFICO DE BARRAS (mejorado: etiquetas en el eje X)
 // ============================================================
 
-function GraficoBarras({ 
-  data, 
-  minVal = 40, 
+function GraficoBarras({
+  data,
+  minVal = 40,
   maxVal = 160,
   showValues = true
-}: { 
+}: {
   data: Array<{ label: string; score: number }>
   minVal?: number
   maxVal?: number
@@ -86,15 +98,15 @@ function GraficoBarras({
 }) {
   return (
     <div className="grafico-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'flex-end', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-end',
         minHeight: '200px',
         borderBottom: '1px solid #333',
         borderLeft: '1px solid #333',
         paddingLeft: '10px',
-        paddingBottom: '10px',
+        paddingBottom: '5px',
         gap: '6px',
         flexWrap: 'wrap'
       }}>
@@ -102,18 +114,18 @@ function GraficoBarras({
           const score = item.score
           const alturaRelativa = ((score - minVal) / (maxVal - minVal)) * 150
           const color = getColorForScore(score, maxVal <= 19)
-          
+
           return (
             <div key={idx} style={{ textAlign: 'center', width: '45px' }}>
-              <div style={{ 
-                backgroundColor: color, 
-                width: '28px', 
-                margin: '0 auto', 
+              <div style={{
+                backgroundColor: color,
+                width: '28px',
+                margin: '0 auto',
                 height: `${Math.max(alturaRelativa, 4)}px`,
-                marginBottom: '4px',
+                marginBottom: '2px',
                 borderRadius: '2px 2px 0 0',
               }} />
-              <div style={{ fontSize: '7px', fontWeight: 'normal', fontFamily: 'Georgia, Times New Roman, serif' }}>
+              <div style={{ fontSize: '7px', fontWeight: 'normal', fontFamily: 'Georgia, Times New Roman, serif', marginTop: '2px' }}>
                 {item.label}
               </div>
               {showValues && (
@@ -137,6 +149,88 @@ function GraficoBarras({
 }
 
 // ============================================================
+// MARCO INTERPRETATIVO PARA SUBPRUEBAS (ampliado)
+// ============================================================
+
+const SUBTEST_INTERPRETATIONS: Record<string, { Bajo: string; Suficiente: string; Alto: string }> = {
+  CC: {
+    Bajo: 'Existe confusión o extravío en el mapeo visual de superficies y su división en coordenadas, lo que afecta la coordinación entre representación, percepción y movimiento. Suele presentar dificultades para reproducir modelos a partir de estímulos visuales, con errores de rotación o inversión, y requiere apoyo externo o ensayo-error constante.',
+    Suficiente: 'Nivel suficiente: logra reproducir los modelos con precisión aceptable, aunque puede mostrar alguna lentitud o mínimos errores en patrones complejos. La coordinación visomotora es adecuada para tareas cotidianas.',
+    Alto: 'Desempeño notable: demuestra una capacidad excepcional para analizar y replicar estructuras geométricas, con rapidez y precisión. Maneja con soltura la rotación mental y la segmentación de superficies.'
+  },
+  AN: {
+    Bajo: 'Presenta dificultades significativas para identificar relaciones semánticas entre conceptos, mostrando escasa capacidad de síntesis y abstracción. Suele responder con asociaciones concretas o tangenciales, y requiere apoyos visuales o ejemplos para establecer comparaciones.',
+    Suficiente: 'Capacidad suficiente: identifica relaciones lógicas entre conceptos de uso común y puede establecer categorías básicas. Su pensamiento abstracto está en desarrollo y le permite resolver analogías simples con cierta fluidez.',
+    Alto: 'Alto rendimiento: demuestra un pensamiento abstracto refinado, captando relaciones complejas y sutiles entre conceptos. Su razonamiento analógico es rápido, preciso y enriquece su discurso con comparaciones elaboradas.'
+  },
+  MR: {
+    Bajo: 'Confusión en la identificación de secuencias y series, así como en la ilación de elementos en ejes de sentido. Falla al percibir patrones de cambio (tamaño, color, orientación) y tiende a responder al azar o por ensayo-error sin estrategia.',
+    Suficiente: 'Manejo suficiente: reconoce patrones visuales y secuencias lógicas en matrices de dificultad moderada. Puede resolver la mayoría de los ítems, aunque con lentitud o dudas en los más complejos.',
+    Alto: 'Alto desarrollo: identifica con rapidez y precisión las reglas subyacentes en matrices complejas, incluso con múltiples atributos. Su razonamiento inductivo es muy eficiente.'
+  },
+  RD: {
+    Bajo: 'Confusión o bloqueo en el uso de la memoria de trabajo, con dificultades para retener y manipular secuencias numéricas. Muestra pérdida de información en tareas de atención sostenida y se ve superado fácilmente por la longitud de los estímulos.',
+    Suficiente: 'Manejo suficiente: retiene y ordena dígitos en orden directo e inverso con un desempeño acorde a su edad. Aunque puede cometer algún error en secuencias largas, mantiene una estrategia eficaz de repaso.',
+    Alto: 'Alto desempeño: exhibe una memoria de trabajo excepcional, manejando secuencias largas con precisión y sin esfuerzo. Además, es capaz de reorganizar la información mentalmente con gran agilidad.'
+  },
+  CLA: {
+    Bajo: 'Desmedro significativo en la velocidad de operatoria mental, lo que repercute en la coordinación visomotora y en la rapidez para procesar estímulos simples. Puede presentar lentitud motriz o fatiga precoz, afectando el número de ítems completados.',
+    Suficiente: 'Desempeño suficiente: velocidad de procesamiento adecuada para la edad, completando la tarea en un tiempo razonable y con pocos errores. Mantiene un ritmo constante durante toda la prueba.',
+    Alto: 'Manejo notable: gran rapidez y precisión en la copia de símbolos, con una excelente coordinación ojo-mano. Su velocidad de procesamiento está por encima de la media, lo que le permite realizar tareas rutinarias con eficiencia.'
+  },
+  VOC: {
+    Bajo: 'Bloqueo o desinterés en el manejo del repertorio léxico y semántico del medio cultural. Dificultad para definir palabras o para encontrar el término exacto, con discurso telegráfico o impreciso. Muestra poca riqueza expresiva.',
+    Suficiente: 'Manejo suficiente: posee un vocabulario funcional para la comunicación diaria, define palabras comunes con precisión y comprende el significado de términos abstractos básicos. Su discurso es coherente y fluido.',
+    Alto: 'Alto nivel: dominio léxico amplio y preciso, con capacidad para definir términos complejos y utilizar un lenguaje rico en matices. Su discurso es elaborado, con buen uso de sinónimos y estructuras gramaticales avanzadas.'
+  },
+  BAL: {
+    Bajo: 'Dificultades significativas en la percepción visual de relaciones de equilibrio y equivalencia, con tendencia a saturarse perceptivamente ante estímulos que requieren comparación de pesos. Errores frecuentes al juzgar si dos conjuntos son equivalentes.',
+    Suficiente: 'Rendimiento suficiente: percibe correctamente relaciones de equilibrio en la mayoría de los ítems, aunque puede dudar en los que requieren mayor razonamiento cuantitativo. No presenta saturación perceptiva relevante.',
+    Alto: 'Manejo notable: percepción visual muy aguda para relaciones de equivalencia, resuelve con rapidez y precisión, incluso en configuraciones complejas. Muestra una excelente comprensión de la conservación de la masa.'
+  },
+  RV: {
+    Bajo: 'Confusión o extravío en la división y rearticulación geométrica regular e irregular de elementos visuales. Dificultad para descomponer mentalmente figuras y volver a ensamblarlas, con errores de orientación o traslape.',
+    Suficiente: 'Nivel suficiente: es capaz de segmentar y recomponer figuras geométricas de complejidad moderada, aunque puede necesitar más tiempo o ensayos en ítems difíciles. Su razonamiento espacial es adecuado.',
+    Alto: 'Manejo notable: gran habilidad para analizar y reconstruir mentalmente figuras, incluso con formas irregulares. Su razonamiento visoespacial es rápido y preciso, destacando en tareas de rotación y traslación.'
+  },
+  RI: {
+    Bajo: 'Presenta dificultades para retener y reconocer estímulos visuales complejos después de una breve exposición. Muestra olvidos frecuentes, confusión entre distractores y baja capacidad de almacenamiento visual a corto plazo.',
+    Suficiente: 'Desempeño suficiente: recuerda correctamente la mayoría de las imágenes presentadas, con un reconocimiento acorde a su edad. Puede fallar en algunos detalles, pero en general mantiene una memoria visual funcional.',
+    Alto: 'Alta capacidad: demuestra una memoria visual excepcional, reteniendo detalles finos y distinguiendo con precisión entre estímulos similares. Su almacenamiento visual es rápido y duradero.'
+  },
+  BS: {
+    Bajo: 'Dificultades en la velocidad de operatoria mental, la agudeza y organización de búsqueda, y la concentración en tareas de esfuerzo visual. Tiende a perderse entre distractores, con alto número de omisiones o errores.',
+    Suficiente: 'Desempeño suficiente: realiza la búsqueda de símbolos con velocidad y precisión adecuadas para su edad, aunque puede disminuir el ritmo en ítems más largos. Mantiene una buena atención visual.',
+    Alto: 'Notable desarrollo: altísima velocidad y precisión en la búsqueda, con una organización visual muy eficiente. Su capacidad de atención sostenida es sobresaliente, completando la tarea con pocos errores.'
+  },
+  IN: {
+    Bajo: 'Bloqueo o desinterés en el acceso a la información del medio cultural amplio. Muestra lagunas en conocimientos generales básicos, con respuestas evasivas o "no sé" frecuentes.',
+    Suficiente: 'Nivel suficiente: posee un bagaje de conocimientos generales acorde a su edad y entorno, respondiendo correctamente a preguntas de cultura general sin dificultad.',
+    Alto: 'Alto nivel: demuestra una gran curiosidad y un amplio repertorio de información cultural, respondiendo con precisión y detalles a preguntas complejas. Su memoria a largo plazo para hechos es excelente.'
+  },
+  SLN: {
+    Bajo: 'Dificultad para alternar entre categorías (letras y números) y para retener el orden secuencial. Muestra confusión al reorganizar la información, con errores de omisión o inversión.',
+    Suficiente: 'Manejo suficiente: logra ordenar correctamente secuencias mixtas de letras y números en tareas de dificultad media, aunque puede necesitar más tiempo en las más largas.',
+    Alto: 'Alto rendimiento: ejecuta con rapidez y sin errores la reorganización de secuencias alfanuméricas, demostrando una excelente flexibilidad cognitiva y memoria de trabajo.'
+  },
+  CAN: {
+    Bajo: 'Dificultad para mantener la atención selectiva y para escanear estímulos visuales de forma organizada. Omite muchos blancos o comete errores por impulsividad, con baja velocidad de procesamiento.',
+    Suficiente: 'Desempeño suficiente: realiza la tarea de cancelación con un nivel de atención y organización adecuado, aunque puede tener algún error en estímulos muy densos.',
+    Alto: 'Alta precisión: mantiene una atención selectiva sobresaliente, escaneando rápidamente y marcando todos los blancos sin errores. Su control inhibitorio es muy eficaz.'
+  },
+  COM: {
+    Bajo: 'Poca densidad en la habilidad de análisis, la reflexividad y la descripción detallada de elementos complejos. Responde de manera superficial o con respuestas concretas, sin profundizar en causas o implicaciones.',
+    Suficiente: 'Nivel suficiente: comprende y explica situaciones sociales o conceptuales con un grado de detalle adecuado, mostrando capacidad de análisis moderada y reflexiva.',
+    Alto: 'Alto desarrollo: demuestra un pensamiento crítico refinado, con análisis detallado de situaciones complejas, identificando múltiples perspectivas y consecuencias. Su discurso es reflexivo y rico en matices.'
+  },
+  ARI: {
+    Bajo: 'Dificultades en el cálculo mental inmediato y en el espacio disponible en la memoria de trabajo. Comete errores por pérdida de información intermedia o por falta de estrategias de cálculo.',
+    Suficiente: 'Desempeño suficiente: resuelve problemas aritméticos mentales con precisión en un tiempo razonable, utilizando estrategias básicas y manteniendo la información en memoria de trabajo.',
+    Alto: 'Notable manejo: realiza cálculos mentales complejos con gran rapidez y exactitud, demostrando un excelente uso de la memoria de trabajo y un razonamiento cuantitativo muy desarrollado.'
+  }
+}
+
+// ============================================================
 // COMPONENTE PRINCIPAL
 // ============================================================
 
@@ -150,8 +244,8 @@ function Wisc5ResultsPageInner() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<WiscData | null>(null)
-  const [plan, setPlan] = useState<any>(null)
+  const [data, setData] = useState<Wisc5Data | null>(null)
+  const [planStatus, setPlanStatus] = useState<any>(null)
   const [patient, setPatient] = useState<any>(null)
   const [patientName, setPatientName] = useState('')
   const [patientId, setPatientId] = useState('')
@@ -216,19 +310,15 @@ function Wisc5ResultsPageInner() {
           return
         }
 
-        // Tipar los datos
-        const typedData: WiscData = {
-          scaled_scores: wiscData.scaled_scores || {},
-          composite_scores: wiscData.composite_scores || {},
-          raw_scores: wiscData.raw_scores || {},
-        }
-        setData(typedData)
+        setData(wiscData as Wisc5Data)
 
-        // 3. Obtener plan del usuario
+        // 3. Obtener plan del usuario (CORREGIDO: extraer primer elemento si es array)
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-          setPlan(planData)
+          // La RPC devuelve un array con un solo objeto
+          const plan = Array.isArray(planData) ? planData[0] : planData
+          setPlanStatus(plan)
         }
 
         setLoading(false)
@@ -241,9 +331,9 @@ function Wisc5ResultsPageInner() {
     load()
   }, [sessionId])
 
-  const isPro = plan?.is_pro || false
+  const isPro = planStatus?.is_pro || false
 
-  // Handlers para descarga
+  // Handlers para descarga DOCX/ODT
   const handleDownload = (type: 'docx' | 'odt') => {
     if (!data) return
     const meta = {
@@ -252,8 +342,8 @@ function Wisc5ResultsPageInner() {
       testId: 'wisc5',
       patientName,
       content: {
-        indexes: data.composite_scores,
-        scaledScores: data.scaled_scores,
+        indexes: data.composite_scores || {},
+        scaledScores: data.scaled_scores || {},
         reportType,
       }
     }
@@ -279,9 +369,9 @@ function Wisc5ResultsPageInner() {
     )
   }
 
-  const scaledScores = data.scaled_scores
-  const compositeScores = data.composite_scores
-  const rawScores = data.raw_scores
+  const scaledScores = data.scaled_scores || {}
+  const compositeScores = data.composite_scores || {}
+  const rawScores = data.raw_scores || {}
 
   // Datos para gráficos
   const indexCodes = ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']
@@ -323,9 +413,18 @@ function Wisc5ResultsPageInner() {
     .filter(([_, pe]) => pe != null)
     .map(([code, pe]) => ({
       label: subtestLabels[code] || code,
-      score: pe,
+      score: pe as number,
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
+
+  // Función para obtener la interpretación de una subprueba
+  function getSubtestInterpretation(code: string, pe: number): string {
+    const entry = SUBTEST_INTERPRETATIONS[code]
+    if (!entry) return 'No disponible.'
+    if (pe >= 12) return entry.Alto
+    if (pe >= 8) return entry.Suficiente
+    return entry.Bajo
+  }
 
   return (
     <div className="min-h-screen" style={{ background: 'white' }}>
@@ -336,7 +435,7 @@ function Wisc5ResultsPageInner() {
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>WISC-V</span>
         <span className="text-xs text-gray-400">{reportType === 'brief' ? 'Breve (7)' : 'Extendido (15)'}</span>
         <div className="flex-1" />
-        
+
         <button
           onClick={() => window.print()}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border"
@@ -344,7 +443,7 @@ function Wisc5ResultsPageInner() {
         >
           Imprimir
         </button>
-        
+
         <PdfDownloadButton
           contentRef={contentRef}
           meta={{
@@ -398,7 +497,7 @@ function Wisc5ResultsPageInner() {
           patientAge={patientAge}
           patientSchool={patientSchool}
           evalDate={evalDate}
-          testName="WISC-V - Escala de Inteligencia de Wechsler para Niños"
+          testName="Informe de Evaluación de Funcionamiento Cognitivo"
         />
 
         {/* GRÁFICO 1: SUBPRUEBAS */}
@@ -407,9 +506,9 @@ function Wisc5ResultsPageInner() {
             <div className="border-b border-gray-300 pb-2 mb-3">
               <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Subpruebas</h2>
             </div>
-            <GraficoBarras 
-              data={datosSubpruebas} 
-              minVal={0} 
+            <GraficoBarras
+              data={datosSubpruebas}
+              minVal={0}
               maxVal={19}
               showValues={true}
             />
@@ -425,9 +524,9 @@ function Wisc5ResultsPageInner() {
             <div className="border-b border-gray-300 pb-2 mb-3">
               <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Índices Compuestos</h2>
             </div>
-            <GraficoBarras 
-              data={datosIndices} 
-              minVal={40} 
+            <GraficoBarras
+              data={datosIndices}
+              minVal={40}
               maxVal={160}
               showValues={true}
             />
@@ -450,13 +549,13 @@ function Wisc5ResultsPageInner() {
                 Coeficiente Intelectual Total (CIT)
               </h3>
               <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
-                El evaluado obtuvo un CIT de <strong>{compositeScores.CIT.score}</strong>, 
-                clasificado como <strong>{getClassification(compositeScores.CIT.score)}</strong> 
-                (percentil {compositeScores.CIT.percentile}). 
-                {compositeScores.CIT.score >= 110 
-                  ? ' Este puntaje indica un desarrollo cognitivo superior al promedio, lo que sugiere buenas capacidades para el aprendizaje y la resolución de problemas complejos.' 
-                  : compositeScores.CIT.score >= 90 
-                    ? ' Este puntaje se encuentra dentro del rango esperado para la población general, indicando un funcionamiento cognitivo acorde a su edad.' 
+                El evaluado obtuvo un CIT de <strong>{compositeScores.CIT.score}</strong>,
+                clasificado como <strong>{getClassification(compositeScores.CIT.score)}</strong>
+                (Rango {compositeScores.CIT.score - 15} – {compositeScores.CIT.score + 15}, Percentil {compositeScores.CIT.percentile}).
+                {compositeScores.CIT.score >= 110
+                  ? ' Este puntaje indica un desarrollo cognitivo superior al promedio, lo que sugiere buenas capacidades para el aprendizaje y la resolución de problemas complejos.'
+                  : compositeScores.CIT.score >= 90
+                    ? ' Este puntaje se encuentra dentro del rango esperado para la población general, indicando un funcionamiento cognitivo acorde a su edad.'
                     : ' Este puntaje se encuentra por debajo del promedio, lo que sugiere la necesidad de apoyos específicos en el ámbito académico y/o cognitivo.'}
               </p>
             </div>
@@ -473,9 +572,9 @@ function Wisc5ResultsPageInner() {
                   {label} ({idx.score})
                 </h3>
                 <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
-                  {idx.score >= 110 
+                  {idx.score >= 110
                     ? `El evaluado muestra un desempeño superior en el índice ${label}, lo que evidencia fortalezas en las habilidades cognitivas asociadas a este dominio.`
-                    : idx.score >= 90 
+                    : idx.score >= 90
                       ? `El desempeño en el índice ${label} se encuentra dentro de lo esperado para su edad, con un desarrollo adecuado de las habilidades cognitivas asociadas.`
                       : `Se observan dificultades en el índice ${label}, lo que sugiere la necesidad de intervención o apoyo en las habilidades cognitivas relacionadas.`}
                   {' '}{(() => {
@@ -493,7 +592,7 @@ function Wisc5ResultsPageInner() {
             )
           })}
 
-          {/* Descripción cualitativa de subpruebas */}
+          {/* Descripción cualitativa de subpruebas (ampliada) */}
           <div className="mt-4">
             <h3 className="text-md font-semibold" style={{ color: '#1a1a1a' }}>
               Análisis Cualitativo por Subprueba
@@ -502,44 +601,23 @@ function Wisc5ResultsPageInner() {
               .filter(([_, pe]) => pe != null)
               .map(([code, pe]) => {
                 const label = subtestLabels[code] || code
-                const descripcion = pe >= 12 
-                  ? 'destaca positivamente, mostrando un desempeño sobresaliente.'
-                  : pe >= 8 
-                    ? 'se encuentra dentro del rango esperado, con un desarrollo adecuado.'
-                    : 'muestra dificultades significativas que podrían requerir atención específica.'
+                const interpretation = getSubtestInterpretation(code, pe as number)
                 return (
                   <p key={code} className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
-                    <strong>{label}:</strong> PE {pe} – {descripcion}
+                    <strong>{label}:</strong> PE {pe as number} – {interpretation}
                   </p>
                 )
               })}
           </div>
         </div>
 
-        {/* RECOMENDACIONES */}
+        {/* RECOMENDACIONES (en párrafo fluido) */}
         <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Recomendaciones</h2>
           </div>
           <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563' }}>
-            Con base en los resultados obtenidos, se sugieren las siguientes orientaciones:
-          </p>
-          <ul className="text-sm leading-relaxed list-disc pl-5 space-y-2 mt-2" style={{ color: '#4b5563' }}>
-            <li>
-              <strong>Áreas de Fortaleza:</strong> Se recomienda potenciar las habilidades destacadas mediante actividades desafiantes que mantengan el interés y promuevan el desarrollo de habilidades superiores. Por ejemplo, si el evaluado destaca en razonamiento verbal, se sugiere fomentar la lectura crítica y la discusión de textos complejos.
-            </li>
-            <li>
-              <strong>Áreas de Debilidad:</strong> Implementar apoyos específicos según los índices más bajos. Si hay debilidad en memoria de trabajo, se recomienda entrenamiento con ejercicios de retención y manipulación de información, así como el uso de ayudas visuales y organización de tareas.
-            </li>
-            <li>
-              <strong>Contexto Educativo:</strong> Adaptar el entorno escolar reduciendo la carga cognitiva en tareas que demanden memoria de trabajo o velocidad de procesamiento. Proporcionar instrucciones claras y segmentadas, y utilizar materiales visuales que faciliten la comprensión.
-            </li>
-            <li>
-              <strong>Seguimiento:</strong> Se sugiere una reevaluación en 12 a 18 meses para monitorear la evolución del perfil cognitivo y ajustar las intervenciones según sea necesario. Además, se recomienda una evaluación complementaria en áreas específicas si se identifican necesidades particulares.
-            </li>
-          </ul>
-          <p className="text-sm leading-relaxed text-justify mt-3" style={{ color: '#4b5563' }}>
-            Los resultados deben interpretarse en el contexto de la historia personal, educativa y familiar del evaluado. Se recomienda integrar esta información con otras fuentes de evaluación (observación, entrevistas, etc.) para una comprensión integral.
+            Con base en los resultados obtenidos, se sugiere potenciar las áreas de fortaleza identificadas mediante actividades desafiantes que mantengan el interés y promuevan el desarrollo de habilidades superiores. Por ejemplo, si el evaluado destaca en razonamiento verbal, se recomienda fomentar la lectura crítica y la discusión de textos complejos. En las áreas de debilidad, se deben implementar apoyos específicos según los índices más bajos; si hay debilidad en memoria de trabajo, se sugiere entrenamiento con ejercicios de retención y manipulación de información, así como el uso de ayudas visuales y organización de tareas. En el contexto educativo, se recomienda adaptar el entorno escolar reduciendo la carga cognitiva en tareas que demanden memoria de trabajo o velocidad de procesamiento, proporcionar instrucciones claras y segmentadas, y utilizar materiales visuales que faciliten la comprensión. Finalmente, se sugiere una reevaluación en 12 a 18 meses para monitorear la evolución del perfil cognitivo y ajustar las intervenciones según sea necesario; además, se recomienda una evaluación complementaria en áreas específicas si se identifican necesidades particulares. Los resultados deben interpretarse en el contexto de la historia personal, educativa y familiar del evaluado, integrando esta información con otras fuentes de evaluación (observación, entrevistas, etc.) para una comprensión integral.
           </p>
         </div>
 
