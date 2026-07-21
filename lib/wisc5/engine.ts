@@ -118,7 +118,7 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
   return { years, months, days, group }
 }
 
-// ─── Motor principal con cache (forzada) ──────────────────────────────
+// ─── Motor principal con cache ──────────────────────────────
 
 export class Wisc5Engine {
   private supabase: SupabaseClient = supabase
@@ -128,14 +128,16 @@ export class Wisc5Engine {
   private ageGroupsSet: Set<string> = new Set()
 
   /**
-   * Carga todas las normas en memoria (forzada, sin cache).
-   * Siempre recarga desde la base de datos para evitar cachés viejas.
+   * Carga todas las normas en memoria (sin límite de paginación).
+   * Usa limit(10000) para asegurar que se carguen todos los registros.
    */
   async loadNorms(): Promise<void> {
-    console.log('📥 [Engine] Cargando normas desde Supabase (forzado)...')
+    console.log('📥 [Engine] Cargando normas desde Supabase (sin límite de paginación)...')
+
+    // 🔥 SOLUCIÓN: usar limit(10000) para evitar la paginación por defecto de Supabase
     const [subtestRes, compositeRes] = await Promise.all([
-      this.supabase.from('wisc5_norms_subtest').select('*'),
-      this.supabase.from('wisc5_norms_composite').select('*'),
+      this.supabase.from('wisc5_norms_subtest').select('*').limit(10000),
+      this.supabase.from('wisc5_norms_composite').select('*').limit(10000),
     ])
 
     if (subtestRes.error) {
@@ -150,14 +152,15 @@ export class Wisc5Engine {
     this.normsSubtest = subtestRes.data || []
     this.normsComposite = compositeRes.data || []
     this.normsLoaded = true
-    this.ageGroupsSet.clear()
 
+    // Guardar los grupos de edad únicos
+    this.ageGroupsSet.clear()
     this.normsSubtest.forEach((n: any) => {
       if (n.age_group) this.ageGroupsSet.add(n.age_group)
     })
 
     console.log(`✅ [Engine] Normas cargadas: ${this.normsSubtest.length} subtest, ${this.normsComposite.length} composite`)
-    console.log(`📋 [Engine] Grupos de edad disponibles (primeros 10):`, Array.from(this.ageGroupsSet).slice(0, 10))
+    console.log(`📋 [Engine] Grupos de edad disponibles (${this.ageGroupsSet.size} grupos):`, Array.from(this.ageGroupsSet).slice(0, 10))
   }
 
   private normalizeAgeGroup(ageGroup: string): string {
@@ -172,6 +175,7 @@ export class Wisc5Engine {
 
     const normalizedGroup = this.normalizeAgeGroup(ageGroup)
 
+    // Buscar exacto
     let entry = this.normsSubtest.find(
       (n: any) =>
         this.normalizeAgeGroup(n.age_group) === normalizedGroup &&
@@ -180,14 +184,47 @@ export class Wisc5Engine {
         rawScore <= n.raw_score_max
     )
 
-    if (!entry) {
-      const availableGroups = Array.from(this.ageGroupsSet).filter(g => g.includes('13')).join(', ')
-      console.warn(`⚠️ [Engine] No se encontró norma para ${subtest} (raw=${rawScore}, group=${ageGroup})`)
-      console.warn(`   Grupos disponibles que contienen '13': ${availableGroups || 'ninguno'}`)
-      return null
+    if (entry) {
+      return entry.scaled_score
     }
 
-    return entry.scaled_score
+    // Buscar en grupos adyacentes (fallback)
+    const [year, rest] = ageGroup.split(':')
+    const [minMonth, maxMonth] = rest.split('-').map(s => parseInt(s))
+    const fallbackGroups: string[] = []
+    if (minMonth >= 6) {
+      const prev = `${year}:${(minMonth-6).toString().padStart(2,'0')}-${year}:${(maxMonth-6).toString().padStart(2,'0')}`
+      fallbackGroups.push(prev)
+    }
+    if (maxMonth <= 5) {
+      const next = `${year}:${(minMonth+6).toString().padStart(2,'0')}-${year}:${(maxMonth+6).toString().padStart(2,'0')}`
+      fallbackGroups.push(next)
+    }
+
+    for (const fallback of fallbackGroups) {
+      const entryFallback = this.normsSubtest.find(
+        (n: any) =>
+          n.age_group === fallback &&
+          n.subtest_code === subtest &&
+          rawScore >= n.raw_score_min &&
+          rawScore <= n.raw_score_max
+      )
+      if (entryFallback) {
+        console.warn(`⚠️ [Engine] Usando grupo ${fallback} como fallback para ${subtest} (raw=${rawScore})`)
+        return entryFallback.scaled_score
+      }
+    }
+
+    // Mostrar grupos disponibles que contienen el año
+    const availableGroups = Array.from(this.ageGroupsSet).filter(g => g.includes(year)).join(', ')
+    console.warn(`⚠️ [Engine] No se encontró norma para ${subtest} (raw=${rawScore}, group=${ageGroup})`)
+    if (availableGroups) {
+      console.warn(`   Grupos disponibles que contienen '${year}': ${availableGroups}`)
+    } else {
+      console.warn(`   Ningún grupo disponible para el año ${year}.`)
+    }
+
+    return null
   }
 
   sumToComposite(indexCode: IndexCode, sumScaled: number): Omit<CompositeResult, 'sumScaled'> | null {
