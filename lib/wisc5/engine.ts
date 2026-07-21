@@ -128,29 +128,78 @@ export class Wisc5Engine {
   private ageGroupsSet: Set<string> = new Set()
 
   /**
-   * Carga todas las normas en memoria (sin límite de paginación).
-   * Usa limit(10000) para asegurar que se carguen todos los registros.
+   * Carga TODAS las normas desde Supabase usando paginación manual.
+   * Esto asegura que se obtengan todos los registros (más de 1000).
    */
   async loadNorms(): Promise<void> {
-    console.log('📥 [Engine] Cargando normas desde Supabase (sin límite de paginación)...')
+    console.log('📥 [Engine] Cargando todas las normas desde Supabase (con paginación)...')
 
-    // 🔥 SOLUCIÓN: usar limit(10000) para evitar la paginación por defecto de Supabase
-    const [subtestRes, compositeRes] = await Promise.all([
-      this.supabase.from('wisc5_norms_subtest').select('*').limit(10000),
-      this.supabase.from('wisc5_norms_composite').select('*').limit(10000),
-    ])
+    const pageSize = 1000
+    let allSubtest: any[] = []
+    let allComposite: any[] = []
+    let hasMore = true
+    let page = 0
 
-    if (subtestRes.error) {
-      console.error('❌ [Engine] Error cargando normas subtest:', subtestRes.error)
-      throw new Error(`Error cargando normas subtest: ${subtestRes.error.message}`)
+    // 1. Cargar normas de subpruebas con paginación
+    while (hasMore) {
+      const from = page * pageSize
+      const to = (page + 1) * pageSize - 1
+      console.log(`   ⏳ Cargando subtest página ${page + 1} (registros ${from} a ${to})...`)
+
+      const { data, error } = await this.supabase
+        .from('wisc5_norms_subtest')
+        .select('*')
+        .order('age_group', { ascending: true })
+        .range(from, to)
+
+      if (error) {
+        console.error('❌ [Engine] Error cargando normas subtest:', error)
+        throw new Error(`Error cargando normas subtest: ${error.message}`)
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false
+      } else {
+        allSubtest = allSubtest.concat(data)
+        page++
+        if (data.length < pageSize) {
+          hasMore = false
+        }
+      }
     }
-    if (compositeRes.error) {
-      console.error('❌ [Engine] Error cargando normas composite:', compositeRes.error)
-      throw new Error(`Error cargando normas composite: ${compositeRes.error.message}`)
+
+    // 2. Cargar normas compuestas con paginación
+    hasMore = true
+    page = 0
+    while (hasMore) {
+      const from = page * pageSize
+      const to = (page + 1) * pageSize - 1
+      console.log(`   ⏳ Cargando composite página ${page + 1} (registros ${from} a ${to})...`)
+
+      const { data, error } = await this.supabase
+        .from('wisc5_norms_composite')
+        .select('*')
+        .order('index_code', { ascending: true })
+        .range(from, to)
+
+      if (error) {
+        console.error('❌ [Engine] Error cargando normas composite:', error)
+        throw new Error(`Error cargando normas composite: ${error.message}`)
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false
+      } else {
+        allComposite = allComposite.concat(data)
+        page++
+        if (data.length < pageSize) {
+          hasMore = false
+        }
+      }
     }
 
-    this.normsSubtest = subtestRes.data || []
-    this.normsComposite = compositeRes.data || []
+    this.normsSubtest = allSubtest
+    this.normsComposite = allComposite
     this.normsLoaded = true
 
     // Guardar los grupos de edad únicos
