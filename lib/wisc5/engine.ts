@@ -118,7 +118,7 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
   return { years, months, days, group }
 }
 
-// ─── Motor principal con cache ──────────────────────────────
+// ─── Motor principal con cache (forzada) ──────────────────────────────
 
 export class Wisc5Engine {
   private supabase: SupabaseClient = supabase
@@ -127,13 +127,12 @@ export class Wisc5Engine {
   private normsLoaded = false
   private ageGroupsSet: Set<string> = new Set()
 
+  /**
+   * Carga todas las normas en memoria (forzada, sin cache).
+   * Siempre recarga desde la base de datos para evitar cachés viejas.
+   */
   async loadNorms(): Promise<void> {
-    if (this.normsLoaded) {
-      console.log('✅ [Engine] Normas ya cargadas, omitiendo recarga.')
-      return
-    }
-
-    console.log('📥 [Engine] Cargando normas desde Supabase...')
+    console.log('📥 [Engine] Cargando normas desde Supabase (forzado)...')
     const [subtestRes, compositeRes] = await Promise.all([
       this.supabase.from('wisc5_norms_subtest').select('*'),
       this.supabase.from('wisc5_norms_composite').select('*'),
@@ -151,8 +150,8 @@ export class Wisc5Engine {
     this.normsSubtest = subtestRes.data || []
     this.normsComposite = compositeRes.data || []
     this.normsLoaded = true
+    this.ageGroupsSet.clear()
 
-    // Guardar grupos de edad
     this.normsSubtest.forEach((n: any) => {
       if (n.age_group) this.ageGroupsSet.add(n.age_group)
     })
@@ -173,7 +172,6 @@ export class Wisc5Engine {
 
     const normalizedGroup = this.normalizeAgeGroup(ageGroup)
 
-    // Búsqueda exacta
     let entry = this.normsSubtest.find(
       (n: any) =>
         this.normalizeAgeGroup(n.age_group) === normalizedGroup &&
@@ -182,7 +180,6 @@ export class Wisc5Engine {
         rawScore <= n.raw_score_max
     )
 
-    // Si no se encuentra, mostrar grupos disponibles para depuración
     if (!entry) {
       const availableGroups = Array.from(this.ageGroupsSet).filter(g => g.includes('13')).join(', ')
       console.warn(`⚠️ [Engine] No se encontró norma para ${subtest} (raw=${rawScore}, group=${ageGroup})`)
