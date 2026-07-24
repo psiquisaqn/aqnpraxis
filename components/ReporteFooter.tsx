@@ -36,9 +36,17 @@ export function ReporteFooter({ showFirma = true }: ReporteFooterProps) {
       {/* Espacio para firma */}
       {showFirma && (
         <div className="text-center mb-4">
-          <div className="h-16 flex justify-center items-end">
+          {/* Contenedor de la imagen con altura máxima y centrado */}
+          <div className="flex justify-center items-center" style={{ maxHeight: '60px', overflow: 'hidden' }}>
             {firmaUrl ? (
-              <Image src={firmaUrl} alt="Firma" width={150} height={50} className="object-contain" />
+              <Image
+                src={firmaUrl}
+                alt="Firma"
+                width={150}
+                height={60}
+                className="object-contain"
+                style={{ maxHeight: '60px', width: 'auto' }}
+              />
             ) : (
               <div className="w-40 border-b border-gray-400" />
             )}

@@ -1,11 +1,6 @@
 'use client'
 // app/resultados/wisc5/page.tsx
-// Versión final con todas las correcciones solicitadas:
-// - Título: "Informe de Evaluación de Funcionamiento Cognitivo"
-// - Interpretaciones de subpruebas ampliadas
-// - Recomendaciones en párrafo
-// - Gráficos con etiquetas en el eje X
-// - Corrección de plan Premium para mostrar DOCX y ODT
+// Versión con gráficos corregidos (barras alineadas al eje X)
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -16,7 +11,7 @@ import { ReporteFooter } from '@/components/ReporteFooter'
 import { useReportDocx } from '@/hooks/useReportDocx'
 
 // ============================================================
-// TIPOS (agregado para mayor seguridad)
+// TIPOS
 // ============================================================
 
 interface Wisc5Data {
@@ -33,7 +28,7 @@ interface Wisc5Data {
 }
 
 // ============================================================
-// ESTILOS DE IMPRESIÓN
+// ESTILOS DE IMPRESIÓN (sin reglas para la firma)
 // ============================================================
 
 const printStyles = `
@@ -82,7 +77,7 @@ function getColorForScore(score: number, isScaled: boolean = false): string {
 }
 
 // ============================================================
-// GRÁFICO DE BARRAS (mejorado: etiquetas en el eje X)
+// GRÁFICO DE BARRAS (CORREGIDO)
 // ============================================================
 
 function GraficoBarras({
@@ -96,8 +91,13 @@ function GraficoBarras({
   maxVal?: number
   showValues?: boolean
 }) {
+  const barWidth = 28
+  const itemWidth = 45
+  const maxHeight = 150
+
   return (
     <div className="grafico-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
+      {/* Contenedor de barras */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
@@ -106,28 +106,23 @@ function GraficoBarras({
         borderBottom: '1px solid #333',
         borderLeft: '1px solid #333',
         paddingLeft: '10px',
-        paddingBottom: '5px',
+        paddingBottom: '0px',
         gap: '6px',
         flexWrap: 'wrap'
       }}>
         {data.map((item, idx) => {
           const score = item.score
-          const alturaRelativa = ((score - minVal) / (maxVal - minVal)) * 150
+          const alturaRelativa = ((score - minVal) / (maxVal - minVal)) * maxHeight
           const color = getColorForScore(score, maxVal <= 19)
 
           return (
-            <div key={idx} style={{ textAlign: 'center', width: '45px' }}>
+            <div key={idx} style={{ width: `${itemWidth}px`, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
               <div style={{
                 backgroundColor: color,
-                width: '28px',
-                margin: '0 auto',
+                width: `${barWidth}px`,
                 height: `${Math.max(alturaRelativa, 4)}px`,
-                marginBottom: '2px',
                 borderRadius: '2px 2px 0 0',
               }} />
-              <div style={{ fontSize: '7px', fontWeight: 'normal', fontFamily: 'Georgia, Times New Roman, serif', marginTop: '2px' }}>
-                {item.label}
-              </div>
               {showValues && (
                 <div style={{ fontSize: '8px', color: color, marginTop: '1px', fontWeight: 'bold' }}>
                   {score}
@@ -137,6 +132,24 @@ function GraficoBarras({
           )
         })}
       </div>
+
+      {/* Contenedor de etiquetas (debajo del eje X) */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        paddingLeft: '10px',
+        gap: '6px',
+        flexWrap: 'wrap',
+        marginTop: '2px'
+      }}>
+        {data.map((item, idx) => (
+          <div key={idx} style={{ width: `${itemWidth}px`, textAlign: 'center', fontSize: '7px', fontWeight: 'normal', fontFamily: 'Georgia, Times New Roman, serif' }}>
+            {item.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Escala del eje Y */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7px', color: '#9ca3af', padding: '0 10px' }}>
         <span>{minVal}</span>
         <span>{(minVal + maxVal) / 4}</span>
@@ -312,11 +325,10 @@ function Wisc5ResultsPageInner() {
 
         setData(wiscData as Wisc5Data)
 
-        // 3. Obtener plan del usuario (CORREGIDO: extraer primer elemento si es array)
+        // 3. Obtener plan del usuario
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-          // La RPC devuelve un array con un solo objeto
           const plan = Array.isArray(planData) ? planData[0] : planData
           setPlanStatus(plan)
         }
@@ -333,7 +345,6 @@ function Wisc5ResultsPageInner() {
 
   const isPro = planStatus?.is_pro || false
 
-  // Handlers para descarga DOCX/ODT
   const handleDownload = (type: 'docx' | 'odt') => {
     if (!data) return
     const meta = {
@@ -373,7 +384,6 @@ function Wisc5ResultsPageInner() {
   const compositeScores = data.composite_scores || {}
   const rawScores = data.raw_scores || {}
 
-  // Datos para gráficos
   const indexCodes = ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']
   const indexLabels: Record<string, string> = {
     ICV: 'Comprensión Verbal',
@@ -417,7 +427,6 @@ function Wisc5ResultsPageInner() {
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
 
-  // Función para obtener la interpretación de una subprueba
   function getSubtestInterpretation(code: string, pe: number): string {
     const entry = SUBTEST_INTERPRETATIONS[code]
     if (!entry) return 'No disponible.'
@@ -460,7 +469,6 @@ function Wisc5ResultsPageInner() {
           label="PDF"
         />
 
-        {/* Botones DOCX y ODT solo para Premium */}
         {isPro && (
           <>
             <button
@@ -542,7 +550,6 @@ function Wisc5ResultsPageInner() {
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Interpretación de Resultados</h2>
           </div>
 
-          {/* CIT */}
           {compositeScores.CIT && (
             <div className="mb-4">
               <h3 className="text-md font-semibold" style={{ color: '#1a1a1a' }}>
@@ -561,7 +568,6 @@ function Wisc5ResultsPageInner() {
             </div>
           )}
 
-          {/* Índices */}
           {['ICV', 'IVE', 'IRF', 'IMT', 'IVP'].map(code => {
             const idx = compositeScores[code]
             if (!idx) return null
@@ -592,7 +598,6 @@ function Wisc5ResultsPageInner() {
             )
           })}
 
-          {/* Descripción cualitativa de subpruebas (ampliada) */}
           <div className="mt-4">
             <h3 className="text-md font-semibold" style={{ color: '#1a1a1a' }}>
               Análisis Cualitativo por Subprueba
@@ -611,7 +616,7 @@ function Wisc5ResultsPageInner() {
           </div>
         </div>
 
-        {/* RECOMENDACIONES (en párrafo fluido) */}
+        {/* RECOMENDACIONES */}
         <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Recomendaciones</h2>
