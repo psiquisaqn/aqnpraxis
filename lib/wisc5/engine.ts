@@ -38,6 +38,7 @@ export interface CompositeResult {
   ci95: [number, number]
   classification: string
   sumScaled: number
+  isEstimated?: boolean  // ← nuevo flag para indicar que el CIT es estimado
 }
 
 export interface WiscScoringResult {
@@ -79,7 +80,6 @@ export const CIT_SUBSTITUTES: SubtestCode[] = ['RV', 'RI', 'BS', 'IN', 'SLN', 'C
 /**
  * Clasificación cualitativa según puntaje compuesto (media 100, DE 15)
  * Rangos adaptados para la versión chilena del WISC-V
- * Corregido: 55-69 = Discapacidad Intelectual Leve, <=54 = Discapacidad Intelectual Moderada
  */
 export function getClassification(score: number): string {
   if (score >= 130) return 'Muy Superior'
@@ -276,6 +276,39 @@ export class Wisc5Engine {
     return null
   }
 
+  /**
+   * Aproxima el CIT a partir de la suma de puntajes escalares de las 7 subpruebas primarias.
+   * Usa la fórmula de regresión lineal: CIT ≈ 1.117 * suma + 32.5
+   * También calcula percentil y CI basados en la distribución normal (media 100, DE 15).
+   */
+  private approximateCITFromSum(sumScaled: number): CompositeResult {
+    const score = Math.round(1.117 * sumScaled + 32.5)
+    const clamped = Math.max(40, Math.min(160, score))
+
+    // Percentil aproximado usando distribución normal estándar
+    const z = (clamped - 100) / 15
+    const percentile = Math.round(100 * (0.5 * (1 + erf(z / Math.SQRT2))))
+
+    const ci90: [number, number] = [
+      Math.max(40, Math.round(clamped - 1.645 * 15)),
+      Math.min(160, Math.round(clamped + 1.645 * 15))
+    ]
+    const ci95: [number, number] = [
+      Math.max(40, Math.round(clamped - 1.96 * 15)),
+      Math.min(160, Math.round(clamped + 1.96 * 15))
+    ]
+
+    return {
+      score: clamped,
+      percentile: `${percentile}`,
+      ci90,
+      ci95,
+      classification: getClassification(clamped),
+      sumScaled,
+      isEstimated: true
+    }
+  }
+
   sumToComposite(indexCode: IndexCode, sumScaled: number): Omit<CompositeResult, 'sumScaled'> | null {
     if (!this.normsLoaded) {
       console.warn('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() primero.')
@@ -289,18 +322,25 @@ export class Wisc5Engine {
         sumScaled <= n.sum_scaled_max
     )
 
-    if (!entry) {
-      console.warn(`⚠️ [Engine] No se encontró norma compuesta para ${indexCode} (sum=${sumScaled})`)
-      return null
+    if (entry) {
+      return {
+        score: entry.composite_score,
+        percentile: entry.percentile,
+        ci90: [entry.ci90_lo, entry.ci90_hi],
+        ci95: [entry.ci95_lo, entry.ci95_hi],
+        classification: getClassification(entry.composite_score),
+      }
     }
 
-    return {
-      score: entry.composite_score,
-      percentile: entry.percentile,
-      ci90: [entry.ci90_lo, entry.ci90_hi],
-      ci95: [entry.ci95_lo, entry.ci95_hi],
-      classification: getClassification(entry.composite_score),
+    // Si no hay norma y es CIT, intentar aproximación
+    if (indexCode === 'CIT') {
+      console.warn(`⚠️ [Engine] No se encontró norma para CIT (sum=${sumScaled}). Usando aproximación.`)
+      const approx = this.approximateCITFromSum(sumScaled)
+      return approx
     }
+
+    console.warn(`⚠️ [Engine] No se encontró norma compuesta para ${indexCode} (sum=${sumScaled})`)
+    return null
   }
 
   calculateScaledScores(ageGroup: string, rawScores: RawScores): ScaledScores {
@@ -327,11 +367,15 @@ export class Wisc5Engine {
       if (missing) {
         const idx = subtests.indexOf(missing)
         subtests[idx] = substitution
+        console.log(`🔁 [Engine] Sustitución aplicada: ${missing} → ${substitution}`)
       }
     }
 
     const scores = subtests.map(s => scaledScores[s])
-    if (scores.some(s => s === undefined)) return null
+    if (scores.some(s => s === undefined)) {
+      console.warn(`⚠️ [Engine] Faltan subpruebas para ${indexCode}:`, subtests.filter(s => scaledScores[s] === undefined))
+      return null
+    }
 
     const sumScaled = scores.reduce((acc, s) => acc! + s!, 0) as number
     const composite = this.sumToComposite(indexCode, sumScaled)
@@ -362,6 +406,10 @@ export class Wisc5Engine {
     const IMT = this.calculateIndex('IMT', scaledScores)
     const IVP = this.calculateIndex('IVP', scaledScores)
     const CIT = this.calculateIndex('CIT', scaledScores, options.substitution)
+
+    if (CIT?.isEstimated) {
+      console.warn('⚠️ [Engine] CIT calculado de forma aproximada (sin norma).')
+    }
 
     const realtimePrediction = this.computeRealtimePrediction(scaledScores, CIT)
 
@@ -415,7 +463,7 @@ export class Wisc5Engine {
 
     const knownSum  = completedSubtests.reduce((acc, s) => acc + (scaledScores[s] ?? 10), 0)
     const totalSumEstimated = knownSum + missingSubtests.length * 10
-    const estimatedCIT = this.approximateCITFromSum(totalSumEstimated)
+    const estimatedCIT = this.approximateCITFromSum(totalSumEstimated).score
 
     const confidence: RealtimePrediction['confidence'] =
       completedSubtests.length >= 5 ? 'high'
@@ -432,14 +480,24 @@ export class Wisc5Engine {
     }
   }
 
-  private approximateCITFromSum(sum: number): number {
-    const estimated = Math.round(1.117 * sum + 32.5)
-    return Math.max(40, Math.min(160, estimated))
-  }
-
   prorrateCITSum(sumOf6: number): number {
     return Math.round(sumOf6 * (7 / 6))
   }
+}
+
+// Función auxiliar erf para cálculo de percentil aproximado
+function erf(x: number): number {
+  const a1 = 0.254829592
+  const a2 = -0.284496736
+  const a3 = 1.421413741
+  const a4 = -1.453152027
+  const a5 = 1.061405429
+  const p = 0.3275911
+  const sign = x < 0 ? -1 : 1
+  x = Math.abs(x)
+  const t = 1 / (1 + p * x)
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x)
+  return sign * y
 }
 
 export function createWisc5Engine(): Wisc5Engine {

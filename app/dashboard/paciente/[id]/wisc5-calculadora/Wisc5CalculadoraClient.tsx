@@ -27,6 +27,20 @@ const SUBTESTS_CONFIG = [
   { code: 'ARI', name: 'Aritmética', primary: false },
 ]
 
+// Definir las sustituciones permitidas para CIT
+const SUSTITUCIONES: { original: SubtestCode; replacement: SubtestCode; label: string }[] = [
+  { original: 'CC', replacement: 'RV', label: 'Construcción con Cubos → Rompecabezas Visuales' },
+  { original: 'AN', replacement: 'IN', label: 'Analogías → Información' },
+  { original: 'AN', replacement: 'COM', label: 'Analogías → Comprensión' },
+  { original: 'VOC', replacement: 'IN', label: 'Vocabulario → Información' },
+  { original: 'VOC', replacement: 'COM', label: 'Vocabulario → Comprensión' },
+  { original: 'BAL', replacement: 'ARI', label: 'Balanzas → Aritmética' },
+  { original: 'RD', replacement: 'RI', label: 'Retención de Dígitos → Retención de Imágenes' },
+  { original: 'RD', replacement: 'SLN', label: 'Retención de Dígitos → Secuenciación de Letras y Números' },
+  { original: 'CLA', replacement: 'BS', label: 'Claves → Búsqueda de Símbolos' },
+  { original: 'CLA', replacement: 'CAN', label: 'Claves → Cancelación' },
+]
+
 // ============================================================
 // FUNCIONES AUXILIARES
 // ============================================================
@@ -75,6 +89,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
   const [calculating, setCalculating] = useState<'brief' | 'extended' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Estado para la sustitución seleccionada
+  const [sustitucionSeleccionada, setSustitucionSeleccionada] = useState<{ original: SubtestCode; replacement: SubtestCode } | null>(null)
 
   const engineRef = useRef<Wisc5Engine | null>(null)
   if (!engineRef.current) {
@@ -234,21 +251,20 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       const now = new Date()
       console.log(`📊 [WISC] Calculando para grupo ${ageInfo.group}...`)
 
-      const scaled: ScaledScores = {}
-      for (const code of requiredCodes) {
-        const raw = rawScores[code]
-        if (raw !== undefined && raw !== null) {
-          const s = engine.rawToScaled(ageInfo.group, code as SubtestCode, raw)
-          if (s !== null) {
-            scaled[code as SubtestCode] = s
-          } else {
-            console.warn(`⚠️ [WISC] No se encontró norma para ${code} (raw=${raw}, group=${ageInfo.group})`)
-          }
+      // Construir opciones con sustitución si se seleccionó
+      const options: { substitution?: SubtestCode } = {}
+      if (sustitucionSeleccionada) {
+        // Solo aplicar si la subprueba original está en los requeridos y no tiene puntaje
+        const originalCode = sustitucionSeleccionada.original
+        if (requiredCodes.includes(originalCode) && (rawScores[originalCode] === undefined || rawScores[originalCode] === null)) {
+          options.substitution = sustitucionSeleccionada.replacement
+          console.log(`🔁 [WISC] Sustitución aplicada: ${originalCode} → ${sustitucionSeleccionada.replacement}`)
+        } else {
+          console.warn(`⚠️ [WISC] La subprueba original ${originalCode} no está faltante o no es requerida, se ignora la sustitución.`)
         }
       }
-      console.log('📊 [WISC] Escalares calculados:', scaled)
 
-      const result = engine.score(birth, now, rawScores, {})
+      const result = engine.score(birth, now, rawScores, options)
       console.log('📊 [WISC] Resultado de engine.score:', result)
 
       if (result) {
@@ -261,7 +277,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           CIT: result.CIT,
         }
         console.log('📊 [WISC] Composite scores a setear:', composites)
-        setCalculatedScores({ scaled, composites })
+        setCalculatedScores({ scaled: result.scaledScores, composites })
         setValidationError(null)
         console.log('✅ [WISC] Cálculo completado exitosamente.')
       } else {
@@ -522,6 +538,36 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         </div>
       </div>
 
+      {/* Selector de sustitución */}
+      <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="text-sm font-medium text-gray-700">Sustitución para CIT:</label>
+          <select
+            value={sustitucionSeleccionada ? `${sustitucionSeleccionada.original}|${sustitucionSeleccionada.replacement}` : ''}
+            onChange={(e) => {
+              const val = e.target.value
+              if (!val) {
+                setSustitucionSeleccionada(null)
+              } else {
+                const [original, replacement] = val.split('|') as [SubtestCode, SubtestCode]
+                setSustitucionSeleccionada({ original, replacement })
+              }
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="">Sin sustitución</option>
+            {SUSTITUCIONES.map((item, idx) => (
+              <option key={idx} value={`${item.original}|${item.replacement}`}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-400">
+            (Solo se aplica si la subprueba original no tiene puntaje)
+          </span>
+        </div>
+      </div>
+
       <div className="mt-6 flex flex-wrap gap-3">
         <button
           onClick={() => handleCalculate('brief')}
@@ -563,6 +609,9 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
                     <th className="text-center py-2 px-3">Puntaje</th>
                     <th className="text-center py-2 px-3">Percentil</th>
                     <th className="text-center py-2 px-3">Clasificación</th>
+                    {composites.CIT?.isEstimated && (
+                      <th className="text-center py-2 px-3 text-orange-600">Estimado</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -579,11 +628,19 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
                             {getClassification(idx.score)}
                           </span>
                         </td>
+                        {code === 'CIT' && idx.isEstimated && (
+                          <td className="py-2 px-3 text-center text-orange-600 text-xs">Aproximado</td>
+                        )}
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
+              {composites.CIT?.isEstimated && (
+                <p className="text-xs text-orange-600 mt-2">
+                  ⚠️ El CIT ha sido estimado porque no se encontró la norma para la edad. Se usó una fórmula de regresión.
+                </p>
+              )}
             </div>
           </div>
 
