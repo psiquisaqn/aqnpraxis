@@ -6,7 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Wisc5Engine, type RawScores, type ScaledScores, type SubtestCode } from '@/lib/wisc5/engine'
 
 // ============================================================
-// CONFIGURACIÓN (idéntica a la versión completa)
+// CONFIGURACIÓN
 // ============================================================
 
 const SUBTESTS_CONFIG = [
@@ -28,7 +28,7 @@ const SUBTESTS_CONFIG = [
 ]
 
 // ============================================================
-// DEFINICIÓN DE SUSTITUCIONES (igual que en la calculadora principal)
+// DEFINICIÓN DE SUSTITUCIONES
 // ============================================================
 
 const SUSTITUCIONES: { original: SubtestCode; replacement: SubtestCode; label: string }[] = [
@@ -58,23 +58,13 @@ function getClassification(score: number): string {
   return 'Extremadamente Bajo'
 }
 
-function getScaledClassification(score: number): string {
-  if (score >= 16) return 'Muy Superior'
-  if (score >= 14) return 'Superior'
-  if (score >= 12) return 'Normal Alto'
-  if (score >= 8) return 'Normal Promedio'
-  if (score >= 6) return 'Normal Lento'
-  if (score >= 4) return 'Funcionamiento Intelectual Limítrofe'
-  return 'Extremadamente Bajo'
-}
-
-function getClassificationColor(score: number, isScaled: boolean = false): string {
-  if (score >= 130 || (isScaled && score >= 16)) return 'text-purple-700 bg-purple-50'
-  if (score >= 120 || (isScaled && score >= 14)) return 'text-blue-700 bg-blue-50'
-  if (score >= 110 || (isScaled && score >= 12)) return 'text-green-700 bg-green-50'
-  if (score >= 90 || (isScaled && score >= 8)) return 'text-gray-700 bg-gray-50'
-  if (score >= 80 || (isScaled && score >= 6)) return 'text-yellow-700 bg-yellow-50'
-  if (score >= 70 || (isScaled && score >= 4)) return 'text-orange-700 bg-orange-50'
+function getClassificationColor(score: number): string {
+  if (score >= 130) return 'text-purple-700 bg-purple-50'
+  if (score >= 120) return 'text-blue-700 bg-blue-50'
+  if (score >= 110) return 'text-green-700 bg-green-50'
+  if (score >= 90) return 'text-gray-700 bg-gray-50'
+  if (score >= 80) return 'text-yellow-700 bg-yellow-50'
+  if (score >= 70) return 'text-orange-700 bg-orange-50'
   return 'text-red-700 bg-red-50'
 }
 
@@ -139,14 +129,12 @@ export function Wisc5CalculadoraRapidaClient() {
   useEffect(() => {
     const init = async () => {
       try {
-        // Crear instancia del engine y cargar normas
         const engine = new Wisc5Engine()
         engineRef.current = engine
         await engine.loadNorms()
         setEngineReady(true)
         console.log('✅ [WISC Rápida] Normas cargadas.')
 
-        // Obtener plan del usuario
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           const { data: plan } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
@@ -181,7 +169,7 @@ export function Wisc5CalculadoraRapidaClient() {
   }, [birthDate, evalDate])
 
   // ============================================================
-  // 3. CALCULAR EN TIEMPO REAL (cuando cambian puntajes o sustitución)
+  // 3. CALCULAR EN TIEMPO REAL (con sustitución)
   // ============================================================
   useEffect(() => {
     const calculate = () => {
@@ -204,14 +192,18 @@ export function Wisc5CalculadoraRapidaClient() {
       }
       setScaledScores(newScaled)
 
-      // Calcular compuestos con sustitución si corresponde
+      // Construir opciones con sustitución
       const options: { substitution?: SubtestCode } = {}
       if (sustitucionSeleccionada) {
-        // Solo aplicar si la subprueba original está faltante
+        // Verificar si la subprueba original está en la lista de primarias y no tiene puntaje
         const original = sustitucionSeleccionada.original
-        // Para CIT, la sustitución se aplica solo si la subprueba original no tiene puntaje
-        // y estamos en el contexto de CIT (esto lo maneja el engine internamente)
-        options.substitution = sustitucionSeleccionada.replacement
+        const isPrimary = SUBTESTS_CONFIG.filter(s => s.primary).some(s => s.code === original)
+        if (isPrimary && (rawScores[original] === undefined || rawScores[original] === null)) {
+          options.substitution = sustitucionSeleccionada.replacement
+          console.log(`🔁 [WISC Rápida] Sustitución aplicada: ${original} → ${sustitucionSeleccionada.replacement}`)
+        } else {
+          console.warn(`⚠️ [WISC Rápida] La subprueba original ${original} no está faltante o no es primaria, se ignora la sustitución.`)
+        }
       }
 
       const result = engine.score(birth, now, rawScores, options)
@@ -242,7 +234,7 @@ export function Wisc5CalculadoraRapidaClient() {
   }
 
   // ============================================================
-  // 5. GENERAR INFORME (igual que la versión completa)
+  // 5. GENERAR INFORME (con validación de sustitución)
   // ============================================================
   const generateReport = async (type: 'brief' | 'extended') => {
     if (!fullName.trim()) {
@@ -259,6 +251,46 @@ export function Wisc5CalculadoraRapidaClient() {
     }
     if (!compositeScores) {
       setError('Primero debes ingresar los puntajes para calcular.')
+      return
+    }
+
+    // Validación de subpruebas requeridas con sustitución
+    const requiredCodes = type === 'brief'
+      ? SUBTESTS_CONFIG.filter(s => s.primary).map(s => s.code)
+      : SUBTESTS_CONFIG.map(s => s.code)
+
+    let codesToCheck = [...requiredCodes]
+    if (sustitucionSeleccionada) {
+      const original = sustitucionSeleccionada.original
+      const replacement = sustitucionSeleccionada.replacement
+      // Solo aplicar si la original está en requiredCodes y no tiene puntaje
+      if (requiredCodes.includes(original) && (rawScores[original] === undefined || rawScores[original] === null)) {
+        if (rawScores[replacement] !== undefined && rawScores[replacement] !== null) {
+          codesToCheck = codesToCheck.filter(c => c !== original)
+          if (!codesToCheck.includes(replacement)) {
+            codesToCheck.push(replacement)
+          }
+          console.log(`🔁 [WISC Rápida] Sustitución aplicada en validación: ${original} → ${replacement}`)
+        } else {
+          // Si la de reemplazo también falta, la incluimos para que aparezca en el error
+          if (!codesToCheck.includes(replacement)) {
+            codesToCheck.push(replacement)
+          }
+        }
+      }
+    }
+
+    const missing = codesToCheck.filter(code => rawScores[code] === undefined || rawScores[code] === null)
+    if (missing.length > 0) {
+      const names = missing.map(code => SUBTESTS_CONFIG.find(s => s.code === code)?.name || code)
+      setError(`Faltan subpruebas: ${names.join(', ')}. Completa todos los puntajes para generar el informe.`)
+      return
+    }
+
+    const invalid = codesToCheck.filter(code => isNaN(Number(rawScores[code])))
+    if (invalid.length > 0) {
+      const names = invalid.map(code => SUBTESTS_CONFIG.find(s => s.code === code)?.name || code)
+      setError(`Algunos puntajes no son válidos: ${names.join(', ')}. Revisa los campos.`)
       return
     }
 
@@ -370,7 +402,7 @@ export function Wisc5CalculadoraRapidaClient() {
     )
   }
 
-  if (error) {
+  if (error && !fullName) { // solo mostrar error grave si no hay datos
     return (
       <div className="max-w-2xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
@@ -448,7 +480,7 @@ export function Wisc5CalculadoraRapidaClient() {
         </div>
       </div>
 
-      {/* Selector de sustitución (igual que en la calculadora completa) */}
+      {/* Selector de sustitución */}
       <div className="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
         <div className="flex flex-wrap items-center gap-4">
           <label className="text-sm font-medium text-gray-700">Sustitución para CIT:</label>

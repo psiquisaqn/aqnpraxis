@@ -222,13 +222,36 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       return
     }
 
+    // --- Validación con sustitución ---
     const requiredCodes = type === 'brief'
       ? SUBTESTS_CONFIG.filter(s => s.primary).map(s => s.code)
       : SUBTESTS_CONFIG.map(s => s.code)
 
-    console.log(`📋 [WISC] Subpruebas requeridas (${type}):`, requiredCodes)
+    // Construir lista de códigos a verificar, aplicando sustitución si corresponde
+    let codesToCheck = [...requiredCodes]
+    if (sustitucionSeleccionada) {
+      const original = sustitucionSeleccionada.original
+      const replacement = sustitucionSeleccionada.replacement
+      // Si la subprueba original está en las requeridas y no tiene puntaje, pero la de reemplazo sí tiene
+      if (requiredCodes.includes(original) && (rawScores[original] === undefined || rawScores[original] === null)) {
+        if (rawScores[replacement] !== undefined && rawScores[replacement] !== null) {
+          // Remover la original y agregar la de reemplazo (si no está ya)
+          codesToCheck = codesToCheck.filter(c => c !== original)
+          if (!codesToCheck.includes(replacement)) {
+            codesToCheck.push(replacement)
+          }
+          console.log(`🔁 [WISC] Sustitución aplicada en validación: ${original} → ${replacement}`)
+        } else {
+          // Si la de reemplazo también falta, se reportará como faltante más abajo
+          if (!codesToCheck.includes(replacement)) {
+            codesToCheck.push(replacement)
+          }
+        }
+      }
+    }
 
-    const missing = requiredCodes.filter(code => rawScores[code] === undefined || rawScores[code] === null)
+    // Verificar faltantes
+    const missing = codesToCheck.filter(code => rawScores[code] === undefined || rawScores[code] === null)
     if (missing.length > 0) {
       const names = missing.map(code => SUBTESTS_CONFIG.find(s => s.code === code)?.name || code)
       const msg = `Faltan subpruebas: ${names.join(', ')}. Completa todos los puntajes para calcular.`
@@ -237,10 +260,12 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       return
     }
 
-    const invalid = requiredCodes.filter(code => isNaN(Number(rawScores[code])))
+    // Verificar puntajes inválidos (solo los que están en codesToCheck)
+    const invalid = codesToCheck.filter(code => isNaN(Number(rawScores[code])))
     if (invalid.length > 0) {
+      const names = invalid.map(code => SUBTESTS_CONFIG.find(s => s.code === code)?.name || code)
       console.warn('⚠️ [WISC] Puntajes inválidos:', invalid)
-      setValidationError('Algunos puntajes no son válidos. Revisa los campos.')
+      setValidationError(`Algunos puntajes no son válidos: ${names.join(', ')}. Revisa los campos.`)
       return
     }
 
@@ -258,7 +283,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
         const originalCode = sustitucionSeleccionada.original
         if (requiredCodes.includes(originalCode) && (rawScores[originalCode] === undefined || rawScores[originalCode] === null)) {
           options.substitution = sustitucionSeleccionada.replacement
-          console.log(`🔁 [WISC] Sustitución aplicada: ${originalCode} → ${sustitucionSeleccionada.replacement}`)
+          console.log(`🔁 [WISC] Sustitución aplicada en cálculo: ${originalCode} → ${sustitucionSeleccionada.replacement}`)
         } else {
           console.warn(`⚠️ [WISC] La subprueba original ${originalCode} no está faltante o no es requerida, se ignora la sustitución.`)
         }
