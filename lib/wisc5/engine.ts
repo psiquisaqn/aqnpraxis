@@ -38,7 +38,7 @@ export interface CompositeResult {
   ci95: [number, number]
   classification: string
   sumScaled: number
-  isEstimated?: boolean  // ← nuevo flag para indicar que el CIT es estimado
+  isEstimated?: boolean
 }
 
 export interface WiscScoringResult {
@@ -118,6 +118,22 @@ export function getAgeGroup(birthDate: Date, evalDate: Date): {
   return { years, months, days, group }
 }
 
+// ─── Función auxiliar erf para percentil aproximado ────────
+
+function erf(x: number): number {
+  const a1 = 0.254829592
+  const a2 = -0.284496736
+  const a3 = 1.421413741
+  const a4 = -1.453152027
+  const a5 = 1.061405429
+  const p = 0.3275911
+  const sign = x < 0 ? -1 : 1
+  x = Math.abs(x)
+  const t = 1 / (1 + p * x)
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x)
+  return sign * y
+}
+
 // ─── Motor principal con cache ──────────────────────────────
 
 export class Wisc5Engine {
@@ -126,6 +142,7 @@ export class Wisc5Engine {
   private normsComposite: any[] = []
   private normsLoaded = false
   private ageGroupsSet: Set<string> = new Set()
+  private currentAgeGroup: string = ''
 
   /**
    * Carga TODAS las normas desde Supabase usando paginación manual.
@@ -202,7 +219,7 @@ export class Wisc5Engine {
     this.normsComposite = allComposite
     this.normsLoaded = true
 
-    // Guardar los grupos de edad únicos
+    // Guardar los grupos de edad únicos (solo para subpruebas)
     this.ageGroupsSet.clear()
     this.normsSubtest.forEach((n: any) => {
       if (n.age_group) this.ageGroupsSet.add(n.age_group)
@@ -309,38 +326,51 @@ export class Wisc5Engine {
     }
   }
 
-  sumToComposite(indexCode: IndexCode, sumScaled: number): Omit<CompositeResult, 'sumScaled'> | null {
+  /**
+   * Busca la norma compuesta en la tabla.
+   * Para CIT ignora age_group (porque la tabla no tiene esa columna).
+   * Para otros índices, filtra por age_group.
+   */
+  sumToComposite(indexCode: IndexCode, sumScaled: number, ageGroup?: string): Omit<CompositeResult, 'sumScaled'> | null {
     if (!this.normsLoaded) {
       console.warn('⚠️ [Engine] Normas no cargadas. Llamar a loadNorms() primero.')
       return null
     }
 
-    const entry = this.normsComposite.find(
-      (n: any) =>
-        n.index_code === indexCode &&
-        sumScaled >= n.sum_scaled_min &&
-        sumScaled <= n.sum_scaled_max
-    )
-
-    if (entry) {
-      return {
-        score: entry.composite_score,
-        percentile: entry.percentile,
-        ci90: [entry.ci90_lo, entry.ci90_hi],
-        ci95: [entry.ci95_lo, entry.ci95_hi],
-        classification: getClassification(entry.composite_score),
+    // Buscar en la tabla
+    let entry = this.normsComposite.find((n: any) => {
+      if (n.index_code !== indexCode) return false
+      if (sumScaled < n.sum_scaled_min || sumScaled > n.sum_scaled_max) return false
+      
+      // Para CIT, ignorar age_group (porque no existe en la tabla)
+      if (indexCode === 'CIT') return true
+      
+      // Para otros índices, filtrar por age_group
+      if (ageGroup) {
+        return n.age_group === ageGroup
       }
+      
+      // Si no hay ageGroup, devolver true (fallback)
+      return true
+    })
+
+    if (!entry) {
+      console.warn(`⚠️ [Engine] No se encontró norma para ${indexCode} (sum=${sumScaled}, ageGroup=${ageGroup || 'sin grupo'})`)
+      
+      // Si es CIT, usar regresión como fallback (aunque con los datos insertados ya no debería ocurrir)
+      if (indexCode === 'CIT') {
+        return this.approximateCITFromSum(sumScaled)
+      }
+      return null
     }
 
-    // Si no hay norma y es CIT, intentar aproximación
-    if (indexCode === 'CIT') {
-      console.warn(`⚠️ [Engine] No se encontró norma para CIT (sum=${sumScaled}). Usando aproximación.`)
-      const approx = this.approximateCITFromSum(sumScaled)
-      return approx
+    return {
+      score: entry.composite_score,
+      percentile: entry.percentile,
+      ci90: [entry.ci90_lo, entry.ci90_hi],
+      ci95: [entry.ci95_lo, entry.ci95_hi],
+      classification: getClassification(entry.composite_score),
     }
-
-    console.warn(`⚠️ [Engine] No se encontró norma compuesta para ${indexCode} (sum=${sumScaled})`)
-    return null
   }
 
   calculateScaledScores(ageGroup: string, rawScores: RawScores): ScaledScores {
@@ -358,6 +388,7 @@ export class Wisc5Engine {
   calculateIndex(
     indexCode: IndexCode,
     scaledScores: ScaledScores,
+    ageGroup: string,
     substitution?: SubtestCode
   ): CompositeResult | null {
     const subtests = [...INDEX_COMPOSITION[indexCode]]
@@ -378,7 +409,7 @@ export class Wisc5Engine {
     }
 
     const sumScaled = scores.reduce((acc, s) => acc! + s!, 0) as number
-    const composite = this.sumToComposite(indexCode, sumScaled)
+    const composite = this.sumToComposite(indexCode, sumScaled, ageGroup)
     if (!composite) return null
 
     return { ...composite, sumScaled }
@@ -395,17 +426,18 @@ export class Wisc5Engine {
     }
 
     const { group } = getAgeGroup(birthDate, evalDate)
+    this.currentAgeGroup = group
     console.log(`📊 [Engine] Calculando para grupo: ${group}`)
 
     const scaledScores = this.calculateScaledScores(group, rawScores)
     console.log(`📊 [Engine] Escalares calculados:`, scaledScores)
 
-    const ICV = this.calculateIndex('ICV', scaledScores)
-    const IVE = this.calculateIndex('IVE', scaledScores)
-    const IRF = this.calculateIndex('IRF', scaledScores)
-    const IMT = this.calculateIndex('IMT', scaledScores)
-    const IVP = this.calculateIndex('IVP', scaledScores)
-    const CIT = this.calculateIndex('CIT', scaledScores, options.substitution)
+    const ICV = this.calculateIndex('ICV', scaledScores, group)
+    const IVE = this.calculateIndex('IVE', scaledScores, group)
+    const IRF = this.calculateIndex('IRF', scaledScores, group)
+    const IMT = this.calculateIndex('IMT', scaledScores, group)
+    const IVP = this.calculateIndex('IVP', scaledScores, group)
+    const CIT = this.calculateIndex('CIT', scaledScores, group, options.substitution)
 
     if (CIT?.isEstimated) {
       console.warn('⚠️ [Engine] CIT calculado de forma aproximada (sin norma).')
@@ -483,21 +515,6 @@ export class Wisc5Engine {
   prorrateCITSum(sumOf6: number): number {
     return Math.round(sumOf6 * (7 / 6))
   }
-}
-
-// Función auxiliar erf para cálculo de percentil aproximado
-function erf(x: number): number {
-  const a1 = 0.254829592
-  const a2 = -0.284496736
-  const a3 = 1.421413741
-  const a4 = -1.453152027
-  const a5 = 1.061405429
-  const p = 0.3275911
-  const sign = x < 0 ? -1 : 1
-  x = Math.abs(x)
-  const t = 1 / (1 + p * x)
-  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x)
-  return sign * y
 }
 
 export function createWisc5Engine(): Wisc5Engine {
