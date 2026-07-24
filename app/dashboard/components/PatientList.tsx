@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import PatientCard from './PatientCard'  // ← IMPORTACIÓN DEFAULT (sin llaves)
+import PatientCard from './PatientCard'
 import { NewPatientModal } from './NewPatientModal'
 import { NewSessionModal } from './NewSessionModal'
 import { calcAge } from '@/lib/utils'
@@ -146,7 +146,17 @@ export default function PatientList({ patients: initialPatients }: Props) {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filtered.map((p) => (
-            <PatientCard key={p.id} patient={p} onNewSession={(id) => setSessionPatientId(id)} />
+            <div key={p.id} className="flex items-center gap-3">
+              <div className="flex-1">
+                <PatientCard patient={p} onNewSession={(id) => setSessionPatientId(id)} />
+              </div>
+              <Link
+                href={`/dashboard/paciente/${p.id}`}
+                className="shrink-0 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+              >
+                Ver ficha
+              </Link>
+            </div>
           ))}
         </div>
       )}

@@ -104,7 +104,6 @@ export function DashboardShell({ profile, children }: Props) {
   const handleNavigation = (href: string) => {
     console.log('🔍 Navegando a:', href)  // ← Log para depuración
     if (isMobile) setSidebarOpen(false)
-    // Usamos window.location para forzar la navegación y evitar problemas con el router de Next
     window.location.href = href
   }
 
@@ -136,17 +135,21 @@ export function DashboardShell({ profile, children }: Props) {
           ${isMobile && !sidebarOpen ? '-translate-x-full' : 'translate-x-0'}
           ${isMobile ? 'w-64 shadow-xl' : 'w-64'}
         `}
-        style={{ pointerEvents: 'auto' }} // ← Asegurar que el sidebar reciba eventos
+        style={{ pointerEvents: 'auto' }}
       >
-        {/* Header con logo */}
+        {/* Header con logo - AHORA CLICKEABLE */}
         <div className="flex items-center justify-between px-4 border-b border-gray-200 py-3">
-          <div className="w-full flex justify-center">
+          <button
+            onClick={() => handleNavigation('/dashboard')}
+            className="w-full flex justify-center hover:opacity-80 transition-opacity"
+            style={{ cursor: 'pointer' }}
+          >
             <img 
               src="/isotipoaqnpraxis.png" 
               alt="AQN Praxis" 
               className="w-auto h-10 object-contain"
             />
-          </div>
+          </button>
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(false)}
@@ -171,7 +174,7 @@ export function DashboardShell({ profile, children }: Props) {
                 style={{
                   color: active ? '#3B82F6' : '#6B7280',
                   background: active ? '#EFF6FF' : 'transparent',
-                  pointerEvents: 'auto', // ← Forzar eventos
+                  pointerEvents: 'auto',
                   cursor: 'pointer',
                 }}
               >
