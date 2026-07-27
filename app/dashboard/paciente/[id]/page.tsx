@@ -1,40 +1,140 @@
-import { PatientDetailClient } from './PatientDetailClient'
-import Link from 'next/link'
+'use client'
 
-export const dynamic = 'force-dynamic'
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
+// Importaciones desde app/dashboard/components/
+import PatientCard from '@/app/dashboard/components/PatientCard'
+import { SessionsTab } from '@/app/dashboard/components/SessionsTab'
+import { ReportsTab } from '@/app/dashboard/components/ReportsTab'
+import { ProgramsTab } from '@/app/dashboard/components/ProgramsTab'
+import { EntrevistasTab } from '@/app/dashboard/components/EntrevistasTab'
+import { calcAge } from '@/lib/utils'
 
-interface Props {
-  params: Promise<{ id: string }>
-}
+export default function PatientDetailPage() {
+  const router = useRouter()
+  const params = useParams()
+  const patientId = params?.id as string
 
-export default async function PatientPage({ params }: Props) {
-  const { id } = await params
-  return (
-    <div>
-      <div className="flex justify-end gap-3 px-4 pt-4">
-        <Link
-          href={`/dashboard/agenda?patient=${id}&new=true`}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="2" y="3" width="12" height="11" rx="1" stroke="white" strokeWidth="1.2"/>
-            <path d="M5 1v3M11 1v3M3 6h10" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-          Agendar sesión
-        </Link>
-        <Link
-          href={`/dashboard/paciente/${id}/nueva-sesion-dual`}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="2" y="3" width="12" height="10" rx="1" stroke="white" strokeWidth="1.2"/>
-            <path d="M5 1v2M11 1v2M3 6h10" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-            <circle cx="8" cy="9" r="1" fill="white"/>
-          </svg>
-          Evaluación dual
-        </Link>
+  const [patient, setPatient] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'sesiones' | 'informes' | 'programas' | 'entrevistas'>('sesiones')
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  useEffect(() => {
+    if (!patientId) return
+
+    const loadPatient = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+
+        const { data, error } = await supabase
+          .from('patients')
+          .select(`
+            *,
+            sessions (
+              id,
+              test_id,
+              status,
+              created_at,
+              completed_at
+            )
+          `)
+          .eq('id', patientId)
+          .eq('psychologist_id', user.id)
+          .single()
+
+        if (error) throw error
+        if (!data) throw new Error('Paciente no encontrado')
+
+        const age = data.birth_date ? calcAge(data.birth_date) : null
+
+        setPatient({
+          ...data,
+          age_years: age?.years || 0,
+          age_months: age?.months || 0,
+          sessions: data.sessions || [],
+        })
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadPatient()
+  }, [patientId, supabase])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Cargando paciente...</p>
+        </div>
       </div>
-      <PatientDetailClient patientId={id} />
+    )
+  }
+
+  if (error || !patient) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+          <p className="text-red-600 text-sm">{error || 'Paciente no encontrado'}</p>
+          <button onClick={() => router.push('/dashboard')} className="mt-3 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">
+            Volver al dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const tabs = [
+    { id: 'sesiones', label: 'Sesiones' },
+    { id: 'informes', label: 'Informes' },
+    { id: 'programas', label: 'Programas' },
+    { id: 'entrevistas', label: 'Entrevistas' },
+  ]
+
+  return (
+    <div className="max-w-6xl mx-auto p-4">
+      {/* Tarjeta del paciente */}
+      <div className="mb-6">
+        <PatientCard patient={patient} onNewSession={() => {}} />
+      </div>
+
+      {/* Navegación de pestañas */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="flex gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-white text-blue-600 border border-b-0 border-gray-200'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Contenido de pestañas */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        {activeTab === 'sesiones' && <SessionsTab patientId={patient.id} />}
+        {activeTab === 'informes' && <ReportsTab patientId={patient.id} />}
+        {activeTab === 'programas' && <ProgramsTab patientId={patient.id} />}
+        {activeTab === 'entrevistas' && <EntrevistasTab patientId={patient.id} />}
+      </div>
     </div>
   )
 }
