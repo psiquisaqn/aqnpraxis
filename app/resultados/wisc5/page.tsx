@@ -1,6 +1,6 @@
 'use client'
 // app/resultados/wisc5/page.tsx
-// Versión con gráficos corregidos (barras alineadas al eje X)
+// Versión con gráficos separados para informe extendido
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -9,6 +9,7 @@ import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { ReporteHeader } from '@/components/ReporteHeader'
 import { ReporteFooter } from '@/components/ReporteFooter'
 import { useReportDocx } from '@/hooks/useReportDocx'
+import { type SubtestCode } from '@/lib/wisc5/engine'
 
 // ============================================================
 // TIPOS
@@ -28,7 +29,7 @@ interface Wisc5Data {
 }
 
 // ============================================================
-// ESTILOS DE IMPRESIÓN (sin reglas para la firma)
+// ESTILOS DE IMPRESIÓN
 // ============================================================
 
 const printStyles = `
@@ -77,7 +78,7 @@ function getColorForScore(score: number, isScaled: boolean = false): string {
 }
 
 // ============================================================
-// GRÁFICO DE BARRAS (CORREGIDO)
+// GRÁFICO DE BARRAS
 // ============================================================
 
 function GraficoBarras({
@@ -133,7 +134,7 @@ function GraficoBarras({
         })}
       </div>
 
-      {/* Contenedor de etiquetas (debajo del eje X) */}
+      {/* Contenedor de etiquetas */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
@@ -162,7 +163,7 @@ function GraficoBarras({
 }
 
 // ============================================================
-// MARCO INTERPRETATIVO PARA SUBPRUEBAS (ampliado)
+// MARCO INTERPRETATIVO PARA SUBPRUEBAS
 // ============================================================
 
 const SUBTEST_INTERPRETATIONS: Record<string, { Bajo: string; Suficiente: string; Alto: string }> = {
@@ -384,6 +385,7 @@ function Wisc5ResultsPageInner() {
   const compositeScores = data.composite_scores || {}
   const rawScores = data.raw_scores || {}
 
+  // Datos para gráficos
   const indexCodes = ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']
   const indexLabels: Record<string, string> = {
     ICV: 'Comprensión Verbal',
@@ -419,13 +421,20 @@ function Wisc5ResultsPageInner() {
     ARI: 'Aritmética'
   }
 
+  // Construir datos de subpruebas incluyendo el código para poder filtrar
   const datosSubpruebas = Object.entries(scaledScores)
     .filter(([_, pe]) => pe != null)
     .map(([code, pe]) => ({
+      code: code as SubtestCode,
       label: subtestLabels[code] || code,
       score: pe as number,
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
+
+  // Para separar primarias y secundarias
+  const primaryCodes: SubtestCode[] = ['CC', 'AN', 'MR', 'RD', 'CLA', 'VOC', 'BAL']
+  const datosPrimarias = datosSubpruebas.filter(item => primaryCodes.includes(item.code))
+  const datosSecundarias = datosSubpruebas.filter(item => !primaryCodes.includes(item.code))
 
   function getSubtestInterpretation(code: string, pe: number): string {
     const entry = SUBTEST_INTERPRETATIONS[code]
@@ -508,25 +517,69 @@ function Wisc5ResultsPageInner() {
           testName="Informe de Evaluación de Funcionamiento Cognitivo"
         />
 
-        {/* GRÁFICO 1: SUBPRUEBAS */}
+        {/* GRÁFICO DE SUBPRUEBAS (separado según tipo de informe) */}
         {datosSubpruebas.length > 0 && (
           <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
-            <div className="border-b border-gray-300 pb-2 mb-3">
-              <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Subpruebas</h2>
-            </div>
-            <GraficoBarras
-              data={datosSubpruebas}
-              minVal={0}
-              maxVal={19}
-              showValues={true}
-            />
-            <p className="text-xs text-gray-400 mt-2 italic">
-              Gráfico de puntajes escalares (PE) por subprueba. Cada barra representa el desempeño en una subprueba específica.
-            </p>
+            {reportType === 'extended' ? (
+              // --- Versión extendida: dos gráficos ---
+              <>
+                {/* Primarias */}
+                <div className="border-b border-gray-300 pb-2 mb-3">
+                  <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Subpruebas Primarias</h2>
+                </div>
+                {datosPrimarias.length > 0 && (
+                  <>
+                    <GraficoBarras
+                      data={datosPrimarias}
+                      minVal={0}
+                      maxVal={19}
+                      showValues={true}
+                    />
+                    <p className="text-xs text-gray-400 mt-2 italic">
+                      Gráfico de puntajes escalares (PE) de las 7 subpruebas primarias del WISC-V.
+                    </p>
+                  </>
+                )}
+
+                {/* Secundarias */}
+                <div className="border-b border-gray-300 pb-2 mt-6 mb-3">
+                  <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Subpruebas Secundarias</h2>
+                </div>
+                {datosSecundarias.length > 0 && (
+                  <>
+                    <GraficoBarras
+                      data={datosSecundarias}
+                      minVal={0}
+                      maxVal={19}
+                      showValues={true}
+                    />
+                    <p className="text-xs text-gray-400 mt-2 italic">
+                      Gráfico de puntajes escalares (PE) de las subpruebas complementarias.
+                    </p>
+                  </>
+                )}
+              </>
+            ) : (
+              // --- Versión breve: un solo gráfico ---
+              <>
+                <div className="border-b border-gray-300 pb-2 mb-3">
+                  <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Subpruebas</h2>
+                </div>
+                <GraficoBarras
+                  data={datosSubpruebas}
+                  minVal={0}
+                  maxVal={19}
+                  showValues={true}
+                />
+                <p className="text-xs text-gray-400 mt-2 italic">
+                  Gráfico de puntajes escalares (PE) por subprueba. Cada barra representa el desempeño en una subprueba específica.
+                </p>
+              </>
+            )}
           </div>
         )}
 
-        {/* GRÁFICO 2: ÍNDICES COMPUESTOS */}
+        {/* GRÁFICO DE ÍNDICES COMPUESTOS */}
         {datosIndices.length > 0 && (
           <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
             <div className="border-b border-gray-300 pb-2 mb-3">
