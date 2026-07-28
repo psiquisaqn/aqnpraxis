@@ -71,59 +71,44 @@ export default function NuevaEntrevistaPage() {
     setError(null)
 
     try {
-      // 🔍 LOG PARA DEPURAR 403
-      console.log('🔍 [Entrevista] Iniciando guardado...')
-      
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      console.log('🔑 [Entrevista] Usuario obtenido:', user)
-      console.log('🔑 [Entrevista] Error de usuario:', userError)
-      
-      if (!user) {
-        console.error('❌ [Entrevista] No hay usuario autenticado')
-        throw new Error('No autenticado. Por favor, inicia sesión nuevamente.')
-      }
+      console.log('🔍 [Entrevista] Enviando a API...')
 
-      console.log('📝 [Entrevista] Datos a insertar:', {
-        patient_id: patientId,
-        psychologist_id: user.id,
-        fecha,
-        hora,
-        asistentes: asistentes.trim() || null,
-        motivacion_principal: motivacionPrincipal.trim() || null,
-        info_relevante: infoRelevante.trim() || null,
-        sugerencias_acuerdos: sugerenciasAcuerdos.trim() || null,
-      })
-
-      // 1. Insertar entrevista
-      const { data: entrevistaData, error: insertError } = await supabase
-        .from('entrevistas')
-        .insert({
+      // 1. Insertar entrevista usando la API Route (evita problemas de RLS)
+      const response = await fetch('/api/entrevistas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           patient_id: patientId,
-          psychologist_id: user.id,
           fecha,
           hora,
           asistentes: asistentes.trim() || null,
           motivacion_principal: motivacionPrincipal.trim() || null,
           info_relevante: infoRelevante.trim() || null,
           sugerencias_acuerdos: sugerenciasAcuerdos.trim() || null,
-        })
-        .select('id')
-        .single()
+        }),
+      })
 
-      if (insertError) {
-        console.error('❌ [Entrevista] Error al insertar:', insertError)
-        throw insertError
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('❌ [Entrevista] Error en API:', data)
+        throw new Error(data.error || 'Error al guardar la entrevista')
       }
 
-      console.log('✅ [Entrevista] Entrevista insertada con ID:', entrevistaData.id)
+      console.log('✅ [Entrevista] Entrevista insertada con ID:', data.id)
 
-      // 2. Insertar en informes
+      // 2. Insertar en informes (se hace desde el cliente porque ya funciona)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autenticado')
+
       const { error: informesError } = await supabase
         .from('informes')
         .insert({
           patient_id: patientId,
           psychologist_id: user.id,
-          session_id: entrevistaData.id,
+          session_id: data.id,
           test_id: 'entrevista',
           puntaje_total: null,
           nivel: null,
@@ -139,7 +124,7 @@ export default function NuevaEntrevistaPage() {
       console.log('✅ [Entrevista] Registro en informes creado correctamente.')
 
       // 3. Redirigir al detalle de la entrevista
-      router.push(`/dashboard/informes/entrevista/${entrevistaData.id}`)
+      router.push(`/dashboard/informes/entrevista/${data.id}`)
     } catch (err: any) {
       console.error('❌ [Entrevista] Error general:', err)
       setError(err.message || 'Error al guardar la entrevista')
