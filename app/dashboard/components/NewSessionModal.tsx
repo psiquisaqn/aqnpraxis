@@ -13,7 +13,7 @@ const TESTS = [
   { id: 'bdi2', label: 'BDI-II - Depresión' },
   { id: 'coopersmith', label: 'Coopersmith SEI - Autoestima' },
   { id: 'peca', label: 'PECA - Conducta Adaptativa' },
-  // WISC-V eliminado
+  { id: 'entrevista', label: 'Entrevista Psicológica' }, // ← Agregado
 ]
 
 export function NewSessionModal({ patientId, onClose }: Props) {
@@ -24,6 +24,13 @@ export function NewSessionModal({ patientId, onClose }: Props) {
   if (!patientId) return null
 
   const handleCreate = async (testId: string) => {
+    // Si es entrevista, redirigir directamente al formulario
+    if (testId === 'entrevista') {
+      onClose()
+      router.push(`/dashboard/paciente/${patientId}/entrevista/nueva`)
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -50,7 +57,6 @@ export function NewSessionModal({ patientId, onClose }: Props) {
       if (createError) throw createError
 
       onClose()
-      // Redirigir a la página del test correspondiente
       const testRoutes: Record<string, string> = {
         bdi2: `/bdi2/${session.id}`,
         coopersmith: `/coopersmith/${session.id}`,
