@@ -71,13 +71,13 @@ export default function NuevaEntrevistaPage() {
     setError(null)
 
     try {
-      // Obtener usuario para psychologist_id
+      console.log('🔍 [Entrevista] Enviando a API...')
+
+      // Obtener el usuario para enviar psychologist_id
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      console.log('🔍 [Entrevista] Enviando a API...')
-
-      // 1. Insertar entrevista usando la API Route
+      // 1. Insertar entrevista usando la API Route (evita problemas de RLS)
       const response = await fetch('/api/entrevistas', {
         method: 'POST',
         headers: {
@@ -85,7 +85,7 @@ export default function NuevaEntrevistaPage() {
         },
         body: JSON.stringify({
           patient_id: patientId,
-          psychologist_id: user.id, // ← Este es el campo que faltaba
+          psychologist_id: user.id,
           fecha,
           hora,
           asistentes: asistentes.trim() || null,
@@ -104,13 +104,12 @@ export default function NuevaEntrevistaPage() {
 
       console.log('✅ [Entrevista] Entrevista insertada con ID:', data.id)
 
-      // 2. Insertar en informes
+      // 2. Insertar en informes (sin session_id para evitar error de clave foránea)
       const { error: informesError } = await supabase
         .from('informes')
         .insert({
           patient_id: patientId,
           psychologist_id: user.id,
-          session_id: data.id,
           test_id: 'entrevista',
           puntaje_total: null,
           nivel: null,
