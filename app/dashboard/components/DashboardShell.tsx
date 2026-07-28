@@ -49,6 +49,17 @@ const NAV = [
       </svg>
     ),
   },
+  // → NUEVA ENTRADA: Entrevistas
+  {
+    href: '/dashboard/entrevistas',
+    label: 'Entrevistas',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M3 3h12a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M5 6h8M5 9h6M5 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
   {
     href: '/sala',
     label: 'Sala de pacientes',
@@ -102,7 +113,6 @@ export function DashboardShell({ profile, children }: Props) {
   }, [])
 
   const handleNavigation = (href: string) => {
-    console.log('🔍 Navegando a:', href)  // ← Log para depuración
     if (isMobile) setSidebarOpen(false)
     window.location.href = href
   }
@@ -137,7 +147,7 @@ export function DashboardShell({ profile, children }: Props) {
         `}
         style={{ pointerEvents: 'auto' }}
       >
-        {/* Header con logo - AHORA CLICKEABLE */}
+        {/* Header con logo - clicable para ir al dashboard */}
         <div className="flex items-center justify-between px-4 border-b border-gray-200 py-3">
           <button
             onClick={() => handleNavigation('/dashboard')}

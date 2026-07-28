@@ -71,8 +71,28 @@ export default function NuevaEntrevistaPage() {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No autenticado')
+      // 🔍 LOG PARA DEPURAR 403
+      console.log('🔍 [Entrevista] Iniciando guardado...')
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      console.log('🔑 [Entrevista] Usuario obtenido:', user)
+      console.log('🔑 [Entrevista] Error de usuario:', userError)
+      
+      if (!user) {
+        console.error('❌ [Entrevista] No hay usuario autenticado')
+        throw new Error('No autenticado. Por favor, inicia sesión nuevamente.')
+      }
+
+      console.log('📝 [Entrevista] Datos a insertar:', {
+        patient_id: patientId,
+        psychologist_id: user.id,
+        fecha,
+        hora,
+        asistentes: asistentes.trim() || null,
+        motivacion_principal: motivacionPrincipal.trim() || null,
+        info_relevante: infoRelevante.trim() || null,
+        sugerencias_acuerdos: sugerenciasAcuerdos.trim() || null,
+      })
 
       // 1. Insertar entrevista
       const { data: entrevistaData, error: insertError } = await supabase
@@ -90,9 +110,14 @@ export default function NuevaEntrevistaPage() {
         .select('id')
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('❌ [Entrevista] Error al insertar:', insertError)
+        throw insertError
+      }
 
-      // 2. Insertar en informes (para que aparezca en la lista de informes)
+      console.log('✅ [Entrevista] Entrevista insertada con ID:', entrevistaData.id)
+
+      // 2. Insertar en informes
       const { error: informesError } = await supabase
         .from('informes')
         .insert({
@@ -106,11 +131,17 @@ export default function NuevaEntrevistaPage() {
           created_at: new Date().toISOString(),
         })
 
-      if (informesError) throw informesError
+      if (informesError) {
+        console.error('❌ [Entrevista] Error al insertar en informes:', informesError)
+        throw informesError
+      }
+
+      console.log('✅ [Entrevista] Registro en informes creado correctamente.')
 
       // 3. Redirigir al detalle de la entrevista
       router.push(`/dashboard/informes/entrevista/${entrevistaData.id}`)
     } catch (err: any) {
+      console.error('❌ [Entrevista] Error general:', err)
       setError(err.message || 'Error al guardar la entrevista')
     } finally {
       setSaving(false)
