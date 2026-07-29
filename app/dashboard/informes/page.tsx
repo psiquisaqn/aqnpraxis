@@ -8,6 +8,7 @@ import Link from 'next/link'
 interface Informe {
   id: string
   session_id: string | null
+  entrevista_id: string | null
   patient_id: string
   test_id: string
   puntaje_total: number | null
@@ -137,9 +138,9 @@ export default function InformesPage() {
                   </td>
                   <td className="py-3 px-4">
                     {report.test_id === 'entrevista' ? (
-                      report.session_id ? (
+                      report.entrevista_id ? (
                         <Link
-                          href={`/dashboard/informes/entrevista/${report.session_id}`}
+                          href={`/dashboard/informes/entrevista/${report.entrevista_id}`}
                           className="text-blue-600 hover:underline text-sm"
                         >
                           Ver entrevista

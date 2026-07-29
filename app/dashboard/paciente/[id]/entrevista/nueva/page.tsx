@@ -9,13 +9,11 @@ export default function NuevaEntrevistaPage() {
   const params = useParams()
   const patientId = params?.id as string
 
-  // Estados para el formulario
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [patientName, setPatientName] = useState('')
 
-  // Campos del formulario
   const [fecha, setFecha] = useState('')
   const [hora, setHora] = useState('')
   const [asistentes, setAsistentes] = useState('')
@@ -28,7 +26,6 @@ export default function NuevaEntrevistaPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  // Cargar datos del paciente
   useEffect(() => {
     if (!patientId) return
 
@@ -52,7 +49,6 @@ export default function NuevaEntrevistaPage() {
     loadPatient()
   }, [patientId, supabase])
 
-  // Establecer fecha y hora actual por defecto
   useEffect(() => {
     const now = new Date()
     const fechaStr = now.toISOString().split('T')[0]
@@ -74,16 +70,12 @@ export default function NuevaEntrevistaPage() {
     try {
       console.log('🔍 [Entrevista] Enviando a API...')
 
-      // Obtener el usuario autenticado
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      // 1. Insertar entrevista usando la API Route
       const response = await fetch('/api/entrevistas', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           patient_id: patientId,
           psychologist_id: user.id,
@@ -104,21 +96,20 @@ export default function NuevaEntrevistaPage() {
         throw new Error(data.error || 'Error al guardar la entrevista')
       }
 
-      // Verificar que data.id existe
       if (!data.id) {
         throw new Error('No se recibió el ID de la entrevista')
       }
 
       console.log('✅ [Entrevista] Entrevista insertada con ID:', data.id)
 
-      // 2. Insertar en informes con session_id = ID de la entrevista
+      // Insertar en informes usando entrevista_id (sin clave foránea)
       const { error: informesError } = await supabase
         .from('informes')
         .insert({
           patient_id: patientId,
           psychologist_id: user.id,
-          session_id: data.id,  // ← Guardamos el ID de la entrevista
           test_id: 'entrevista',
+          entrevista_id: data.id,  // ← Columna dedicada
           puntaje_total: null,
           nivel: null,
           recomendaciones: 'Entrevista psicológica',
@@ -132,7 +123,6 @@ export default function NuevaEntrevistaPage() {
 
       console.log('✅ [Entrevista] Registro en informes creado correctamente.')
 
-      // 3. Redirigir al detalle de la entrevista usando el ID de la entrevista
       router.push(`/dashboard/informes/entrevista/${data.id}`)
     } catch (err: any) {
       console.error('❌ [Entrevista] Error general:', err)
@@ -178,7 +168,6 @@ export default function NuevaEntrevistaPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Fila: Fecha y Hora */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -206,11 +195,8 @@ export default function NuevaEntrevistaPage() {
             </div>
           </div>
 
-          {/* Asistentes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Asistentes
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Asistentes</label>
             <input
               type="text"
               value={asistentes}
@@ -220,11 +206,8 @@ export default function NuevaEntrevistaPage() {
             />
           </div>
 
-          {/* Motivación */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Motivación o Inquietud Principal
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Motivación o Inquietud Principal</label>
             <textarea
               value={motivacionPrincipal}
               onChange={(e) => setMotivacionPrincipal(e.target.value)}
@@ -234,11 +217,8 @@ export default function NuevaEntrevistaPage() {
             />
           </div>
 
-          {/* Información relevante */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Información Relevante
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Información Relevante</label>
             <textarea
               value={infoRelevante}
               onChange={(e) => setInfoRelevante(e.target.value)}
@@ -248,11 +228,8 @@ export default function NuevaEntrevistaPage() {
             />
           </div>
 
-          {/* Sugerencias y acuerdos */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sugerencias y Acuerdos
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sugerencias y Acuerdos</label>
             <textarea
               value={sugerenciasAcuerdos}
               onChange={(e) => setSugerenciasAcuerdos(e.target.value)}
@@ -262,7 +239,6 @@ export default function NuevaEntrevistaPage() {
             />
           </div>
 
-          {/* Botones */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
