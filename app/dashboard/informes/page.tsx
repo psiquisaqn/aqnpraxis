@@ -8,7 +8,6 @@ import Link from 'next/link'
 interface Informe {
   id: string
   session_id: string | null
-  entrevista_id: string | null
   patient_id: string
   test_id: string
   puntaje_total: number | null
@@ -46,7 +45,7 @@ export default function InformesPage() {
           .from('informes')
           .select('*, patient:patients(full_name, rut)')
           .eq('psychologist_id', user.id)
-          .in('test_id', ['bdi2', 'coopersmith', 'peca', 'wisc5', 'entrevista'])
+          .in('test_id', ['bdi2', 'coopersmith', 'peca', 'wisc5']) // ← Eliminado 'entrevista'
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -89,7 +88,6 @@ export default function InformesPage() {
     coopersmith: 'Coopersmith (Autoestima)',
     peca: 'PECA (Conducta Adaptativa)',
     wisc5: 'WISC-V (Inteligencia)',
-    entrevista: 'Entrevista Psicológica',
   }
 
   return (
@@ -97,7 +95,7 @@ export default function InformesPage() {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
         <h1 className="text-xl font-semibold text-gray-800">Informes generados</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Listado de todos los informes generados para tus pacientes.
+          Listado de todos los informes de tests generados para tus pacientes.
         </p>
       </div>
 
@@ -137,25 +135,12 @@ export default function InformesPage() {
                     {report.nivel || '-'}
                   </td>
                   <td className="py-3 px-4">
-                    {report.test_id === 'entrevista' ? (
-                      report.entrevista_id ? (
-                        <Link
-                          href={`/dashboard/informes/entrevista/${report.entrevista_id}`}
-                          className="text-blue-600 hover:underline text-sm"
-                        >
-                          Ver entrevista
-                        </Link>
-                      ) : (
-                        <span className="text-gray-400 text-sm">Sin datos</span>
-                      )
-                    ) : (
-                      <Link
-                        href={`/resultados/${report.test_id}?session=${report.session_id}`}
-                        className="text-blue-600 hover:underline text-sm"
-                      >
-                        Ver informe
-                      </Link>
-                    )}
+                    <Link
+                      href={`/resultados/${report.test_id}?session=${report.session_id}`}
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      Ver informe
+                    </Link>
                   </td>
                 </tr>
               ))}

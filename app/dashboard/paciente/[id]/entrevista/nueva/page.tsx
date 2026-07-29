@@ -28,7 +28,6 @@ export default function NuevaEntrevistaPage() {
 
   useEffect(() => {
     if (!patientId) return
-
     const loadPatient = async () => {
       setLoading(true)
       const { data, error } = await supabase
@@ -36,7 +35,6 @@ export default function NuevaEntrevistaPage() {
         .select('full_name')
         .eq('id', patientId)
         .single()
-
       if (error) {
         console.error('Error cargando paciente:', error)
         setError('No se pudo cargar la información del paciente.')
@@ -45,16 +43,13 @@ export default function NuevaEntrevistaPage() {
       }
       setLoading(false)
     }
-
     loadPatient()
   }, [patientId, supabase])
 
   useEffect(() => {
     const now = new Date()
-    const fechaStr = now.toISOString().split('T')[0]
-    const horaStr = now.toTimeString().slice(0, 5)
-    setFecha(fechaStr)
-    setHora(horaStr)
+    setFecha(now.toISOString().split('T')[0])
+    setHora(now.toTimeString().slice(0, 5))
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,11 +63,10 @@ export default function NuevaEntrevistaPage() {
     setError(null)
 
     try {
-      console.log('🔍 [Entrevista] Enviando a API...')
-
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
+      // 1. Insertar entrevista usando la API Route
       const response = await fetch('/api/entrevistas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,43 +83,13 @@ export default function NuevaEntrevistaPage() {
       })
 
       const data = await response.json()
-      console.log('🔍 [Entrevista] Respuesta de API:', data)
+      if (!response.ok) throw new Error(data.error || 'Error al guardar la entrevista')
+      if (!data.id) throw new Error('No se recibió el ID de la entrevista')
 
-      if (!response.ok) {
-        console.error('❌ [Entrevista] Error en API:', data)
-        throw new Error(data.error || 'Error al guardar la entrevista')
-      }
-
-      if (!data.id) {
-        throw new Error('No se recibió el ID de la entrevista')
-      }
-
-      console.log('✅ [Entrevista] Entrevista insertada con ID:', data.id)
-
-      // Insertar en informes usando entrevista_id (sin clave foránea)
-      const { error: informesError } = await supabase
-        .from('informes')
-        .insert({
-          patient_id: patientId,
-          psychologist_id: user.id,
-          test_id: 'entrevista',
-          entrevista_id: data.id,  // ← Columna dedicada
-          puntaje_total: null,
-          nivel: null,
-          recomendaciones: 'Entrevista psicológica',
-          created_at: new Date().toISOString(),
-        })
-
-      if (informesError) {
-        console.error('❌ [Entrevista] Error al insertar en informes:', informesError)
-        throw informesError
-      }
-
-      console.log('✅ [Entrevista] Registro en informes creado correctamente.')
-
+      // 2. Redirigir al detalle de la entrevista (ya no se guarda en informes)
       router.push(`/dashboard/informes/entrevista/${data.id}`)
     } catch (err: any) {
-      console.error('❌ [Entrevista] Error general:', err)
+      console.error('❌ [Entrevista] Error:', err)
       setError(err.message || 'Error al guardar la entrevista')
     } finally {
       setSaving(false)
@@ -170,88 +134,40 @@ export default function NuevaEntrevistaPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha <span className="text-red-500">*</span></label>
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Hora <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={hora}
-                onChange={(e) => setHora(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Hora <span className="text-red-500">*</span></label>
+              <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Asistentes</label>
-            <input
-              type="text"
-              value={asistentes}
-              onChange={(e) => setAsistentes(e.target.value)}
-              placeholder="Ej: Madre, padre, apoderado, etc."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
+            <input type="text" value={asistentes} onChange={(e) => setAsistentes(e.target.value)} placeholder="Ej: Madre, padre, apoderado, etc." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Motivación o Inquietud Principal</label>
-            <textarea
-              value={motivacionPrincipal}
-              onChange={(e) => setMotivacionPrincipal(e.target.value)}
-              rows={4}
-              placeholder="Describe la razón principal de la consulta..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y"
-            />
+            <textarea value={motivacionPrincipal} onChange={(e) => setMotivacionPrincipal(e.target.value)} rows={4} placeholder="Describe la razón principal de la consulta..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Información Relevante</label>
-            <textarea
-              value={infoRelevante}
-              onChange={(e) => setInfoRelevante(e.target.value)}
-              rows={4}
-              placeholder="Antecedentes, historia clínica, contexto familiar/educativo..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y"
-            />
+            <textarea value={infoRelevante} onChange={(e) => setInfoRelevante(e.target.value)} rows={4} placeholder="Antecedentes, historia clínica, contexto familiar/educativo..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Sugerencias y Acuerdos</label>
-            <textarea
-              value={sugerenciasAcuerdos}
-              onChange={(e) => setSugerenciasAcuerdos(e.target.value)}
-              rows={4}
-              placeholder="Acuerdos con el paciente/familia, sugerencias, derivaciones, etc."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y"
-            />
+            <textarea value={sugerenciasAcuerdos} onChange={(e) => setSugerenciasAcuerdos(e.target.value)} rows={4} placeholder="Acuerdos con el paciente/familia, sugerencias, derivaciones, etc." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y" />
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => router.push(`/dashboard/paciente/${patientId}`)}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-            >
+            <button type="button" onClick={() => router.push(`/dashboard/paciente/${patientId}`)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
+            <button type="submit" disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
               {saving ? 'Guardando...' : 'Guardar entrevista'}
             </button>
           </div>
