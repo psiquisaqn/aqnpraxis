@@ -260,7 +260,6 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       return
     }
 
-    // Verificar puntajes inválidos (solo los que están en codesToCheck)
     const invalid = codesToCheck.filter(code => isNaN(Number(rawScores[code])))
     if (invalid.length > 0) {
       const names = invalid.map(code => SUBTESTS_CONFIG.find(s => s.code === code)?.name || code)
@@ -418,7 +417,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
       }
       console.log('✅ [WISC] Puntajes guardados correctamente.')
 
-      // Insertar en informes
+      // Insertar en informes (incluyendo tipo)
       const citScore = calculatedScores.composites?.CIT?.score || 0
       const citClassification = getClassification(citScore)
 
@@ -433,6 +432,7 @@ export function Wisc5CalculadoraClient({ patientId }: Wisc5CalculadoraClientProp
           nivel: citClassification,
           recomendaciones: `Informe WISC-V generado automáticamente. Tipo: ${type === 'brief' ? 'Breve (7 subpruebas)' : 'Extendido (15 subpruebas)'}.`,
           created_at: new Date().toISOString(),
+          tipo: type, // ← Guardar el tipo para recuperarlo al listar
         })
 
       if (informesError) {

@@ -13,6 +13,7 @@ interface Informe {
   puntaje_total: number | null
   nivel: string | null
   recomendaciones: string | null
+  tipo: string | null  // ← Nuevo campo
   created_at: string
   patient: {
     full_name: string
@@ -43,9 +44,9 @@ export default function InformesPage() {
 
         const { data, error } = await supabase
           .from('informes')
-          .select('*, patient:patients(full_name, rut)')
+          .select('*, patient:patients(full_name, rut), tipo') // ← Incluir tipo
           .eq('psychologist_id', user.id)
-          .in('test_id', ['bdi2', 'coopersmith', 'peca', 'wisc5']) // ← Eliminado 'entrevista'
+          .in('test_id', ['bdi2', 'coopersmith', 'peca', 'wisc5'])
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -136,7 +137,7 @@ export default function InformesPage() {
                   </td>
                   <td className="py-3 px-4">
                     <Link
-                      href={`/resultados/${report.test_id}?session=${report.session_id}`}
+                      href={`/resultados/${report.test_id}?session=${report.session_id}&type=${report.tipo || 'brief'}`}
                       className="text-blue-600 hover:underline text-sm"
                     >
                       Ver informe
