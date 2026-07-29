@@ -146,13 +146,13 @@ export default function PatientList({ patients: initialPatients }: Props) {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filtered.map((p) => (
-            <div key={p.id} className="flex items-center gap-3">
-              <div className="flex-1">
+            <div key={p.id} className="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+              <div className="flex-1 w-full">
                 <PatientCard patient={p} onNewSession={(id) => setSessionPatientId(id)} />
               </div>
               <Link
                 href={`/dashboard/paciente/${p.id}`}
-                className="shrink-0 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                className="w-full md:w-auto shrink-0 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center"
               >
                 Ver ficha
               </Link>
