@@ -138,7 +138,7 @@ export default function InformesPage() {
                   <td className="py-3 px-4">
                     {report.test_id === 'entrevista' ? (
                       <Link
-                        href={`/dashboard/informes/entrevista/${report.id}`}
+                        href={`/dashboard/informes/entrevista/${report.session_id}`}
                         className="text-blue-600 hover:underline text-sm"
                       >
                         Ver entrevista

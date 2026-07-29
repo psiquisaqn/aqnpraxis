@@ -9,6 +9,7 @@ export default function NuevaEntrevistaPage() {
   const params = useParams()
   const patientId = params?.id as string
 
+  // Estados para el formulario
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,7 +74,7 @@ export default function NuevaEntrevistaPage() {
     try {
       console.log('🔍 [Entrevista] Enviando a API...')
 
-      // Obtener el usuario para enviar psychologist_id
+      // Obtener el usuario autenticado
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
@@ -104,13 +105,13 @@ export default function NuevaEntrevistaPage() {
 
       console.log('✅ [Entrevista] Entrevista insertada con ID:', data.id)
 
-      // 2. Insertar en informes usando el mismo ID que la entrevista
+      // 2. Insertar en informes (usando session_id para referenciar la entrevista)
       const { error: informesError } = await supabase
         .from('informes')
         .insert({
-          id: data.id,  // ← Mismo ID que la entrevista
           patient_id: patientId,
           psychologist_id: user.id,
+          session_id: data.id,  // ← Guardamos el ID de la entrevista
           test_id: 'entrevista',
           puntaje_total: null,
           nivel: null,
@@ -125,7 +126,7 @@ export default function NuevaEntrevistaPage() {
 
       console.log('✅ [Entrevista] Registro en informes creado correctamente.')
 
-      // 3. Redirigir al detalle de la entrevista (usando el mismo ID)
+      // 3. Redirigir al detalle de la entrevista usando el ID de la entrevista
       router.push(`/dashboard/informes/entrevista/${data.id}`)
     } catch (err: any) {
       console.error('❌ [Entrevista] Error general:', err)
