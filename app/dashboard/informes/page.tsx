@@ -7,6 +7,7 @@ import Link from 'next/link'
 
 interface Informe {
   id: string
+  session_id: string | null
   patient_id: string
   test_id: string
   puntaje_total: number | null
@@ -144,7 +145,7 @@ export default function InformesPage() {
                       </Link>
                     ) : (
                       <Link
-                        href={`/resultados/${report.test_id}?session=${report.id}`}
+                        href={`/resultados/${report.test_id}?session=${report.session_id}`}
                         className="text-blue-600 hover:underline text-sm"
                       >
                         Ver informe

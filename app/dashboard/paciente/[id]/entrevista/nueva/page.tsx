@@ -104,10 +104,11 @@ export default function NuevaEntrevistaPage() {
 
       console.log('✅ [Entrevista] Entrevista insertada con ID:', data.id)
 
-      // 2. Insertar en informes (sin session_id para evitar error de clave foránea)
+      // 2. Insertar en informes usando el mismo ID que la entrevista
       const { error: informesError } = await supabase
         .from('informes')
         .insert({
+          id: data.id,  // ← Mismo ID que la entrevista
           patient_id: patientId,
           psychologist_id: user.id,
           test_id: 'entrevista',
@@ -124,7 +125,7 @@ export default function NuevaEntrevistaPage() {
 
       console.log('✅ [Entrevista] Registro en informes creado correctamente.')
 
-      // 3. Redirigir al detalle de la entrevista
+      // 3. Redirigir al detalle de la entrevista (usando el mismo ID)
       router.push(`/dashboard/informes/entrevista/${data.id}`)
     } catch (err: any) {
       console.error('❌ [Entrevista] Error general:', err)
