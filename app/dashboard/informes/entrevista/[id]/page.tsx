@@ -43,7 +43,7 @@ export default function EntrevistaDetallePage({ params }: { params: { id: string
   useEffect(() => {
     const load = async () => {
       try {
-        // 1. Cargar entrevista
+        // 1. Cargar entrevista directamente desde la tabla entrevistas
         const { data, error } = await supabase
           .from('entrevistas')
           .select(`
@@ -54,6 +54,7 @@ export default function EntrevistaDetallePage({ params }: { params: { id: string
           .single()
 
         if (error || !data) {
+          console.error('Error cargando entrevista:', error)
           setError('Entrevista no encontrada')
           setLoading(false)
           return
@@ -68,6 +69,7 @@ export default function EntrevistaDetallePage({ params }: { params: { id: string
           setPlanStatus(plan)
         }
       } catch (err) {
+        console.error('Error:', err)
         setError('Error al cargar los datos')
       } finally {
         setLoading(false)
@@ -99,7 +101,7 @@ export default function EntrevistaDetallePage({ params }: { params: { id: string
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">Cargando...</p>
+          <p className="text-gray-500 text-sm">Cargando entrevista...</p>
         </div>
       </div>
     )
