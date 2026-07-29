@@ -78,7 +78,7 @@ export default function NuevaEntrevistaPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      // 1. Insertar entrevista usando la API Route (evita problemas de RLS)
+      // 1. Insertar entrevista usando la API Route
       const response = await fetch('/api/entrevistas', {
         method: 'POST',
         headers: {
@@ -97,15 +97,21 @@ export default function NuevaEntrevistaPage() {
       })
 
       const data = await response.json()
+      console.log('🔍 [Entrevista] Respuesta de API:', data)
 
       if (!response.ok) {
         console.error('❌ [Entrevista] Error en API:', data)
         throw new Error(data.error || 'Error al guardar la entrevista')
       }
 
+      // Verificar que data.id existe
+      if (!data.id) {
+        throw new Error('No se recibió el ID de la entrevista')
+      }
+
       console.log('✅ [Entrevista] Entrevista insertada con ID:', data.id)
 
-      // 2. Insertar en informes (usando session_id para referenciar la entrevista)
+      // 2. Insertar en informes con session_id = ID de la entrevista
       const { error: informesError } = await supabase
         .from('informes')
         .insert({

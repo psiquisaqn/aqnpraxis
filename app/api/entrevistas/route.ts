@@ -5,17 +5,15 @@ export async function POST(request: Request) {
   console.log('🔍 [API] Iniciando petición...')
   
   try {
-    // Verificar que las variables de entorno existen
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY // ← Usamos anon, no service_role
-    
-    console.log('🔑 [API] URL:', supabaseUrl ? '✅ existe' : '❌ falta')
-    console.log('🔑 [API] Key:', supabaseKey ? '✅ existe' : '❌ falta')
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    // Cliente con anon key (RLS está desactivado, así que debería funcionar)
-    const supabase = createClient(supabaseUrl!, supabaseKey!)
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Faltan variables de entorno')
+    }
 
-    // Obtener datos del body
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
     const body = await request.json()
     console.log('📝 [API] Body recibido:', body)
 
@@ -30,15 +28,14 @@ export async function POST(request: Request) {
       sugerencias_acuerdos 
     } = body
 
-    // Validar
-    if (!patient_id || !fecha || !hora) {
+    if (!patient_id || !fecha || !hora || !psychologist_id) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos' },
         { status: 400 }
       )
     }
 
-    // Insertar directamente (RLS desactivado)
+    // Insertar y devolver el ID generado
     const { data, error } = await supabase
       .from('entrevistas')
       .insert({
@@ -55,9 +52,9 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      console.error('❌ [API] Error de Supabase:', error)
+      console.error('❌ [API] Error al insertar:', error)
       return NextResponse.json(
-        { error: error.message, details: error },
+        { error: error.message },
         { status: 500 }
       )
     }
