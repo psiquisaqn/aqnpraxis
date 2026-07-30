@@ -67,6 +67,8 @@ function Bdi2ResultsPageInner() {
 
     const load = async () => {
       try {
+        console.log('🔍 [BDI‑II] Iniciando carga de datos...')
+
         // 1. Cargar puntajes BDI-II
         const { data: scores, error: scoresError } = await supabase
           .from('bdi2_scores')
@@ -75,9 +77,12 @@ function Bdi2ResultsPageInner() {
           .single()
 
         if (scoresError || !scores) {
+          console.error('❌ Error cargando scores BDI‑II:', scoresError)
           setLoading(false)
           return
         }
+
+        console.log('✅ Scores BDI‑II cargados:', scores)
 
         // Reconstruir respuestas
         const responses: Record<number, number> = {}
@@ -110,6 +115,8 @@ function Bdi2ResultsPageInner() {
           .eq('id', sessionId)
           .single()
 
+        console.log('✅ Datos de sesión cargados:', sessionData)
+
         if (sessionData?.patient) {
           const p = sessionData.patient as any
           setPatientName(p.full_name ?? '')
@@ -130,26 +137,63 @@ function Bdi2ResultsPageInner() {
 
         // 3. Cargar plan del usuario
         const { data: { user } } = await supabase.auth.getUser()
+        console.log('🔍 Usuario autenticado:', user)
+
         if (user) {
-          const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-          const plan = Array.isArray(planData) ? planData[0] : planData
-          setPlanStatus(plan)
+          // Opción A: usando RPC (si existe)
+          const { data: planData, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+          console.log('🔍 planData (RPC):', planData)
+          console.log('🔍 error RPC:', rpcError)
+
+          let plan = Array.isArray(planData) ? planData[0] : planData
+          if (plan && typeof plan === 'object' && 'is_pro' in plan) {
+            console.log('✅ Plan obtenido vía RPC:', plan)
+            setPlanStatus(plan)
+          } else {
+            console.warn('⚠️ RPC no devolvió un plan válido, intentando consulta directa a profiles...')
+
+            // Opción B: consulta directa a la tabla profiles (fallback)
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('plan')
+              .eq('id', user.id)
+              .single()
+
+            console.log('🔍 Perfil obtenido:', profile)
+            console.log('🔍 error perfil:', profileError)
+
+            if (!profileError && profile) {
+              const isPro = profile.plan === 'premium' || profile.plan === 'pro'
+              setPlanStatus({ is_pro: isPro })
+              console.log('✅ Plan obtenido desde profiles, isPro:', isPro)
+            } else {
+              // Si nada funciona, asumimos free
+              console.warn('⚠️ No se pudo obtener el plan, se asume free.')
+              setPlanStatus({ is_pro: false })
+            }
+          }
+        } else {
+          console.warn('⚠️ Usuario no autenticado, se asume plan gratuito.')
+          setPlanStatus({ is_pro: false })
         }
 
       } catch (err) {
-        console.error('Error cargando datos:', err)
+        console.error('❌ Error general en load():', err)
       } finally {
         setLoading(false)
+        console.log('🔍 Estado final planStatus:', planStatus)
       }
     }
 
     load()
   }, [sessionId])
 
-  const isPro = planStatus?.is_pro || false
+  const isPro = planStatus?.is_pro ?? false
+  console.log('🔍 isPro calculado:', isPro)
 
   const handleDownload = (type: 'docx' | 'odt') => {
     if (!result) return
+    console.log(`📥 Descargando ${type.toUpperCase()} para BDI‑II`)
     const meta = {
       sessionId,
       patientId,
@@ -219,7 +263,7 @@ function Bdi2ResultsPageInner() {
           }}
           label="PDF"
         />
-        {isPro && (
+        {isPro ? (
           <>
             <button
               onClick={() => handleDownload('docx')}
@@ -234,6 +278,10 @@ function Bdi2ResultsPageInner() {
               ODT
             </button>
           </>
+        ) : (
+          <span className="text-xs text-gray-400 italic">
+            (Descarga DOCX/ODT disponible en plan premium)
+          </span>
         )}
         <button
           onClick={() => router.push('/dashboard')}

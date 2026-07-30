@@ -65,12 +65,12 @@ export function DualTestWrapper({
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
                     <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(completed/totalItems)*100}%` }} />
                   </div>
-                  <div className="grid grid-cols-3 gap-1 max-h-[300px] overflow-y-auto">
+                  <div className="grid grid-cols-6 gap-1 max-h-[200px] overflow-y-auto">
                     {items.map((item) => (
                       <button
                         key={item.num}
                         onClick={() => onItemSelect(item.num)}
-                        className={`text-xs py-1 rounded transition-colors ${
+                        className={`text-[10px] py-0.5 px-1 rounded transition-colors ${
                           item.num === currentItem
                             ? 'bg-blue-600 text-white'
                             : answeredItems.has(item.num)

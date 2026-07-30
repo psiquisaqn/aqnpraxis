@@ -49,7 +49,6 @@ const NAV = [
       </svg>
     ),
   },
-  // → NUEVA ENTRADA: Entrevistas
   {
     href: '/dashboard/entrevistas',
     label: 'Entrevistas',
@@ -57,17 +56,6 @@ const NAV = [
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
         <path d="M3 3h12a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/>
         <path d="M5 6h8M5 9h6M5 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
-  {
-    href: '/sala',
-    label: 'Sala de pacientes',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M3 15c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        <path d="M9 9a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" strokeWidth="1.5"/>
       </svg>
     ),
   },
