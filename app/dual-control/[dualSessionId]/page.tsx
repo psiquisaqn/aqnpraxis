@@ -11,11 +11,8 @@ import { PecaControl } from './peca'
 export default function DualControlPage() {
   const params = useParams()
   const dualSessionId = params.dualSessionId as string
-  const [sessionData, setSessionData] = useState<{
-    sessionId: string
-    testId: string
-    patientId?: string
-  } | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [testId, setTestId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,45 +29,26 @@ export default function DualControlPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
 
-      // Obtener la sesión dual y la sesión asociada
-      const { data: dualData, error: dualError } = await supabase
+      // Obtener la sesión dual con el test_id
+      const { data, error } = await supabase
         .from('dual_sessions')
-        .select('session_id')
+        .select('session_id, test_id')
         .eq('id', dualSessionId)
         .single()
 
-      if (dualError) {
-        console.error('❌ Error al obtener dual_session:', dualError)
+      if (error) {
+        console.error('❌ Error al obtener dual_session:', error)
         setError('No se pudo cargar la sesión dual.')
         setLoading(false)
         return
       }
 
-      if (!dualData?.session_id) {
+      if (data?.session_id) {
+        setSessionId(data.session_id)
+        setTestId(data.test_id)
+      } else {
         setError('No se encontró la sesión asociada.')
-        setLoading(false)
-        return
       }
-
-      // Obtener la sesión real para saber el test_id
-      const { data: session, error: sessionError } = await supabase
-        .from('sessions')
-        .select('id, test_id, patient_id')
-        .eq('id', dualData.session_id)
-        .single()
-
-      if (sessionError) {
-        console.error('❌ Error al obtener sesión:', sessionError)
-        setError('No se pudo cargar la sesión.')
-        setLoading(false)
-        return
-      }
-
-      setSessionData({
-        sessionId: session.id,
-        testId: session.test_id,
-        patientId: session.patient_id,
-      })
       setLoading(false)
     }
 
@@ -88,7 +66,7 @@ export default function DualControlPage() {
     )
   }
 
-  if (error || !sessionData) {
+  if (error || !sessionId || !testId) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center max-w-md">
@@ -104,10 +82,9 @@ export default function DualControlPage() {
     )
   }
 
-  // Renderizar el control según el test_id
-  const { sessionId, testId, patientId } = sessionData
+  // Renderizar el control según test_id
+  console.log('🔍 [DualControl] test_id:', testId, 'sessionId:', sessionId)
 
-  // Props comunes
   const commonProps = {
     dualSessionId,
     sessionId,
@@ -117,7 +94,7 @@ export default function DualControlPage() {
 
   switch (testId) {
     case 'bdi2':
-      return <Bdi2Control {...commonProps} />
+      return <Bdi2Control {...commonProps} displayReady={true} />
     case 'coopersmith':
       return <CoopersmithControl {...commonProps} />
     case 'peca':
@@ -128,9 +105,7 @@ export default function DualControlPage() {
       return (
         <div className="flex items-center justify-center min-h-screen p-4">
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center max-w-md">
-            <p className="text-yellow-700">
-              Test no soportado: <strong>{testId}</strong>
-            </p>
+            <p className="text-yellow-700">Test no soportado: {testId}</p>
             <button
               onClick={() => window.history.back()}
               className="mt-4 px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700"
