@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -114,6 +113,13 @@ export default function PatientCard({ patient, onNewSession }: Props) {
             className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
             Ver ficha
+          </button>
+          {/* Botón para WISC-V */}
+          <button
+            onClick={() => router.push(`/dashboard/paciente/${patient.id}/wisc5-calculadora`)}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+          >
+            WISC-V
           </button>
         </div>
       </div>

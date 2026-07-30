@@ -150,12 +150,7 @@ export default function PatientList({ patients: initialPatients }: Props) {
               <div className="flex-1 w-full">
                 <PatientCard patient={p} onNewSession={(id) => setSessionPatientId(id)} />
               </div>
-              <Link
-                href={`/dashboard/paciente/${p.id}`}
-                className="w-full md:w-auto shrink-0 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center"
-              >
-                Ver ficha
-              </Link>
+              {/* Eliminado el botón "Ver ficha" duplicado */}
             </div>
           ))}
         </div>
