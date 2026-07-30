@@ -13,7 +13,8 @@ const TESTS = [
   { id: 'bdi2', label: 'BDI-II - Depresión' },
   { id: 'coopersmith', label: 'Coopersmith SEI - Autoestima' },
   { id: 'peca', label: 'PECA - Conducta Adaptativa' },
-  { id: 'entrevista', label: 'Entrevista Psicológica' }, // ← Agregado
+  { id: 'entrevista', label: 'Entrevista Psicológica' },
+  // WISC-V eliminado de aquí (tiene su propio acceso)
 ]
 
 export function NewSessionModal({ patientId, onClose }: Props) {
@@ -43,6 +44,7 @@ export function NewSessionModal({ patientId, onClose }: Props) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
+      // 1. Crear sesión en sessions
       const { data: session, error: createError } = await supabase
         .from('sessions')
         .insert({
@@ -55,18 +57,31 @@ export function NewSessionModal({ patientId, onClose }: Props) {
         .single()
 
       if (createError) throw createError
+      const sessionId = session.id
+
+      // 2. Crear sesión dual
+      const { data: dualSession, error: dualError } = await supabase
+        .from('dual_sessions')
+        .insert({
+          session_id: sessionId,
+          test_id: testId,
+        })
+        .select('id')
+        .single()
+
+      if (dualError) {
+        console.error('❌ Error creando dual_session:', dualError)
+        // Fallback: redirigir a la página de control con el session_id
+        // (algunas páginas de control aceptan session_id directamente)
+        router.push(`/dual-control/${sessionId}`)
+      } else {
+        // Redirigir al control dual con el ID de dual_session
+        router.push(`/dual-control/${dualSession.id}`)
+      }
 
       onClose()
-      const testRoutes: Record<string, string> = {
-        bdi2: `/bdi2/${session.id}`,
-        coopersmith: `/coopersmith/${session.id}`,
-        peca: `/peca/${session.id}`,
-      }
-      const route = testRoutes[testId]
-      if (route) {
-        router.push(route)
-      }
     } catch (err: any) {
+      console.error('❌ Error en handleCreate:', err)
       setError(err.message || 'Error al crear sesión')
     } finally {
       setLoading(false)
