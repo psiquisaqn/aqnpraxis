@@ -13,7 +13,7 @@ interface Informe {
   puntaje_total: number | null
   nivel: string | null
   recomendaciones: string | null
-  tipo: string | null  // ← Nuevo campo
+  tipo: string | null
   created_at: string
   patient: {
     full_name: string
@@ -26,39 +26,69 @@ export default function InformesPage() {
   const [informes, setInformes] = useState<Informe[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          setError('No autenticado')
-          setLoading(false)
-          return
-        }
-
-        const { data, error } = await supabase
-          .from('informes')
-          .select('*, patient:patients(full_name, rut), tipo') // ← Incluir tipo
-          .eq('psychologist_id', user.id)
-          .in('test_id', ['bdi2', 'coopersmith', 'peca', 'wisc5'])
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        setInformes(data || [])
-      } catch (err: any) {
-        setError(err.message)
-      } finally {
+  const loadInformes = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError('No autenticado')
         setLoading(false)
+        return
       }
+
+      const { data, error } = await supabase
+        .from('informes')
+        .select('*, patient:patients(full_name, rut), tipo')
+        .eq('psychologist_id', user.id)
+        .in('test_id', ['bdi2', 'coopersmith', 'peca', 'wisc5'])
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setInformes(data || [])
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadInformes()
   }, [supabase])
+
+  const handleDelete = async (reportId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este informe? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    setDeletingId(reportId)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autenticado')
+
+      const { error } = await supabase
+        .from('informes')
+        .delete()
+        .eq('id', reportId)
+        .eq('psychologist_id', user.id)
+
+      if (error) throw error
+
+      // Actualizar lista local (eliminar el informe)
+      setInformes(prev => prev.filter(r => r.id !== reportId))
+      setDeletingId(null)
+    } catch (err: any) {
+      alert('Error al eliminar el informe: ' + err.message)
+      setDeletingId(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -106,47 +136,58 @@ export default function InformesPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Paciente</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Test</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Puntaje</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Nivel</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {informes.map((report) => (
-                <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-gray-600">
-                    {new Date(report.created_at).toLocaleDateString('es-CL')}
-                  </td>
-                  <td className="py-3 px-4 font-medium text-gray-800">
-                    {report.patient?.full_name || 'Sin paciente'}
-                  </td>
-                  <td className="py-3 px-4 text-gray-600">
-                    {testLabels[report.test_id] || report.test_id}
-                  </td>
-                  <td className="py-3 px-4 text-gray-600">
-                    {report.puntaje_total ?? '-'}
-                  </td>
-                  <td className="py-3 px-4 text-gray-600">
-                    {report.nivel || '-'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <Link
-                      href={`/resultados/${report.test_id}?session=${report.session_id}&type=${report.tipo || 'brief'}`}
-                      className="text-blue-600 hover:underline text-sm"
-                    >
-                      Ver informe
-                    </Link>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Paciente</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Test</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Puntaje</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Nivel</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Acción</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {informes.map((report) => (
+                  <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
+                      {new Date(report.created_at).toLocaleDateString('es-CL')}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-gray-800">
+                      {report.patient?.full_name || 'Sin paciente'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {testLabels[report.test_id] || report.test_id}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {report.puntaje_total ?? '-'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {report.nivel || '-'}
+                    </td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/resultados/${report.test_id}?session=${report.session_id}&type=${report.tipo || 'brief'}`}
+                          className="text-blue-600 hover:underline text-sm"
+                        >
+                          Ver
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(report.id)}
+                          disabled={deletingId === report.id}
+                          className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
+                        >
+                          {deletingId === report.id ? 'Eliminando...' : 'Eliminar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
