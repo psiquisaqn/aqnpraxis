@@ -81,13 +81,19 @@ export default function InformesPage() {
 
       if (error) throw error
 
-      // Actualizar lista local (eliminar el informe)
       setInformes(prev => prev.filter(r => r.id !== reportId))
       setDeletingId(null)
     } catch (err: any) {
       alert('Error al eliminar el informe: ' + err.message)
       setDeletingId(null)
     }
+  }
+
+  // Formatear puntaje con un decimal, eliminando .0 si es entero
+  const formatScore = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return '-'
+    const fixed = Number(value).toFixed(1)
+    return fixed.replace(/\.0$/, '')
   }
 
   if (loading) {
@@ -161,7 +167,7 @@ export default function InformesPage() {
                       {testLabels[report.test_id] || report.test_id}
                     </td>
                     <td className="py-3 px-4 text-gray-600">
-                      {report.puntaje_total ?? '-'}
+                      {formatScore(report.puntaje_total)}
                     </td>
                     <td className="py-3 px-4 text-gray-600">
                       {report.nivel || '-'}
