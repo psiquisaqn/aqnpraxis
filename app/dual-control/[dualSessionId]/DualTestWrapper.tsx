@@ -14,6 +14,7 @@ interface DualTestWrapperProps {
   onStart: () => void
   children: ReactNode
   hideNavigation?: boolean
+  onBackToDashboard?: () => void  // ✅ nueva prop
 }
 
 export function DualTestWrapper({
@@ -27,10 +28,23 @@ export function DualTestWrapper({
   showQuestionZero,
   onStart,
   children,
-  hideNavigation = false
+  hideNavigation = false,
+  onBackToDashboard
 }: DualTestWrapperProps) {
   return (
     <div className="max-w-4xl mx-auto p-4">
+      {/* Botón "Volver al panel principal" siempre visible */}
+      {onBackToDashboard && (
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={onBackToDashboard}
+            className="text-xs text-gray-500 hover:text-gray-700 hover:underline transition-colors"
+          >
+            ← Volver al panel principal
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
         {showQuestionZero ? (
           <div className="text-center py-8">
