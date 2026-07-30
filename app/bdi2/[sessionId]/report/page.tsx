@@ -1,17 +1,12 @@
 'use client'
 // app/bdi2/[sessionId]/report/page.tsx
-// Versión mejorada con:
-// - Fondo blanco, sin recuadros de colores
-// - Logo y firma configurables
-// - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
-// - Saltos de página controlados (conclusión en página nueva)
-// - Botón Imprimir visible
-// - Isotipo AQN Praxis al final
+// Versión con descarga DOCX/ODT para premium + logs de depuración
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { useReportDocx } from '@/hooks/useReportDocx'
 import { ReporteHeader } from '@/components/ReporteHeader'
 import { ReporteFooter } from '@/components/ReporteFooter'
 
@@ -133,6 +128,8 @@ function GraficoBarras({ data }: { data: Array<{ label: string; value: number; m
 export default function Bdi2ReportPage() {
   const { sessionId } = useParams()
   const router = useRouter()
+  const contentRef = useRef<HTMLDivElement>(null)
+
   const [data, setData] = useState<any>(null)
   const [patient, setPatient] = useState<any>(null)
   const [patientId, setPatientId] = useState<string>('')
@@ -142,29 +139,42 @@ export default function Bdi2ReportPage() {
   const [patientSchool, setPatientSchool] = useState('')
   const [evalDate, setEvalDate] = useState('')
   const [loading, setLoading] = useState(true)
-  const contentRef = useRef<HTMLDivElement>(null)
+  const [planStatus, setPlanStatus] = useState<any>(null)
+
+  const { generateDocx } = useReportDocx()
 
   useEffect(() => {
     async function load() {
+      console.log('🔍 [BDI-II Report] Iniciando carga de datos...')
+
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
 
+      // 1. Cargar puntajes BDI-II
       const { data: score, error } = await supabase
         .from('bdi2_scores')
         .select('*')
         .eq('session_id', sessionId as string)
         .single()
 
-      if (error || !score) { setLoading(false); return }
+      if (error || !score) {
+        console.error('❌ Error cargando scores BDI-II:', error)
+        setLoading(false)
+        return
+      }
+      console.log('✅ Scores BDI-II cargados:', score)
       setData(score)
 
+      // 2. Cargar datos del paciente
       const { data: session } = await supabase
         .from('sessions')
         .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
         .eq('id', sessionId as string)
         .single()
+
+      console.log('✅ Datos de sesión cargados:', session)
 
       if (session?.patient) {
         const p = session.patient as any
@@ -184,10 +194,76 @@ export default function Bdi2ReportPage() {
           day: '2-digit', month: 'long', year: 'numeric'
         }))
       }
+
+      // 3. Cargar plan del usuario
+      const { data: { user } } = await supabase.auth.getUser()
+      console.log('🔍 Usuario autenticado:', user)
+
+      if (user) {
+        // Opción A: usando RPC (si existe)
+        const { data: planData, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+        console.log('🔍 planData (RPC):', planData)
+        console.log('🔍 error RPC:', rpcError)
+
+        let plan = Array.isArray(planData) ? planData[0] : planData
+        if (plan && typeof plan === 'object' && 'is_pro' in plan) {
+          console.log('✅ Plan obtenido vía RPC:', plan)
+          setPlanStatus(plan)
+        } else {
+          console.warn('⚠️ RPC no devolvió un plan válido, intentando consulta directa a profiles...')
+
+          // Opción B: consulta directa a la tabla profiles (fallback)
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('plan')
+            .eq('id', user.id)
+            .single()
+
+          console.log('🔍 Perfil obtenido:', profile)
+          console.log('🔍 error perfil:', profileError)
+
+          if (!profileError && profile) {
+            const isPro = profile.plan === 'premium' || profile.plan === 'pro'
+            setPlanStatus({ is_pro: isPro })
+            console.log('✅ Plan obtenido desde profiles, isPro:', isPro)
+          } else {
+            console.warn('⚠️ No se pudo obtener el plan, se asume free.')
+            setPlanStatus({ is_pro: false })
+          }
+        }
+      } else {
+        console.warn('⚠️ Usuario no autenticado, se asume plan gratuito.')
+        setPlanStatus({ is_pro: false })
+      }
+
+      console.log('🔍 Estado final planStatus:', planStatus)
       setLoading(false)
     }
     load()
   }, [sessionId])
+
+  const isPro = planStatus?.is_pro ?? false
+  console.log('🔍 isPro calculado:', isPro)
+
+  const handleDownload = (type: 'docx' | 'odt') => {
+    if (!data) return
+    console.log(`📥 Descargando ${type.toUpperCase()} para BDI‑II`)
+    const meta = {
+      sessionId: sessionId as string,
+      patientId,
+      testId: 'bdi2',
+      patientName: patient?.full_name ?? '',
+      content: {
+        totalScore: data.total_score,
+        severity: data.severity_label,
+        cognitiveAffectiveScore: data.cognitive_affective_score || 0,
+        somaticMotivationalScore: data.somatic_motivational_score || 0,
+        suicidalIdeationScore: data.suicidal_ideation_score || 0,
+        responses: {},
+      }
+    }
+    generateDocx(contentRef, meta, type)
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
@@ -207,8 +283,6 @@ export default function Bdi2ReportPage() {
   )
 
   const interpretacion = getInterpretacionSeveridad(data.total_score)
-  
-  // Determinar color según severidad (solo para texto, no para fondos)
   const severityColor = data.total_score <= 13 ? '#2e7d32' : data.total_score <= 19 ? '#e65100' : data.total_score <= 28 ? '#e65100' : '#c62828'
 
   const datosGrafico = [
@@ -237,12 +311,32 @@ export default function Bdi2ReportPage() {
           meta={{
             sessionId: sessionId as string,
             patientId,
-            testId: 'beck_bdi2',
+            testId: 'bdi2',
             patientName: patient?.full_name ?? '',
             content: { totalScore: data.total_score, severity: data.severity_label }
           }}
-          label="Guardar PDF"
+          label="PDF"
         />
+        {isPro ? (
+          <>
+            <button
+              onClick={() => handleDownload('docx')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            >
+              DOCX
+            </button>
+            <button
+              onClick={() => handleDownload('odt')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+            >
+              ODT
+            </button>
+          </>
+        ) : (
+          <span className="text-xs text-gray-400 italic">
+            (Descarga DOCX/ODT disponible en plan premium)
+          </span>
+        )}
         <button
           onClick={() => router.push('/dashboard')}
           className="px-4 py-2 rounded-lg text-sm transition-colors"
@@ -255,7 +349,6 @@ export default function Bdi2ReportPage() {
       {/* Contenido del informe */}
       <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
         
-        {/* Header con logo y datos del paciente */}
         <ReporteHeader
           patientName={patient?.full_name || 'Paciente'}
           patientRut={patientRut}
@@ -324,7 +417,6 @@ export default function Bdi2ReportPage() {
           </p>
         </div>
 
-        {/* Footer con firma e isotipo */}
         <ReporteFooter showFirma={true} />
       </div>
     </div>
