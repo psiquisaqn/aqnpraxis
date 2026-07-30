@@ -1,13 +1,4 @@
 'use client'
-// app/resultados/peca/page.tsx
-// Versión mejorada con:
-// - Fondo blanco, sin recuadros de colores
-// - Logo y firma configurables
-// - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
-// - Saltos de página controlados
-// - Botón Imprimir y Guardar PDF visibles
-// - Gráfico compacto y legible
-// - Isotipo AQN Praxis al final
 
 import { useEffect, useState, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -16,8 +7,8 @@ import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 import { scorePeca, type PecaResult } from '@/lib/peca/engine'
 import { ReporteHeader } from '@/components/ReporteHeader'
 import { ReporteFooter } from '@/components/ReporteFooter'
+import { useReportDocx } from '@/hooks/useReportDocx'
 
-// Estilos para impresión
 const printStyles = `
   @media print {
     body { margin: 0; padding: 0; background: white; }
@@ -29,36 +20,34 @@ const printStyles = `
   }
 `
 
-// Interpretación según nivel de participación
 function getInterpretacionParticipacion(porcentaje: number): { nivel: string; descripcion: string; recomendacion: string } {
   if (porcentaje >= 75) {
     return {
       nivel: "Alta Capacidad de Participación",
-      descripcion: "El evaluado presenta una alta capacidad de participación y adaptación conductual. Las habilidades adaptativas están bien desarrolladas, permitiendo un funcionamiento independiente en la mayoría de los contextos. El evaluado demuestra autonomía en las actividades de la vida diaria, habilidades sociales apropiadas y capacidad para resolver problemas cotidianos de manera efectiva.",
-      recomendacion: "Se recomienda continuar con estrategias de refuerzo positivo y monitoreo periódico. Mantener los apoyos actuales y fomentar la autonomía en nuevas áreas."
+      descripcion: "El evaluado presenta una alta capacidad de participación y adaptación conductual. Las habilidades adaptativas están bien desarrolladas, permitiendo un funcionamiento independiente en la mayoría de los contextos.",
+      recomendacion: "Se recomienda continuar con estrategias de refuerzo positivo y monitoreo periódico."
     }
   } else if (porcentaje >= 50) {
     return {
       nivel: "Nivel Medio de Participación",
-      descripcion: "El evaluado muestra un nivel medio de participación en conductas adaptativas. Presenta habilidades funcionales en varias áreas, aunque requiere apoyo ocasional en tareas más complejas. La autonomía es parcial y existen algunas dificultades en contextos sociales o prácticos que limitan la independencia plena.",
-      recomendacion: "Se sugiere trabajar en áreas específicas identificadas en las dimensiones con menor puntuación, mediante actividades estructuradas y seguimiento cercano. Implementar apoyos focalizados en las áreas deficitarias."
+      descripcion: "El evaluado muestra un nivel medio de participación en conductas adaptativas. Presenta habilidades funcionales en varias áreas, aunque requiere apoyo ocasional en tareas más complejas.",
+      recomendacion: "Se sugiere trabajar en áreas específicas identificadas en las dimensiones con menor puntuación."
     }
   } else if (porcentaje >= 25) {
     return {
       nivel: "Dificultades Significativas",
-      descripcion: "El evaluado presenta dificultades significativas en conducta adaptativa. Requiere apoyos sustanciales para desenvolverse en actividades cotidianas, tanto en el ámbito social como en el práctico. Las habilidades de comunicación, socialización o autonomía personal están afectadas de manera importante, limitando la independencia funcional.",
-      recomendacion: "Se recomienda intervención multidisciplinaria, entrenamiento en habilidades específicas y reevaluación en 3-6 meses. Implementar un plan de apoyos individualizado con objetivos concretos y medibles."
+      descripcion: "El evaluado presenta dificultades significativas en conducta adaptativa. Requiere apoyos sustanciales para desenvolverse en actividades cotidianas.",
+      recomendacion: "Se recomienda intervención multidisciplinaria, entrenamiento en habilidades específicas y reevaluación en 3-6 meses."
     }
   } else {
     return {
       nivel: "Requiere Apoyo Intensivo",
-      descripcion: "El evaluado requiere apoyo intensivo en conducta adaptativa. Las habilidades para la vida diaria, la interacción social y la resolución de problemas se encuentran severamente afectadas. La dependencia de cuidadores es alta y la autonomía es muy limitada en la mayoría de los contextos.",
-      recomendacion: "Se recomienda derivación a especialistas, programa de intervención individualizado y reevaluación en 3 meses. Considerar la implementación de un sistema de apoyos extensos y continuos, con participación de múltiples profesionales."
+      descripcion: "El evaluado requiere apoyo intensivo en conducta adaptativa. Las habilidades para la vida diaria y la interacción social se encuentran severamente afectadas.",
+      recomendacion: "Se recomienda derivación a especialistas, programa de intervención individualizado y reevaluación en 3 meses."
     }
   }
 }
 
-// Interpretación de dimensiones específicas (nueva redacción: "La habilidad adaptativa evaluada está [grado], por lo que el nivel de apoyos necesario es [intensidad]")
 function getInterpretacionDimension(nombre: string, puntaje: number, intensidad: string): string {
   const baseDescripcion: Record<string, string> = {
     'com': 'Habilidades de comunicación (lenguaje receptivo y expresivo), capacidad para expresar necesidades y comprender instrucciones.',
@@ -72,22 +61,19 @@ function getInterpretacionDimension(nombre: string, puntaje: number, intensidad:
     'aor': 'Áreas ocupacionales y recreativas, habilidades para el trabajo y uso adecuado del tiempo libre.'
   }
   
-  // Descripción del grado de afectación
   const gradoAfectacion = intensidad === 'Generalizado' ? 'muy afectada' :
                           intensidad === 'Extenso' ? 'significativamente afectada' :
                           intensidad === 'Limitado' ? 'moderadamente afectada' :
                           'levemente afectada'
   
-  // Nueva redacción
-  return `${nombre}: ${baseDescripcion[nombre] || 'Habilidad adaptativa evaluada.'} La habilidad adaptativa evaluada está "${gradoAfectacion}", por lo que el nivel de apoyos necesario es "${intensidad.toLowerCase()}".`
+  // Sin comillas en las etiquetas
+  return `${nombre}: ${baseDescripcion[nombre] || 'Habilidad adaptativa evaluada.'} La habilidad adaptativa evaluada está ${gradoAfectacion}, por lo que el nivel de apoyos necesario es ${intensidad.toLowerCase()}.`
 }
 
-// Conclusión general
 function getConclusionGeneral(result: PecaResult, nombrePaciente: string): string {
   const porcentaje = Math.round(result.participationLevel * 100)
   const interpretacion = getInterpretacionParticipacion(porcentaje)
   
-  // Identificar dimensiones más alta y más baja
   let dimensionAlta = { label: '', puntaje: -1 }
   let dimensionBaja = { label: '', puntaje: 101 }
   
@@ -104,7 +90,6 @@ function getConclusionGeneral(result: PecaResult, nombrePaciente: string): strin
   return `${nombrePaciente || 'El evaluado'} presenta ${interpretacion.nivel.toLowerCase()} en conducta adaptativa, con un puntaje global de ${porcentaje}%. ${interpretacion.descripcion} Las principales fortalezas se observan en ${dimensionAlta.label} (${Math.round(dimensionAlta.puntaje)}%), mientras que las mayores dificultades se concentran en ${dimensionBaja.label} (${Math.round(dimensionBaja.puntaje)}%). ${interpretacion.recomendacion} Es fundamental que esta evaluación sea complementada con observación directa en contextos naturales y entrevistas con cuidadores o educadores para obtener un perfil completo y preciso del funcionamiento adaptativo del evaluado.`
 }
 
-// Función para obtener color según intensidad (solo para texto y gráfico)
 function getIntensityColor(intensity: string): string {
   switch (intensity) {
     case 'Generalizado': return '#A32D2D'
@@ -115,11 +100,8 @@ function getIntensityColor(intensity: string): string {
   }
 }
 
-// Gráfico de barras para dimensiones - versión compacta y legible
 function GraficoBarrasDimensiones({ data }: { data: Array<{ label: string; value: number; intensidad: string }> }) {
   const maxVal = 100
-  
-  // Mapeo de etiquetas largas a cortas para mejor visualización
   const shortLabels: Record<string, string> = {
     'Comunicación': 'Com.',
     'Académico func.': 'Acad.',
@@ -187,6 +169,9 @@ function PecaResultsPageInner() {
   const [patientSchool, setPatientSchool] = useState('')
   const [evalDate, setEvalDate] = useState('')
   const [loading, setLoading] = useState(true)
+  const [planStatus, setPlanStatus] = useState<any>(null)
+
+  const { generateDocx } = useReportDocx()
 
   useEffect(() => {
     if (!sessionId) return
@@ -197,58 +182,86 @@ function PecaResultsPageInner() {
     )
 
     async function load() {
-      // 1. Leer peca_scores directamente (p01-p45)
-      const { data: scores, error: scoresError } = await supabase
-        .from('peca_scores')
-        .select('*')
-        .eq('session_id', sessionId)
-        .single()
+      try {
+        const { data: scores, error: scoresError } = await supabase
+          .from('peca_scores')
+          .select('*')
+          .eq('session_id', sessionId)
+          .single()
 
-      if (scoresError || !scores) { setLoading(false); return }
+        if (scoresError || !scores) { setLoading(false); return }
 
-      // 2. Reconstruir respuestas desde p01-p45
-      const resp: Record<number, 1 | 2 | 3 | 4> = {}
-      for (let i = 1; i <= 45; i++) {
-        const key = 'p' + String(i).padStart(2, '0') as keyof typeof scores
-        const val = scores[key]
-        if (val !== null && val !== undefined) {
-          resp[i] = val as 1 | 2 | 3 | 4
+        const resp: Record<number, 1 | 2 | 3 | 4> = {}
+        for (let i = 1; i <= 45; i++) {
+          const key = 'p' + String(i).padStart(2, '0') as keyof typeof scores
+          const val = scores[key]
+          if (val !== null && val !== undefined) {
+            resp[i] = val as 1 | 2 | 3 | 4
+          }
         }
-      }
-      const calculatedResult = scorePeca(resp)
-      setResult(calculatedResult)
+        const calculatedResult = scorePeca(resp)
+        setResult(calculatedResult)
 
-      // 3. Leer datos de sesión + paciente
-      const { data: sessionData } = await supabase
-        .from('sessions')
-        .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
-        .eq('id', sessionId)
-        .single()
+        const { data: sessionData } = await supabase
+          .from('sessions')
+          .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
+          .eq('id', sessionId)
+          .single()
 
-      if (sessionData?.patient) {
-        const p = sessionData.patient as any
-        setPatientName(p.full_name ?? '')
-        setPatientId(p.id ?? '')
-        setPatientRut(p.rut ?? '')
-        setPatientSchool(p.school ?? '')
-        
-        if (p.birth_date) {
-          setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
-          const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
-          setPatientAge(age)
+        if (sessionData?.patient) {
+          const p = sessionData.patient as any
+          setPatientName(p.full_name ?? '')
+          setPatientId(p.id ?? '')
+          setPatientRut(p.rut ?? '')
+          setPatientSchool(p.school ?? '')
+          if (p.birth_date) {
+            setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
+            const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
+            setPatientAge(age)
+          }
         }
-      }
-      if (sessionData?.started_at) {
-        setEvalDate(new Date(sessionData.started_at).toLocaleDateString('es-CL', {
-          day: '2-digit', month: 'long', year: 'numeric'
-        }))
-      }
+        if (sessionData?.started_at) {
+          setEvalDate(new Date(sessionData.started_at).toLocaleDateString('es-CL', {
+            day: '2-digit', month: 'long', year: 'numeric'
+          }))
+        }
 
-      setLoading(false)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+          const plan = Array.isArray(planData) ? planData[0] : planData
+          setPlanStatus(plan)
+        }
+
+      } catch (err) {
+        console.error('Error:', err)
+      } finally {
+        setLoading(false)
+      }
     }
 
     load()
   }, [sessionId])
+
+  const isPro = planStatus?.is_pro || false
+
+  const handleDownload = (type: 'docx' | 'odt') => {
+    if (!result) return
+    const meta = {
+      sessionId,
+      patientId,
+      testId: 'peca',
+      patientName,
+      content: {
+        participationLevel: result.participationLevel,
+        dimensions: result.dimensions,
+        aamrSets: result.aamrSets,
+        participationText: result.participationText,
+        participationNeeds: result.participationNeeds,
+      }
+    }
+    generateDocx(contentRef, meta, type)
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
@@ -279,7 +292,6 @@ function PecaResultsPageInner() {
     <div className="min-h-screen" style={{ background: 'white' }}>
       <style>{printStyles}</style>
       
-      {/* Barra superior - no imprimible */}
       <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3 flex-wrap no-print" style={{ background: 'white', borderColor: '#e5e5e0' }}>
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>PECA</span>
         <div className="flex-1" />
@@ -293,21 +305,36 @@ function PecaResultsPageInner() {
         <PdfDownloadButton
           contentRef={contentRef}
           meta={{
-            sessionId: sessionId,
+            sessionId,
             patientId,
             testId: 'peca',
-            patientName: patientName,
+            patientName,
             content: {
               participationLevel: result.participationLevel,
-              answeredItems: result.answeredItems,
               dimensions: result.dimensions,
               aamrSets: result.aamrSets,
               participationText: result.participationText,
-              participationNeeds: result.participationNeeds
+              participationNeeds: result.participationNeeds,
             }
           }}
-          label="Guardar PDF"
+          label="PDF"
         />
+        {isPro && (
+          <>
+            <button
+              onClick={() => handleDownload('docx')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            >
+              DOCX
+            </button>
+            <button
+              onClick={() => handleDownload('odt')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+            >
+              ODT
+            </button>
+          </>
+        )}
         <button
           onClick={() => router.push('/dashboard')}
           className="px-4 py-2 rounded-lg text-sm transition-colors"
@@ -317,10 +344,7 @@ function PecaResultsPageInner() {
         </button>
       </div>
 
-      {/* Contenido del informe */}
       <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
-        
-        {/* Header con logo y datos del paciente */}
         <ReporteHeader
           patientName={patientName}
           patientRut={patientRut}
@@ -331,7 +355,7 @@ function PecaResultsPageInner() {
           testName="PECA - Prueba de Evaluación de Conducta Adaptativa"
         />
 
-        {/* Nivel de participación */}
+        {/* Participación general */}
         <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Participación general</h2>
@@ -373,7 +397,7 @@ function PecaResultsPageInner() {
           <p className="text-sm font-medium" style={{ color: nivelColor }}>Recomendación: {interpretacionParticipacion.recomendacion}</p>
         </div>
 
-        {/* Gráfico de barras de dimensiones */}
+        {/* Gráfico */}
         <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Perfil de Dimensiones Adaptativas</h2>
@@ -438,7 +462,7 @@ function PecaResultsPageInner() {
           </div>
         </div>
 
-        {/* Conclusión general con salto de página */}
+        {/* Conclusión */}
         <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
@@ -448,7 +472,6 @@ function PecaResultsPageInner() {
           </p>
         </div>
 
-        {/* Footer con firma e isotipo */}
         <ReporteFooter showFirma={true} />
       </div>
     </div>

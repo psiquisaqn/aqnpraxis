@@ -7,9 +7,9 @@ interface DualTestWrapperProps {
   totalItems: number
   currentItem: number
   completed: number
-  onItemSelect?: (num: number) => void  // ← opcional
-  items?: Array<{ num: number }>        // ← opcional
-  answeredItems?: Set<number>           // ← opcional
+  onItemSelect?: (num: number) => void
+  items?: Array<{ num: number }>
+  answeredItems?: Set<number>
   showQuestionZero: boolean
   onStart: () => void
   children: ReactNode
@@ -33,7 +33,6 @@ export function DualTestWrapper({
     <div className="max-w-4xl mx-auto p-4">
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
         {showQuestionZero ? (
-          // Pantalla de inicio - texto genérico sin alusión a "paciente"
           <div className="text-center py-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">{title}</h2>
             <p className="text-gray-600 mb-6">
@@ -49,11 +48,16 @@ export function DualTestWrapper({
             </button>
           </div>
         ) : (
-          <div className={`flex flex-col ${hideNavigation ? '' : 'md:flex-row'} gap-6`}>
+          <div className="flex flex-col gap-6">
+            {/* Contenido del test (arriba) */}
+            <div className="w-full">
+              {children}
+            </div>
+
+            {/* Navegación (abajo) */}
             {!hideNavigation && items.length > 0 && (
-              // Panel de navegación rápida (solo si no está oculto y hay items)
-              <div className="md:w-1/4">
-                <div className="bg-gray-50 rounded-lg p-3 sticky top-4">
+              <div className="w-full">
+                <div className="bg-gray-50 rounded-lg p-3">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-gray-600">Progreso</span>
                     <span className="text-gray-800 font-medium">{completed}/{totalItems}</span>
@@ -81,10 +85,6 @@ export function DualTestWrapper({
                 </div>
               </div>
             )}
-            {/* Contenido del test */}
-            <div className={hideNavigation ? 'w-full' : 'md:w-3/4'}>
-              {children}
-            </div>
           </div>
         )}
       </div>

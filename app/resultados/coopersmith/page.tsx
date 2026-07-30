@@ -1,16 +1,12 @@
 'use client'
 // app/resultados/coopersmith/page.tsx
-// Versión mejorada con:
-// - Fondo blanco, sin recuadros de colores
-// - Logo y firma configurables
-// - Datos completos del paciente (RUT, edad, fecha nacimiento, colegio)
-// - Saltos de página controlados (conclusión en página nueva)
-// - Isotipo AQN Praxis al final
+// Versión con descarga de DOCX/ODT para premium
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { useReportDocx } from '@/hooks/useReportDocx'
 import { scoreCoopersmith, type CooperResult } from '@/lib/coopersmith/engine'
 import { ReporteHeader } from '@/components/ReporteHeader'
 import { ReporteFooter } from '@/components/ReporteFooter'
@@ -186,6 +182,9 @@ function CoopersmithReportPageInner() {
   const [patientSchool, setPatientSchool] = useState('')
   const [evalDate, setEvalDate] = useState('')
   const [loading, setLoading] = useState(true)
+  const [planStatus, setPlanStatus] = useState<any>(null)
+
+  const { generateDocx } = useReportDocx()
 
   useEffect(() => {
     if (!sessionId) return
@@ -196,45 +195,91 @@ function CoopersmithReportPageInner() {
     )
 
     async function load() {
-      const { data: scores, error: scoresError } = await supabase
-        .from('coopersmith_scores')
-        .select('*')
-        .eq('session_id', sessionId)
-        .single()
+      try {
+        // 1. Cargar puntajes Coopersmith
+        const { data: scores, error: scoresError } = await supabase
+          .from('coopersmith_scores')
+          .select('*')
+          .eq('session_id', sessionId)
+          .single()
 
-      if (scoresError || !scores) { setLoading(false); return }
-
-      const built = buildResultFromDb(scores)
-      setResult(built)
-
-      const { data: sessionData } = await supabase
-        .from('sessions')
-        .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
-        .eq('id', sessionId)
-        .single()
-
-      if (sessionData?.patient) {
-        const p = sessionData.patient as any
-        setPatientName(p.full_name ?? '')
-        setPatientId(p.id ?? '')
-        setPatientRut(p.rut ?? '')
-        setPatientSchool(p.school ?? '')
-        
-        if (p.birth_date) {
-          setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
-          const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
-          setPatientAge(age)
+        if (scoresError || !scores) {
+          setLoading(false)
+          return
         }
+
+        const built = buildResultFromDb(scores)
+        setResult(built)
+
+        // 2. Cargar datos del paciente
+        const { data: sessionData } = await supabase
+          .from('sessions')
+          .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
+          .eq('id', sessionId)
+          .single()
+
+        if (sessionData?.patient) {
+          const p = sessionData.patient as any
+          setPatientName(p.full_name ?? '')
+          setPatientId(p.id ?? '')
+          setPatientRut(p.rut ?? '')
+          setPatientSchool(p.school ?? '')
+          
+          if (p.birth_date) {
+            setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
+            const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
+            setPatientAge(age)
+          }
+        }
+        if (sessionData?.started_at) {
+          setEvalDate(new Date(sessionData.started_at).toLocaleDateString('es-CL', {
+            day: '2-digit', month: 'long', year: 'numeric'
+          }))
+        }
+
+        // 3. Cargar plan del usuario
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+          const plan = Array.isArray(planData) ? planData[0] : planData
+          setPlanStatus(plan)
+        }
+
+      } catch (err) {
+        console.error('Error cargando datos:', err)
+      } finally {
+        setLoading(false)
       }
-      if (sessionData?.started_at) {
-        setEvalDate(new Date(sessionData.started_at).toLocaleDateString('es-CL', {
-          day: '2-digit', month: 'long', year: 'numeric'
-        }))
-      }
-      setLoading(false)
     }
     load()
   }, [sessionId])
+
+  const isPro = planStatus?.is_pro || false
+
+  const handleDownload = (type: 'docx' | 'odt') => {
+    if (!result) return
+    // Mapear subescalas a los campos esperados por el hook
+    const subscales = result.subscales.reduce((acc, s) => {
+      acc[s.code] = s.scaledScore
+      return acc
+    }, {} as Record<string, number>)
+
+    const meta = {
+      sessionId,
+      patientId,
+      testId: 'coopersmith',
+      patientName,
+      content: {
+        totalScore: result.totalScaled,
+        level: result.level,
+        general: subscales.general || 0,
+        social: subscales.social || 0,
+        familiar: subscales.hogar || 0,    // Hogar → Familiar
+        academico: subscales.escolar || 0, // Escolar → Académico
+      }
+    }
+    generateDocx(contentRef, meta, type)
+  }
 
   if (loading) return <Spinner />
   if (!result)  return <Error onBack={() => router.back()} />
@@ -272,8 +317,24 @@ function CoopersmithReportPageInner() {
         <PdfDownloadButton
           contentRef={contentRef}
           meta={{ sessionId, patientId, testId: 'coopersmith', patientName, content: { total: result.totalScaled, level: result.level } }}
-          label="Guardar PDF"
+          label="PDF"
         />
+        {isPro && (
+          <>
+            <button
+              onClick={() => handleDownload('docx')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            >
+              DOCX
+            </button>
+            <button
+              onClick={() => handleDownload('odt')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+            >
+              ODT
+            </button>
+          </>
+        )}
         <button onClick={() => router.push('/dashboard')}
           className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
           style={{ background: '#2563eb', border: 'none' }}>

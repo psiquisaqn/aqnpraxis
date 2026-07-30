@@ -1,213 +1,301 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
-import { TestResultsLayout } from '@/components/TestResultsLayout'
-import { scoreBdi2, type BdiResult, BDI2_SEVERITY_COLORS } from '@/lib/bdi2/engine'
+import { useEffect, useState, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
+import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { ReporteHeader } from '@/components/ReporteHeader'
+import { ReporteFooter } from '@/components/ReporteFooter'
+import { useReportDocx } from '@/hooks/useReportDocx'
+
+const printStyles = `
+  @media print {
+    body { margin: 0; padding: 0; background: white; }
+    .no-print { display: none; }
+    .reporte-container { padding: 1.5cm; width: 100%; }
+    .page-break-before { page-break-before: always; }
+    .page-break-inside { page-break-inside: avoid; }
+  }
+`
+
+function getSeverityClass(severity: string): string {
+  switch (severity) {
+    case 'minima': return 'text-green-700'
+    case 'leve': return 'text-yellow-700'
+    case 'moderada': return 'text-orange-700'
+    case 'grave': return 'text-red-700'
+    default: return 'text-gray-700'
+  }
+}
+
+function getSeverityLabel(severity: string): string {
+  switch (severity) {
+    case 'minima': return 'Depresión mínima'
+    case 'leve': return 'Depresión leve'
+    case 'moderada': return 'Depresión moderada'
+    case 'grave': return 'Depresión grave'
+    default: return 'No clasificado'
+  }
+}
 
 function Bdi2ResultsPageInner() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session') ?? ''
+  const contentRef = useRef<HTMLDivElement>(null)
 
-  const [result, setResult] = useState<BdiResult | null>(null)
+  const [result, setResult] = useState<any>(null)
   const [patientName, setPatientName] = useState('')
   const [patientId, setPatientId] = useState('')
+  const [patientRut, setPatientRut] = useState('')
+  const [patientBirthDate, setPatientBirthDate] = useState('')
+  const [patientAge, setPatientAge] = useState<number | undefined>(undefined)
+  const [patientSchool, setPatientSchool] = useState('')
   const [evalDate, setEvalDate] = useState('')
   const [loading, setLoading] = useState(true)
+  const [planStatus, setPlanStatus] = useState<any>(null)
+
+  const { generateDocx } = useReportDocx()
 
   useEffect(() => {
     if (!sessionId) return
-    fetch('/api/scores/bdi2?session=' + sessionId)
-      .then(r => r.json())
-      .then((data) => {
-        if (!data || data.error) { setLoading(false); return }
-        
+
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    const load = async () => {
+      try {
+        // 1. Cargar puntajes BDI-II
+        const { data: scores, error: scoresError } = await supabase
+          .from('bdi2_scores')
+          .select('*')
+          .eq('session_id', sessionId)
+          .single()
+
+        if (scoresError || !scores) {
+          setLoading(false)
+          return
+        }
+
         // Reconstruir respuestas
-        const resp: Record<number, 0 | 1 | 2 | 3> = {}
+        const responses: Record<number, number> = {}
         for (let i = 1; i <= 21; i++) {
-          const key = `item_${i}` as keyof typeof data
-          if (data[key] !== null && data[key] !== undefined) {
-            resp[i] = data[key] as 0 | 1 | 2 | 3
+          const key = 'item_' + i
+          if (scores[key] !== undefined && scores[key] !== null) {
+            responses[i] = scores[key]
           }
         }
-        
-        const scored = scoreBdi2(resp)
-        setResult(scored)
-        setPatientName((data.session as any)?.patient?.full_name ?? '')
-        setPatientId((data.session as any)?.patient?.id ?? '')
-        const d = (data.session as any)?.started_at
-        if (d) setEvalDate(new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }))
+
+        const totalScore = scores.total_score || 0
+        const severity = scores.severity_label || 'No clasificado'
+        const cognitiveAffectiveScore = scores.cognitive_affective_score || 0
+        const somaticMotivationalScore = scores.somatic_motivational_score || 0
+        const suicidalIdeationScore = scores.suicidal_ideation_score || 0
+
+        setResult({
+          totalScore,
+          severity,
+          cognitiveAffectiveScore,
+          somaticMotivationalScore,
+          suicidalIdeationScore,
+          responses,
+        })
+
+        // 2. Cargar datos del paciente
+        const { data: sessionData } = await supabase
+          .from('sessions')
+          .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
+          .eq('id', sessionId)
+          .single()
+
+        if (sessionData?.patient) {
+          const p = sessionData.patient as any
+          setPatientName(p.full_name ?? '')
+          setPatientId(p.id ?? '')
+          setPatientRut(p.rut ?? '')
+          setPatientSchool(p.school ?? '')
+          if (p.birth_date) {
+            setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
+            const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
+            setPatientAge(age)
+          }
+        }
+        if (sessionData?.started_at) {
+          setEvalDate(new Date(sessionData.started_at).toLocaleDateString('es-CL', {
+            day: '2-digit', month: 'long', year: 'numeric'
+          }))
+        }
+
+        // 3. Cargar plan del usuario
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+          const plan = Array.isArray(planData) ? planData[0] : planData
+          setPlanStatus(plan)
+        }
+
+      } catch (err) {
+        console.error('Error cargando datos:', err)
+      } finally {
         setLoading(false)
-      })
-      .catch(() => setLoading(false))
+      }
+    }
+
+    load()
   }, [sessionId])
 
-  if (loading) return <Spinner />
-  if (!result) return <Error />
+  const isPro = planStatus?.is_pro || false
 
-  const severityColor = BDI2_SEVERITY_COLORS[result.severity]
+  const handleDownload = (type: 'docx' | 'odt') => {
+    if (!result) return
+    const meta = {
+      sessionId,
+      patientId,
+      testId: 'bdi2',
+      patientName,
+      content: {
+        totalScore: result.totalScore,
+        severity: result.severity,
+        cognitiveAffectiveScore: result.cognitiveAffectiveScore,
+        somaticMotivationalScore: result.somaticMotivationalScore,
+        suicidalIdeationScore: result.suicidalIdeationScore,
+        responses: result.responses,
+      }
+    }
+    generateDocx(contentRef, meta, type)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
+        <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: '#4a4a4a', borderTopColor: 'transparent' }} />
+      </div>
+    )
+  }
+
+  if (!result) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'white' }}>
+        <div className="text-center">
+          <p className="text-sm mb-3" style={{ color: '#4b5563' }}>No se encontraron resultados</p>
+          <button onClick={() => router.back()} className="text-sm" style={{ color: '#4a4a4a' }}>← Volver</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <TestResultsLayout
-      patientName={patientName}
-      patientId={patientId}
-      testName="BDI-II - Inventario de Depresión de Beck"
-      testCode="BDI-II"
-      evalDate={evalDate}
-      pdfMeta={{
-        sessionId,
-        patientId,
-        testId: 'bdi2',
-        patientName,
-        content: result
-      }}
-    >
-      <div className="mt-5 px-5 py-4 rounded-xl bg-gray-50 border border-gray-100">
-        <div className="flex flex-col sm:flex-row items-center gap-6 mb-3">
-          <div className="text-center sm:text-left">
-            <p className="text-xs font-medium uppercase tracking-widest mb-1 text-gray-400">
-              Puntaje total
-            </p>
-            <div className="flex items-baseline gap-3">
-              <span className="text-5xl font-bold" style={{ fontFamily: 'var(--font-serif)', color: severityColor }}>
-                {result.totalScore}
-              </span>
-              <div>
-                <div className="text-sm font-semibold" style={{ color: severityColor }}>
-                  {result.severityLabel}
-                </div>
-                <div className="text-xs text-gray-400">de 63 puntos</div>
+    <div className="min-h-screen" style={{ background: 'white' }}>
+      <style>{printStyles}</style>
+
+      {/* Barra superior - no imprimible */}
+      <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3 flex-wrap no-print" style={{ background: 'white', borderColor: '#e5e5e0' }}>
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>BDI-II</span>
+        <div className="flex-1" />
+        <button
+          onClick={() => window.print()}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg border"
+          style={{ color: '#4b5563', borderColor: '#e5e5e0' }}
+        >
+          Imprimir
+        </button>
+        <PdfDownloadButton
+          contentRef={contentRef}
+          meta={{
+            sessionId,
+            patientId,
+            testId: 'bdi2',
+            patientName,
+            content: {
+              totalScore: result.totalScore,
+              severity: result.severity,
+              cognitiveAffectiveScore: result.cognitiveAffectiveScore,
+              somaticMotivationalScore: result.somaticMotivationalScore,
+              suicidalIdeationScore: result.suicidalIdeationScore,
+              responses: result.responses,
+            }
+          }}
+          label="PDF"
+        />
+        {isPro && (
+          <>
+            <button
+              onClick={() => handleDownload('docx')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            >
+              DOCX
+            </button>
+            <button
+              onClick={() => handleDownload('odt')}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+            >
+              ODT
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="px-4 py-2 rounded-lg text-sm transition-colors"
+          style={{ background: '#e5e5e0', color: '#4b5563' }}
+        >
+          Volver al dashboard
+        </button>
+      </div>
+
+      {/* Contenido */}
+      <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
+        <ReporteHeader
+          patientName={patientName}
+          patientRut={patientRut}
+          patientBirthDate={patientBirthDate}
+          patientAge={patientAge}
+          patientSchool={patientSchool}
+          evalDate={evalDate}
+          testName="BDI-II - Inventario de Depresión de Beck"
+        />
+
+        <div className="mb-6" style={{ pageBreakInside: 'avoid' }}>
+          <div className="border-b border-gray-300 pb-2 mb-3">
+            <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Resultados</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">Puntaje total</div>
+              <div className="text-3xl font-bold" style={{ color: '#1a1a1a' }}>{result.totalScore}</div>
+            </div>
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">Severidad</div>
+              <div className={`text-xl font-semibold ${getSeverityClass(result.severity)}`}>
+                {getSeverityLabel(result.severity)}
               </div>
             </div>
-          </div>
-          
-          <div className="flex-1">
-            <div className="flex h-2 rounded-full overflow-hidden">
-              {[
-                { max: 13, color: '#3B6D11', label: 'Mínima' },
-                { max: 19, color: '#854F0B', label: 'Leve' },
-                { max: 28, color: '#993C1D', label: 'Moderada' },
-                { max: 63, color: '#A32D2D', label: 'Grave' },
-              ].map((range) => (
-                <div
-                  key={range.label}
-                  className="flex-1"
-                  style={{ background: `${range.color}30` }}
-                />
-              ))}
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">Puntaje cognitivo-afectivo</div>
+              <div className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>{result.cognitiveAffectiveScore}</div>
             </div>
-            <div className="relative mt-1">
-              <div
-                className="absolute w-3 h-3 rounded-full border-2 border-white shadow -translate-x-1/2"
-                style={{ left: `${(result.totalScore / 63) * 100}%`, top: 0, background: severityColor }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] mt-4 text-gray-400">
-              <span>0</span><span>13</span><span>20</span><span>29</span><span>63</span>
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">Puntaje somático-motivacional</div>
+              <div className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>{result.somaticMotivationalScore}</div>
             </div>
           </div>
+          {result.suicidalIdeationScore > 0 && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700 font-medium">
+                ⚠️ Ideación suicida detectada: {result.suicidalIdeationScore} puntos.
+                Se recomienda evaluación inmediata por un profesional de salud mental.
+              </p>
+            </div>
+          )}
         </div>
-        <p className="text-sm leading-relaxed text-gray-600">
-          {result.severityDescription}
-        </p>
-      </div>
 
-      {result.suicidalIdeationScore >= 1 && (
-        <div className="mt-3 px-4 py-3 rounded-xl text-sm bg-red-50 border border-red-200 text-red-700">
-          <strong>⚠ Alerta de seguridad:</strong> El ítem 9 (ideación suicida) presenta puntaje {result.suicidalIdeationScore}/3.
-          Se requiere evaluación de riesgo inmediata por profesional de salud mental.
-        </div>
-      )}
-
-      {/* Subescalas */}
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-widest mb-4 text-gray-400">
-          Subescalas
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between mb-1.5">
-              <span className="text-sm font-medium text-gray-700">Cognitivo-afectiva</span>
-              <span className="text-sm font-bold" style={{ color: severityColor }}>
-                {result.cognitiveAffectiveScore}
-              </span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden bg-gray-100">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${(result.cognitiveAffectiveScore / 39) * 100}%`, background: severityColor }}
-              />
-            </div>
-            <p className="text-xs text-gray-400 mt-1">Ítems 1-13 · Máximo 39 puntos</p>
-          </div>
-          <div>
-            <div className="flex justify-between mb-1.5">
-              <span className="text-sm font-medium text-gray-700">Somático-motivacional</span>
-              <span className="text-sm font-bold" style={{ color: severityColor }}>
-                {result.somaticMotivationalScore}
-              </span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden bg-gray-100">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${(result.somaticMotivationalScore / 24) * 100}%`, background: severityColor }}
-              />
-            </div>
-            <p className="text-xs text-gray-400 mt-1">Ítems 14-21 · Máximo 24 puntos</p>
-          </div>
-        </div>
-      </div>
-
-      {result.flaggedItems.length > 0 && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-widest mb-3 text-gray-400">
-            Ítems con puntaje relevante (≥ 2)
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {result.flaggedItems.map(item => (
-              <span
-                key={item}
-                className="px-2 py-1 text-xs rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200"
-              >
-                Ítem {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </TestResultsLayout>
-  )
-}
-
-function Spinner() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-8 h-8 rounded-full border-2 animate-spin border-blue-500 border-t-transparent" />
-    </div>
-  )
-}
-
-function Error() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <p className="text-sm text-gray-600">No se encontraron resultados</p>
-        <button
-          onClick={() => window.history.back()}
-          className="mt-3 text-sm text-blue-600 hover:text-blue-700"
-        >
-          ← Volver
-        </button>
+        <ReporteFooter showFirma={true} />
       </div>
     </div>
   )
 }
 
 export default function Bdi2ResultsPage() {
-  return (
-    <Suspense fallback={<Spinner />}>
-      <Bdi2ResultsPageInner />
-    </Suspense>
-  )
+  return <Bdi2ResultsPageInner />
 }
