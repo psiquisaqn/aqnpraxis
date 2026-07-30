@@ -6,7 +6,7 @@
 // FIX #7: Layout de opciones en grid 2x2 para reducir espacio vertical
 // y que el botón "Finalizar evaluación" sea visible sin scroll.
 // 
-// FIX #8: Inicio automático cuando displayReady es true.
+// FIX #8: Inicio automático al montarse (sin esperar displayReady).
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -36,18 +36,22 @@ function generarRecomendacionesBDI2(result: any): string {
   return "Evaluación completada. Revisar resultados detallados."
 }
 
-export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveResponse, displayReady = false }: Bdi2ControlProps) {
+export function Bdi2Control({ 
+  dualSessionId, 
+  sessionId, 
+  onUpdatePatient, 
+  onSaveResponse, 
+  displayReady = false 
+}: Bdi2ControlProps) {
   const router = useRouter()
   const [currentItem, setCurrentItem] = useState(1)
   const [responses, setResponses] = useState<Record<number, BdiResponse>>({})
   const [finishing, setFinishing] = useState(false)
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const firstItemSent = useRef(false)
-  const autoStarted = useRef(false) // ← nueva ref para evitar auto-inicio duplicado
+  const autoStarted = useRef(false)
 
   const currentItemData = BDI2_ITEMS.find(item => item.num === currentItem)
-
-  // FIX #4: valor derivado, no state separado
   const completedCount = Object.keys(responses).length
   const allDone = completedCount === 21
   const answeredItems = new Set(Object.keys(responses).map(Number))
@@ -62,7 +66,8 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const buildPayload = (num: number, sel?: BdiResponse, resp = responses) => {
     const d = BDI2_ITEMS.find(i => i.num === num)
     return {
-      type: 'bdi2', item: num,
+      type: 'bdi2', 
+      item: num,
       label: d?.label,
       options: BDI_OPTIONS,
       selected: sel,
@@ -83,18 +88,31 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
     }, 100)
   }
 
-  // 🔥 NUEVO: Inicio automático cuando displayReady sea true
+  // 🔥 NUEVO: Inicio automático al montarse (independiente de displayReady)
+  useEffect(() => {
+    if (!autoStarted.current) {
+      console.log('🔄 [BDI2] Iniciando automáticamente al montar...')
+      autoStarted.current = true
+      // Pequeño retraso para asegurar que el DOM esté listo
+      setTimeout(() => {
+        handleStartTest()
+      }, 300)
+    }
+  }, [])
+
+  // También mantengo el efecto de displayReady por si el padre lo necesita,
+  // pero ya no es obligatorio.
   useEffect(() => {
     if (displayReady && showQuestionZero && !autoStarted.current) {
-      console.log('🔄 [BDI2] displayReady es true, iniciando automáticamente...')
+      console.log('🔄 [BDI2] displayReady es true, iniciando...')
       autoStarted.current = true
       handleStartTest()
     }
   }, [displayReady, showQuestionZero])
 
-  // Log para depurar
+  // Log de depuración
   useEffect(() => {
-    console.log('🔍 [BDI2] displayReady:', displayReady, 'showQuestionZero:', showQuestionZero)
+    console.log('🔍 [BDI2] displayReady:', displayReady, 'showQuestionZero:', showQuestionZero, 'autoStarted:', autoStarted.current)
   }, [displayReady, showQuestionZero])
 
   const handleResponse = (value: BdiResponse) => {
@@ -258,7 +276,6 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
             {responses[currentItem] !== undefined && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Respondido</span>}
           </div>
           <p className="text-gray-800 font-medium mb-4">{currentItemData?.label}</p>
-          {/* FIX #7: Layout grid 2x2 en lugar de lista vertical */}
           <div className="grid grid-cols-2 gap-2">
             {BDI_OPTIONS.map((opt: any) => (
               <button key={opt.value} onClick={() => handleResponse(opt.value as BdiResponse)}
