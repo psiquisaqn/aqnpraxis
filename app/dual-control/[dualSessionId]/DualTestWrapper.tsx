@@ -7,13 +7,13 @@ interface DualTestWrapperProps {
   totalItems: number
   currentItem: number
   completed: number
-  onItemSelect: (num: number) => void
-  items: Array<{ num: number }>
-  answeredItems: Set<number>
+  onItemSelect?: (num: number) => void  // ← opcional
+  items?: Array<{ num: number }>        // ← opcional
+  answeredItems?: Set<number>           // ← opcional
   showQuestionZero: boolean
   onStart: () => void
   children: ReactNode
-  hideNavigation?: boolean // ← nueva propiedad opcional para WISC-V
+  hideNavigation?: boolean
 }
 
 export function DualTestWrapper({
@@ -21,13 +21,13 @@ export function DualTestWrapper({
   totalItems,
   currentItem,
   completed,
-  onItemSelect,
-  items,
-  answeredItems,
+  onItemSelect = () => {},
+  items = [],
+  answeredItems = new Set(),
   showQuestionZero,
   onStart,
   children,
-  hideNavigation = false // ← por defecto falso
+  hideNavigation = false
 }: DualTestWrapperProps) {
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -50,8 +50,8 @@ export function DualTestWrapper({
           </div>
         ) : (
           <div className={`flex flex-col ${hideNavigation ? '' : 'md:flex-row'} gap-6`}>
-            {!hideNavigation && (
-              // Panel de navegación rápida (solo si no está oculto)
+            {!hideNavigation && items.length > 0 && (
+              // Panel de navegación rápida (solo si no está oculto y hay items)
               <div className="md:w-1/4">
                 <div className="bg-gray-50 rounded-lg p-3 sticky top-4">
                   <div className="flex justify-between text-sm mb-2">
