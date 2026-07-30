@@ -5,6 +5,8 @@
 //
 // FIX #7: Layout de opciones en grid 2x2 para reducir espacio vertical
 // y que el botón "Finalizar evaluación" sea visible sin scroll.
+// 
+// FIX #8: Inicio automático cuando displayReady es true.
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -41,6 +43,7 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   const [finishing, setFinishing] = useState(false)
   const [showQuestionZero, setShowQuestionZero] = useState(true)
   const firstItemSent = useRef(false)
+  const autoStarted = useRef(false) // ← nueva ref para evitar auto-inicio duplicado
 
   const currentItemData = BDI2_ITEMS.find(item => item.num === currentItem)
 
@@ -69,27 +72,29 @@ export function Bdi2Control({ dualSessionId, sessionId, onUpdatePatient, onSaveR
   }
 
   const handleStartTest = () => {
+    console.log('🟢 [BDI2] handleStartTest llamado')
     setShowQuestionZero(false)
     setTimeout(() => {
       if (!firstItemSent.current) {
+        console.log('📤 [BDI2] Enviando ítem 1')
         onUpdatePatient(buildPayload(1))
         firstItemSent.current = true
       }
-    }, 500)
+    }, 100)
   }
 
+  // 🔥 NUEVO: Inicio automático cuando displayReady sea true
   useEffect(() => {
-    if (!showQuestionZero && !firstItemSent.current) {
-      onUpdatePatient(buildPayload(1))
-      firstItemSent.current = true
+    if (displayReady && showQuestionZero && !autoStarted.current) {
+      console.log('🔄 [BDI2] displayReady es true, iniciando automáticamente...')
+      autoStarted.current = true
+      handleStartTest()
     }
-  }, [showQuestionZero])
+  }, [displayReady, showQuestionZero])
 
+  // Log para depurar
   useEffect(() => {
-    if (displayReady && !showQuestionZero) {
-      onUpdatePatient(buildPayload(currentItem, responses[currentItem]))
-      firstItemSent.current = true
-    }
+    console.log('🔍 [BDI2] displayReady:', displayReady, 'showQuestionZero:', showQuestionZero)
   }, [displayReady, showQuestionZero])
 
   const handleResponse = (value: BdiResponse) => {
