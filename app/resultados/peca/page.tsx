@@ -58,7 +58,7 @@ function getInterpretacionParticipacion(porcentaje: number): { nivel: string; de
   }
 }
 
-// Interpretación de dimensiones específicas
+// Interpretación de dimensiones específicas (nueva redacción: "La habilidad adaptativa evaluada está [grado], por lo que el nivel de apoyos necesario es [intensidad]")
 function getInterpretacionDimension(nombre: string, puntaje: number, intensidad: string): string {
   const baseDescripcion: Record<string, string> = {
     'com': 'Habilidades de comunicación (lenguaje receptivo y expresivo), capacidad para expresar necesidades y comprender instrucciones.',
@@ -72,12 +72,14 @@ function getInterpretacionDimension(nombre: string, puntaje: number, intensidad:
     'aor': 'Áreas ocupacionales y recreativas, habilidades para el trabajo y uso adecuado del tiempo libre.'
   }
   
-  const nivelDescriptivo = intensidad === 'Generalizado' ? 'muy afectada' :
-                           intensidad === 'Extenso' ? 'significativamente afectada' :
-                           intensidad === 'Limitado' ? 'moderadamente afectada' :
-                           'levemente afectada'
+  // Descripción del grado de afectación
+  const gradoAfectacion = intensidad === 'Generalizado' ? 'muy afectada' :
+                          intensidad === 'Extenso' ? 'significativamente afectada' :
+                          intensidad === 'Limitado' ? 'moderadamente afectada' :
+                          'levemente afectada'
   
-  return `${nombre}: ${baseDescripcion[nombre] || 'Habilidad adaptativa evaluada.'} Actualmente se encuentra ${nivelDescriptivo}, con un nivel de desempeño ${intensidad.toLowerCase()}.`
+  // Nueva redacción
+  return `${nombre}: ${baseDescripcion[nombre] || 'Habilidad adaptativa evaluada.'} La habilidad adaptativa evaluada está "${gradoAfectacion}", por lo que el nivel de apoyos necesario es "${intensidad.toLowerCase()}".`
 }
 
 // Conclusión general

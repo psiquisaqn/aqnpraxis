@@ -4,98 +4,86 @@ import { ReactNode } from 'react'
 
 interface DualTestWrapperProps {
   title: string
-  children: ReactNode
-  showQuestionZero?: boolean
-  onStart?: () => void
   totalItems: number
   currentItem: number
   completed: number
-  onItemSelect: (itemNum: number) => void
-  items: Array<{ num: number; label?: string }>
-  answeredItems?: Set<number>
-  hideNavigation?: boolean  // Nueva prop
+  onItemSelect: (num: number) => void
+  items: Array<{ num: number }>
+  answeredItems: Set<number>
+  showQuestionZero: boolean
+  onStart: () => void
+  children: ReactNode
 }
 
 export function DualTestWrapper({
   title,
-  children,
-  showQuestionZero = true,
-  onStart,
   totalItems,
   currentItem,
   completed,
   onItemSelect,
   items,
   answeredItems,
-  hideNavigation = false,  // Por defecto false para otros tests
+  showQuestionZero,
+  onStart,
+  children
 }: DualTestWrapperProps) {
-  if (showQuestionZero) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-8 max-w-md w-full text-center shadow-lg">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
-          <div className="bg-blue-50 rounded-lg p-6 mb-6">
-            <p className="text-blue-800 text-base">
-              Para iniciar, haz clic en el botón para que el primer ítem se vea en la pantalla del paciente
-            </p>
-          </div>
-          <button onClick={() => onStart?.()} className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-            Comenzar evaluación
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // Si hideNavigation es true, no mostrar la barra de navegación
-  if (hideNavigation) {
-    return (
-      <div className="min-h-screen bg-gray-100">
-        <div className="p-3">
-          {children}
-        </div>
-      </div>
-    )
-  }
-
-  // Altura de la barra de navegación reducida
-  const NAV_HEIGHT = 140
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="p-3" style={{ paddingBottom: NAV_HEIGHT }}>
-        {children}
-      </div>
+    <div className="max-w-4xl mx-auto p-4">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        {showQuestionZero ? (
+          // Pantalla de inicio - texto genérico sin alusión a "paciente"
+          <div className="text-center py-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">{title}</h2>
+            <p className="text-gray-600 mb-6">
+              Consulta al evaluado si está listo para responder las preguntas.
+              <br />
+              Cuando esté preparado, presiona el botón para comenzar.
+            </p>
+            <button
+              onClick={onStart}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Comenzar evaluación
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Panel de navegación rápida */}
+            <div className="md:w-1/4">
+              <div className="bg-gray-50 rounded-lg p-3 sticky top-4">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">Progreso</span>
+                  <span className="text-gray-800 font-medium">{completed}/{totalItems}</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(completed/totalItems)*100}%` }} />
+                </div>
+                <div className="grid grid-cols-3 gap-1 max-h-[300px] overflow-y-auto">
+                  {items.map((item) => (
+                    <button
+                      key={item.num}
+                      onClick={() => onItemSelect(item.num)}
+                      className={`text-xs py-1 rounded transition-colors ${
+                        item.num === currentItem
+                          ? 'bg-blue-600 text-white'
+                          : answeredItems.has(item.num)
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {item.num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-      <div
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-20"
-        style={{ padding: '4px 12px 8px' }}
-      >
-        <p className="text-xs text-gray-500 mb-1 text-center font-medium">
-          Navegación rápida — {completed}/{totalItems} respondidos
-        </p>
-        <div className="flex flex-wrap justify-center gap-1 overflow-y-auto" style={{ maxHeight: 90 }}>
-          {items.map((item) => {
-            const isAnswered = answeredItems ? answeredItems.has(item.num) : false
-            const isCurrent = currentItem === item.num
-            return (
-              <button
-                key={item.num}
-                onClick={() => onItemSelect(item.num)}
-                className={`flex-shrink-0 text-xs font-medium rounded-full transition-all ${
-                  isCurrent
-                    ? 'bg-blue-600 text-white ring-2 ring-blue-300'
-                    : isAnswered
-                    ? 'bg-green-100 text-green-700 border border-green-300'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-                style={{ width: 26, height: 26 }}
-              >
-                {item.num}
-              </button>
-            )
-          })}
-        </div>
+            {/* Contenido del test */}
+            <div className="md:w-3/4">
+              {children}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
