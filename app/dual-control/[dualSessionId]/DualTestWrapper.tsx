@@ -13,6 +13,7 @@ interface DualTestWrapperProps {
   showQuestionZero: boolean
   onStart: () => void
   children: ReactNode
+  hideNavigation?: boolean // ← nueva propiedad opcional para WISC-V
 }
 
 export function DualTestWrapper({
@@ -25,7 +26,8 @@ export function DualTestWrapper({
   answeredItems,
   showQuestionZero,
   onStart,
-  children
+  children,
+  hideNavigation = false // ← por defecto falso
 }: DualTestWrapperProps) {
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -47,39 +49,40 @@ export function DualTestWrapper({
             </button>
           </div>
         ) : (
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Panel de navegación rápida */}
-            <div className="md:w-1/4">
-              <div className="bg-gray-50 rounded-lg p-3 sticky top-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Progreso</span>
-                  <span className="text-gray-800 font-medium">{completed}/{totalItems}</span>
-                </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
-                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(completed/totalItems)*100}%` }} />
-                </div>
-                <div className="grid grid-cols-3 gap-1 max-h-[300px] overflow-y-auto">
-                  {items.map((item) => (
-                    <button
-                      key={item.num}
-                      onClick={() => onItemSelect(item.num)}
-                      className={`text-xs py-1 rounded transition-colors ${
-                        item.num === currentItem
-                          ? 'bg-blue-600 text-white'
-                          : answeredItems.has(item.num)
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {item.num}
-                    </button>
-                  ))}
+          <div className={`flex flex-col ${hideNavigation ? '' : 'md:flex-row'} gap-6`}>
+            {!hideNavigation && (
+              // Panel de navegación rápida (solo si no está oculto)
+              <div className="md:w-1/4">
+                <div className="bg-gray-50 rounded-lg p-3 sticky top-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Progreso</span>
+                    <span className="text-gray-800 font-medium">{completed}/{totalItems}</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                    <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(completed/totalItems)*100}%` }} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 max-h-[300px] overflow-y-auto">
+                    {items.map((item) => (
+                      <button
+                        key={item.num}
+                        onClick={() => onItemSelect(item.num)}
+                        className={`text-xs py-1 rounded transition-colors ${
+                          item.num === currentItem
+                            ? 'bg-blue-600 text-white'
+                            : answeredItems.has(item.num)
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {item.num}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-
+            )}
             {/* Contenido del test */}
-            <div className="md:w-3/4">
+            <div className={hideNavigation ? 'w-full' : 'md:w-3/4'}>
               {children}
             </div>
           </div>
