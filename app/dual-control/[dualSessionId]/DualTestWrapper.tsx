@@ -54,7 +54,7 @@ export function DualTestWrapper({
               {children}
             </div>
 
-            {/* Navegación (abajo) - ultra compacta */}
+            {/* Navegación (abajo) - ultra compacta con flex */}
             {!hideNavigation && items.length > 0 && (
               <div className="w-full">
                 <div className="bg-gray-50 rounded-lg p-3">
@@ -65,18 +65,19 @@ export function DualTestWrapper({
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
                     <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(completed/totalItems)*100}%` }} />
                   </div>
-                  <div className="grid grid-cols-15 gap-0.5 max-h-[120px] overflow-y-auto">
+                  <div className="flex flex-wrap gap-0.5 max-h-[120px] overflow-y-auto overflow-x-hidden">
                     {items.map((item) => (
                       <button
                         key={item.num}
                         onClick={() => onItemSelect(item.num)}
-                        className={`text-[7px] h-5 py-0.5 px-0.5 rounded transition-colors ${
+                        className={`text-[7px] h-5 w-5 py-0.5 px-0.5 rounded transition-colors flex items-center justify-center ${
                           item.num === currentItem
                             ? 'bg-blue-600 text-white'
                             : answeredItems.has(item.num)
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
+                        style={{ minWidth: '18px' }}
                       >
                         {item.num}
                       </button>
