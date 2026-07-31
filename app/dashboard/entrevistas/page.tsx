@@ -22,41 +22,70 @@ export default function EntrevistasPage() {
   const [entrevistas, setEntrevistas] = useState<Entrevista[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          setError('No autenticado')
-          setLoading(false)
-          return
-        }
-
-        const { data, error } = await supabase
-          .from('entrevistas')
-          .select(`
-            *,
-            patient:patients(full_name)
-          `)
-          .eq('psychologist_id', user.id)
-          .order('fecha', { ascending: false })
-
-        if (error) throw error
-        setEntrevistas(data || [])
-      } catch (err: any) {
-        setError(err.message)
-      } finally {
+  const loadEntrevistas = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError('No autenticado')
         setLoading(false)
+        return
       }
+
+      const { data, error } = await supabase
+        .from('entrevistas')
+        .select(`
+          *,
+          patient:patients(full_name)
+        `)
+        .eq('psychologist_id', user.id)
+        .order('fecha', { ascending: false })
+
+      if (error) throw error
+      setEntrevistas(data || [])
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadEntrevistas()
   }, [supabase])
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta entrevista? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    setDeletingId(id)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autenticado')
+
+      const { error } = await supabase
+        .from('entrevistas')
+        .delete()
+        .eq('id', id)
+        .eq('psychologist_id', user.id)
+
+      if (error) throw error
+
+      setEntrevistas(prev => prev.filter(e => e.id !== id))
+      setDeletingId(null)
+    } catch (err: any) {
+      alert('Error al eliminar la entrevista: ' + err.message)
+      setDeletingId(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -101,7 +130,6 @@ export default function EntrevistasPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  {/* Acción ahora es la primera columna */}
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Acción</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Hora</th>
@@ -112,16 +140,24 @@ export default function EntrevistasPage() {
               <tbody>
                 {entrevistas.map((e) => (
                   <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    {/* Celda de acción ahora primero */}
                     <td className="py-3 px-4 whitespace-nowrap">
-                      <Link
-                        href={`/dashboard/informes/entrevista/${e.id}`}
-                        className="text-blue-600 hover:underline text-sm"
-                      >
-                        Ver detalle
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/informes/entrevista/${e.id}`}
+                          className="text-blue-600 hover:underline text-sm"
+                        >
+                          Ver
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(e.id)}
+                          disabled={deletingId === e.id}
+                          className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
+                        >
+                          {deletingId === e.id ? 'Eliminando...' : 'Eliminar'}
+                        </button>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
+                    <td className="py-3 px-4 text-gray-600">
                       {new Date(e.fecha).toLocaleDateString('es-CL')}
                     </td>
                     <td className="py-3 px-4 text-gray-600">
