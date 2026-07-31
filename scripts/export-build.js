@@ -2,77 +2,37 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const appPath = path.join(process.cwd(), 'app');
-const backupPath = path.join(process.cwd(), 'app_backup');
+const apiPath = path.join(process.cwd(), 'app', 'api');
+const backupPath = path.join(process.cwd(), 'app_api_backup');
 
-// Carpetas a mover (rutas dinámicas que no se pueden exportar estáticamente)
-const foldersToMove = [
-  'api',
-  'coopersmith',
-  'bdi2',
-  'peca',
-  'wisc5',
-  'dual-control',
-  'sala',
-  'display',
-  'session',
-  'dual-display',
-  'auth', // si tiene callbacks
-  'resultados', // puede tener rutas dinámicas
-  // agrega más según sea necesario
-];
-
-function moveFolder(source, dest) {
+// Función para mover la carpeta api
+function moveApi(source, dest) {
   if (fs.existsSync(source)) {
     if (fs.existsSync(dest)) {
       fs.rmSync(dest, { recursive: true, force: true });
     }
     fs.renameSync(source, dest);
     console.log(`✅ Movido ${source} → ${dest}`);
+  } else {
+    console.log(`⚠️ No existe la carpeta ${source}, omitiendo.`);
   }
 }
 
-// Crear backup de toda la carpeta app
-if (fs.existsSync(backupPath)) {
-  fs.rmSync(backupPath, { recursive: true, force: true });
-}
-fs.mkdirSync(backupPath, { recursive: true });
+console.log('📦 Iniciando build de exportación...');
 
-// Mover carpetas problemáticas
-for (const folder of foldersToMove) {
-  const src = path.join(appPath, folder);
-  const dest = path.join(backupPath, folder);
-  if (fs.existsSync(src)) {
-    moveFolder(src, dest);
-  }
-}
+// Mover solo la carpeta api antes de la build
+moveApi(apiPath, backupPath);
 
 // Ejecutar next build
 try {
-  console.log('🏗️  Ejecutando next build...');
-  execSync('npx next build', { stdio: 'inherit' });
+  execSync('npm run build', { stdio: 'inherit' });
 } catch (error) {
-  // Restaurar carpetas en caso de error
-  console.log('⚠️  Error en build, restaurando carpetas...');
-  for (const folder of foldersToMove) {
-    const src = path.join(backupPath, folder);
-    const dest = path.join(appPath, folder);
-    if (fs.existsSync(src)) {
-      moveFolder(src, dest);
-    }
-  }
-  fs.rmSync(backupPath, { recursive: true, force: true });
+  // Restaurar api en caso de error
+  moveApi(backupPath, apiPath);
   throw error;
 }
 
-// Restaurar carpetas después del build
-console.log('✅ Build completado, restaurando carpetas...');
-for (const folder of foldersToMove) {
-  const src = path.join(backupPath, folder);
-  const dest = path.join(appPath, folder);
-  if (fs.existsSync(src)) {
-    moveFolder(src, dest);
-  }
-}
-fs.rmSync(backupPath, { recursive: true, force: true });
-console.log('✅ Carpeta restaurada.');
+// Restaurar api después de la build
+moveApi(backupPath, apiPath);
+
+console.log('✅ Build completado y api restaurada.');
