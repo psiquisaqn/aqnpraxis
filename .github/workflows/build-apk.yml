@@ -24,10 +24,10 @@ jobs:
 
       - name: 🏗️ Construir la versión estática (Next.js)
         run: |
-          # Usar la configuración de exportación temporalmente
+          # Usar la configuración de exportación
           cp next.config.export.js next.config.js
-          npm run build
-        # Después del build, no es necesario restaurar porque el runner se limpia
+          # Ejecutar el script de exportación (mueve api/ y restaura)
+          node scripts/export-build.js
 
       - name: 🧩 Sincronizar con Capacitor
         run: npx cap sync android

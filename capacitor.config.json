@@ -1,0 +1,6 @@
+{
+  "appId": "com.aqnpraxis.app",
+  "appName": "AQN Praxis",
+  "webDir": "out",
+  "bundledWebRuntime": false
+}

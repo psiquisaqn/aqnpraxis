@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AQN Praxis</string>
+    <string name="title_activity_main">AQN Praxis</string>
+    <string name="package_name">com.aqnpraxis.app</string>
+    <string name="custom_url_scheme">com.aqnpraxis.app</string>
+</resources>

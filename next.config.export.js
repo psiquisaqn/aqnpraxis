@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export', // <-- solo para la exportación estática
+  output: 'export',
   images: {
-    unoptimized: true, // necesario para exportación estática
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
