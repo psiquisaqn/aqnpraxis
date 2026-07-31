@@ -97,43 +97,47 @@ export default function EntrevistasPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Hora</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Paciente</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Motivación principal</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entrevistas.map((e) => (
-                <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-gray-600">
-                    {new Date(e.fecha).toLocaleDateString('es-CL')}
-                  </td>
-                  <td className="py-3 px-4 text-gray-600">
-                    {e.hora}
-                  </td>
-                  <td className="py-3 px-4 font-medium text-gray-800">
-                    {e.patient?.full_name || 'Sin paciente'}
-                  </td>
-                  <td className="py-3 px-4 text-gray-600 max-w-xs truncate">
-                    {e.motivacion_principal || '-'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <Link
-                      href={`/dashboard/informes/entrevista/${e.id}`}
-                      className="text-blue-600 hover:underline text-sm"
-                    >
-                      Ver detalle
-                    </Link>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  {/* Acción ahora es la primera columna */}
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Acción</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Hora</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Paciente</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Motivación principal</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {entrevistas.map((e) => (
+                  <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    {/* Celda de acción ahora primero */}
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <Link
+                        href={`/dashboard/informes/entrevista/${e.id}`}
+                        className="text-blue-600 hover:underline text-sm"
+                      >
+                        Ver detalle
+                      </Link>
+                    </td>
+                    <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
+                      {new Date(e.fecha).toLocaleDateString('es-CL')}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {e.hora}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-gray-800">
+                      {e.patient?.full_name || 'Sin paciente'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600 max-w-xs truncate">
+                      {e.motivacion_principal || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

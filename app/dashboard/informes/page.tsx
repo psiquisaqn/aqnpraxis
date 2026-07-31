@@ -60,7 +60,7 @@ export default function InformesPage() {
 
   useEffect(() => {
     loadInformes()
-  }, [supabase])
+  }, [])
 
   const handleDelete = async (reportId: string) => {
     if (!confirm('¿Estás seguro de eliminar este informe? Esta acción no se puede deshacer.')) {
@@ -89,7 +89,6 @@ export default function InformesPage() {
     }
   }
 
-  // Formatear puntaje con un decimal, eliminando .0 si es entero
   const formatScore = (value: number | null | undefined): string => {
     if (value === null || value === undefined) return '-'
     const fixed = Number(value).toFixed(1)
@@ -146,32 +145,19 @@ export default function InformesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
+                  {/* Acción ahora es la primera columna */}
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Acción</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Paciente</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Test</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Puntaje</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Nivel</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Acción</th>
                 </tr>
               </thead>
               <tbody>
                 {informes.map((report) => (
                   <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
-                      {new Date(report.created_at).toLocaleDateString('es-CL')}
-                    </td>
-                    <td className="py-3 px-4 font-medium text-gray-800">
-                      {report.patient?.full_name || 'Sin paciente'}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {testLabels[report.test_id] || report.test_id}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {formatScore(report.puntaje_total)}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {report.nivel || '-'}
-                    </td>
+                    {/* Celda de acción ahora primero */}
                     <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Link
@@ -188,6 +174,21 @@ export default function InformesPage() {
                           {deletingId === report.id ? 'Eliminando...' : 'Eliminar'}
                         </button>
                       </div>
+                    </td>
+                    <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
+                      {new Date(report.created_at).toLocaleDateString('es-CL')}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-gray-800">
+                      {report.patient?.full_name || 'Sin paciente'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {testLabels[report.test_id] || report.test_id}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {formatScore(report.puntaje_total)}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {report.nivel || '-'}
                     </td>
                   </tr>
                 ))}
