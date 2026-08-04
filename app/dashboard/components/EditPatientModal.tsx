@@ -1,17 +1,22 @@
-// app/dashboard/components/EditPatientModal.tsx
 'use client'
 
 import { useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
-interface Props {
-  patient: any
+interface EditPatientModalProps {
+  patient: {
+    id: string
+    full_name: string
+    rut: string | null
+    birth_date: string | null
+    school: string | null
+  }
   isOpen: boolean
   onClose: () => void
   onUpdate: (updatedPatient: any) => void
 }
 
-export function EditPatientModal({ patient, isOpen, onClose, onUpdate }: Props) {
+export function EditPatientModal({ patient, isOpen, onClose, onUpdate }: EditPatientModalProps) {
   const [fullName, setFullName] = useState(patient?.full_name || '')
   const [rut, setRut] = useState(patient?.rut || '')
   const [birthDate, setBirthDate] = useState(patient?.birth_date || '')
@@ -61,18 +66,21 @@ export function EditPatientModal({ patient, isOpen, onClose, onUpdate }: Props) 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full p-6">
-        <h2 className="text-lg font-semibold mb-4">Editar paciente</h2>
+      <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Editar paciente</h2>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre completo <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ej: Juan Pérez"
               />
             </div>
             <div>
@@ -82,6 +90,7 @@ export function EditPatientModal({ patient, isOpen, onClose, onUpdate }: Props) 
                 value={rut}
                 onChange={(e) => setRut(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ej: 12.345.678-9"
               />
             </div>
             <div>
@@ -100,15 +109,20 @@ export function EditPatientModal({ patient, isOpen, onClose, onUpdate }: Props) 
                 value={school}
                 onChange={(e) => setSchool(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ej: Colegio San José"
               />
             </div>
           </div>
-          {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+
+          {error && (
+            <p className="text-sm text-red-600 mt-3">{error}</p>
+          )}
+
           <div className="flex justify-end gap-2 mt-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
               disabled={loading}
             >
               Cancelar
@@ -116,7 +130,7 @@ export function EditPatientModal({ patient, isOpen, onClose, onUpdate }: Props) 
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm font-medium"
             >
               {loading ? 'Guardando...' : 'Guardar cambios'}
             </button>

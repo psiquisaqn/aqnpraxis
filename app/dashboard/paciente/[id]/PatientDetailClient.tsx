@@ -26,26 +26,32 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
 
   const handleUpdatePatient = (updatedPatient: any) => {
     setCurrentPatient(updatedPatient)
-    // Si quieres refrescar la ruta para que los datos se actualicen en el servidor (opcional)
+    // Opcional: recargar la página para actualizar los datos en el servidor
     // router.refresh()
   }
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      {/* Cabecera del paciente - responsive con botón Editar */}
+      {/* Cabecera del paciente con botón Editar */}
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
           <PatientCard patient={currentPatient} onNewSession={() => {}} />
         </div>
         <button
-          onClick={() => setIsEditModalOpen(true)}
-          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap"
+          onClick={() => {
+            console.log('🔘 Abriendo modal de edición')
+            setIsEditModalOpen(true)
+          }}
+          className="mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap shadow-sm flex items-center gap-2"
         >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
           Editar paciente
         </button>
       </div>
 
-      {/* Navegación de pestañas - responsive con scroll horizontal en móvil */}
+      {/* Navegación de pestañas */}
       <div className="border-b border-gray-200 mb-6 overflow-x-auto">
         <nav className="flex gap-1 min-w-max">
           {tabs.map((tab) => (
