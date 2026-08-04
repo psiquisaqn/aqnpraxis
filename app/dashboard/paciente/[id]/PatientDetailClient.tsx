@@ -26,22 +26,24 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
 
   const handleUpdatePatient = (updatedPatient: any) => {
     setCurrentPatient(updatedPatient)
-    // Opcional: recargar la página para actualizar los datos en el servidor
+    // Si quieres refrescar la ruta para que los datos se actualicen en el servidor (opcional)
     // router.refresh()
   }
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      {/* Cabecera del paciente con botón Editar */}
+      {/* Cabecera del paciente - responsive con botón Editar */}
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
-          <PatientCard patient={currentPatient} onNewSession={() => {}} />
+          <PatientCard
+            patient={currentPatient}
+            onNewSession={() => {}}
+            onEdit={() => setIsEditModalOpen(true)} // ← Botón "Editar" dentro de la tarjeta
+          />
         </div>
+        {/* Botón Editar externo (por si quieres mantenerlo también) */}
         <button
-          onClick={() => {
-            console.log('🔘 Abriendo modal de edición')
-            setIsEditModalOpen(true)
-          }}
+          onClick={() => setIsEditModalOpen(true)}
           className="mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap shadow-sm flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
