@@ -24,7 +24,7 @@ interface Patient {
 interface Props {
   patient: Patient
   onNewSession: (patientId: string) => void
-  onEdit?: () => void  // ← NUEVA PROP (opcional)
+  onEdit?: () => void  // ← opcional
 }
 
 export default function PatientCard({ patient, onNewSession, onEdit }: Props) {
