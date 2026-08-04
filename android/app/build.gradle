@@ -3,6 +3,7 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.aqnpraxis.app"
     compileSdk rootProject.ext.compileSdkVersion
+
     defaultConfig {
         applicationId "com.aqnpraxis.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -12,25 +13,35 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt2/AaptOptions.cpp#80
              ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    // 🔥 CONFIGURACIÓN DE FIRMA (DEBE IR ANTES DE buildTypes)
+    signingConfigs {
+        debug {
+            storeFile file("debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+        release {
+            // Usa variables de entorno si existen, o valores por defecto (cámbialos)
+            storeFile file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "tu_contraseña"
+            keyAlias System.getenv("KEY_ALIAS") ?: "tu_alias"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "tu_contraseña"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig signingConfigs.release  // ← Usa la firma release
         }
-    }
-    signingConfigs {
-        release {
-            // 🔥 Asegúrate de que el archivo keystore.jks esté en la carpeta android/app/
-            storeFile file("keystore.jks")
-            // 📌 Usa variables de entorno para mayor seguridad (recomendado)
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "tu_contraseña_aqui"
-            keyAlias System.getenv("KEY_ALIAS") ?: "tu_alias_aqui"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "tu_contraseña_aqui"
+        debug {
+            signingConfig signingConfigs.debug    // ← Usa la firma debug
         }
     }
 }
