@@ -1,8 +1,8 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.aqnpraxis.app"
-    compileSdk = rootProject.ext.compileSdkVersion
+    namespace "com.aqnpraxis.app"
+    compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.aqnpraxis.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -12,14 +12,25 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt2/AaptOptions.cpp#80
+             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+    signingConfigs {
+        release {
+            // 🔥 Asegúrate de que el archivo keystore.jks esté en la carpeta android/app/
+            storeFile file("keystore.jks")
+            // 📌 Usa variables de entorno para mayor seguridad (recomendado)
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "tu_contraseña_aqui"
+            keyAlias System.getenv("KEY_ALIAS") ?: "tu_alias_aqui"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "tu_contraseña_aqui"
         }
     }
 }
@@ -34,7 +45,6 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
-    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

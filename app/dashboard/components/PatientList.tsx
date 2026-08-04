@@ -1,201 +1,101 @@
 ﻿'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
-import PatientCard from './PatientCard'
-import { NewPatientModal } from './NewPatientModal'
-import { NewSessionModal } from './NewSessionModal'
-import { calcAge } from '@/lib/utils'
-import Link from 'next/link'
+import { useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 
-// Definir tipos localmente para coincidir con PatientCard
-interface LocalSession {
-  id: string
-  test_id: string
-  status: string
-  created_at: string
-  completed_at?: string | null
-}
-
-interface LocalPatient {
+interface Patient {
   id: string
   full_name: string
-  rut?: string
-  birth_date?: string
-  gender?: string
-  school?: string
-  age_years: number
-  age_months: number
-  session_count: number
-  latest_session: LocalSession | null
+  rut: string | null
+  birth_date: string | null
+  school: string | null
 }
 
-interface Props {
-  patients: LocalPatient[]
+interface PatientListProps {
+  patients: Patient[]
+  onPatientClick: (id: string) => void
+  onPatientDeleted?: (id: string) => void // opcional para actualizar lista padre
 }
 
-export default function PatientList({ patients: initialPatients }: Props) {
-  const [patients, setPatients] = useState<LocalPatient[]>(initialPatients as LocalPatient[])
-  const [search, setSearch] = useState('')
-  const [newPatientOpen, setNewPatientOpen] = useState(false)
-  const [sessionPatientId, setSessionPatientId] = useState<string | null>(null)
+export function PatientList({ patients, onPatientClick, onPatientDeleted }: PatientListProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const res = await fetch(`/api/patients?psychologist_id=${user.id}`)
-      if (!res.ok) return
-      const data = await res.json()
-
-      const mapped = data.map((p: any) => {
-        const sessions = (p.sessions ?? []) as any[]
-        const sorted = sessions.sort(
-          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )
-        const age = calcAge(p.birth_date)
-        return {
-          ...p,
-          age_years: age.years,
-          age_months: age.months,
-          session_count: sessions.length,
-          latest_session: sorted[0] ?? null,
-          sessions: undefined,
-        }
-      })
-      setPatients(mapped)
-    }
-    load()
-  }, [])
-
-  const filtered = useMemo(
-    () => patients.filter((p) =>
-      p.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.rut && p.rut.includes(search)) ||
-      (p.school && p.school.toLowerCase().includes(search.toLowerCase()))
-    ),
-    [patients, search]
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const handlePatientCreated = async () => {
-    setNewPatientOpen(false)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const res = await fetch(`/api/patients?psychologist_id=${user.id}`)
-    if (!res.ok) return
-    const data = await res.json()
-    const mapped = data.map((p: any) => {
-      const sessions = (p.sessions ?? []) as any[]
-      const sorted = sessions.sort(
-        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-      const age = calcAge(p.birth_date)
-      return {
-        ...p,
-        age_years: age.years,
-        age_months: age.months,
-        session_count: sessions.length,
-        latest_session: sorted[0] ?? null,
-        sessions: undefined,
+  const handleDelete = async (patientId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Evitar que se dispare el click en la fila
+
+    if (!confirm('¿Estás seguro de eliminar a este paciente? Esto eliminará todas sus sesiones e informes asociados. Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    setDeletingId(patientId)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autenticado')
+
+      // Primero eliminar las sesiones asociadas (opcional, depende de tu schema con ON DELETE CASCADE)
+      // Si tienes ON DELETE CASCADE en la BD, no necesitas hacerlo manualmente.
+      // Pero por seguridad, podemos intentar eliminar el paciente directamente.
+      const { error } = await supabase
+        .from('patients')
+        .delete()
+        .eq('id', patientId)
+        .eq('psychologist_id', user.id)
+
+      if (error) throw error
+
+      // Notificar al padre para que actualice la lista (si se pasa la prop)
+      if (onPatientDeleted) {
+        onPatientDeleted(patientId)
+      } else {
+        // Si no hay callback, recargar la página para refrescar la lista
+        window.location.reload()
       }
-    })
-    setPatients(mapped)
+    } catch (err: any) {
+      alert('Error al eliminar el paciente: ' + err.message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  if (patients.length === 0) {
+    return (
+      <div className="text-center py-10 text-gray-500 text-sm">
+        No hay pacientes registrados.
+      </div>
+    )
   }
 
   return (
-    <>
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
-        <div className="relative flex-1">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
-            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
-          >
-            <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <input 
-            type="text" 
-            placeholder="Buscar paciente..." 
-            value={search} 
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <button 
-          onClick={() => setNewPatientOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+    <div className="space-y-3">
+      {patients.map((patient) => (
+        <div
+          key={patient.id}
+          onClick={() => onPatientClick(patient.id)}
+          className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer flex items-center justify-between gap-4"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="1.75" strokeLinecap="round"/>
-          </svg>
-          Nuevo paciente
-        </button>
-        <Link
-          href="/sala"
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1a6 6 0 100 12A6 6 0 007 1zM7 5v4M5 7h4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          Sala de Pacientes
-        </Link>
-      </div>
-
-      {filtered.length === 0 ? (
-        <EmptyState search={search} onNew={() => setNewPatientOpen(true)} />
-      ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {filtered.map((p) => (
-            <div key={p.id} className="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="flex-1 w-full">
-                <PatientCard patient={p} onNewSession={(id) => setSessionPatientId(id)} />
-              </div>
-              {/* Eliminado el botón "Ver ficha" duplicado */}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-gray-800 truncate">{patient.full_name}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 mt-0.5">
+              {patient.rut && <span>RUT: {patient.rut}</span>}
+              {patient.birth_date && <span>Nac.: {new Date(patient.birth_date).toLocaleDateString('es-CL')}</span>}
+              {patient.school && <span>Colegio: {patient.school}</span>}
             </div>
-          ))}
-        </div>
-      )}
-
-      <NewPatientModal open={newPatientOpen} onClose={handlePatientCreated} />
-      <NewSessionModal patientId={sessionPatientId} onClose={() => setSessionPatientId(null)} />
-    </>
-  )
-}
-
-function EmptyState({ search, onNew }: { search: string; onNew: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 bg-gray-100">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <path d="M14 14a5.5 5.5 0 100-11 5.5 5.5 0 000 11zM3 24c0-5.2 4.925-9 11-9s11 3.8 11 9"
-            stroke="gray" strokeWidth="1.75" strokeLinecap="round"/>
-        </svg>
-      </div>
-      {search ? (
-        <>
-          <p className="text-sm font-medium text-gray-700">
-            No se encontraron resultados para "{search}"
-          </p>
-          <p className="text-xs mt-1 text-gray-400">
-            Prueba con otro nombre, RUT o establecimiento
-          </p>
-        </>
-      ) : (
-        <>
-          <p className="text-sm font-medium text-gray-700">
-            Aún no tienes pacientes registrados
-          </p>
-          <p className="text-xs mt-1 mb-5 text-gray-400">
-            Agrega tu primer paciente para comenzar
-          </p>
-          <button 
-            onClick={onNew} 
-            className="text-sm font-medium px-5 py-2.5 rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+          </div>
+          <button
+            onClick={(e) => handleDelete(patient.id, e)}
+            disabled={deletingId === patient.id}
+            className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50 shrink-0"
           >
-            + Agregar paciente
+            {deletingId === patient.id ? 'Eliminando...' : 'Eliminar'}
           </button>
-        </>
-      )}
+        </div>
+      ))}
     </div>
   )
 }

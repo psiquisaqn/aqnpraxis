@@ -6,6 +6,7 @@ import { SessionsTab } from '@/app/dashboard/components/SessionsTab'
 import { ProgramsTab } from '@/app/dashboard/components/ProgramsTab'
 import { EntrevistasTab } from '@/app/dashboard/components/EntrevistasTab'
 import PatientCard from '@/app/dashboard/components/PatientCard'
+import { EditPatientModal } from '@/app/dashboard/components/EditPatientModal'
 
 interface PatientDetailClientProps {
   patient: any
@@ -14,6 +15,8 @@ interface PatientDetailClientProps {
 export function PatientDetailClient({ patient }: PatientDetailClientProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'evaluaciones' | 'programas' | 'entrevistas'>('evaluaciones')
+  const [currentPatient, setCurrentPatient] = useState(patient)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   const tabs = [
     { id: 'evaluaciones', label: 'Evaluaciones' },
@@ -21,11 +24,25 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
     { id: 'entrevistas', label: 'Entrevistas' },
   ]
 
+  const handleUpdatePatient = (updatedPatient: any) => {
+    setCurrentPatient(updatedPatient)
+    // Si quieres refrescar la ruta para que los datos se actualicen en el servidor (opcional)
+    // router.refresh()
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-4">
-      {/* Cabecera del paciente - responsive */}
-      <div className="mb-6">
-        <PatientCard patient={patient} onNewSession={() => {}} />
+      {/* Cabecera del paciente - responsive con botón Editar */}
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <PatientCard patient={currentPatient} onNewSession={() => {}} />
+        </div>
+        <button
+          onClick={() => setIsEditModalOpen(true)}
+          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap"
+        >
+          Editar paciente
+        </button>
       </div>
 
       {/* Navegación de pestañas - responsive con scroll horizontal en móvil */}
@@ -53,6 +70,14 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
         {activeTab === 'programas' && <ProgramsTab patientId={patient.id} />}
         {activeTab === 'entrevistas' && <EntrevistasTab patientId={patient.id} />}
       </div>
+
+      {/* Modal de edición */}
+      <EditPatientModal
+        patient={currentPatient}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onUpdate={handleUpdatePatient}
+      />
     </div>
   )
 }
