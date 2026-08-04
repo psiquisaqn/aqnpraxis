@@ -24,9 +24,10 @@ interface Patient {
 interface Props {
   patient: Patient
   onNewSession: (patientId: string) => void
+  onEdit?: () => void  // ← opcional
 }
 
-export default function PatientCard({ patient, onNewSession }: Props) {
+export default function PatientCard({ patient, onNewSession, onEdit }: Props) {
   const router = useRouter()
 
   return (
@@ -53,7 +54,6 @@ export default function PatientCard({ patient, onNewSession }: Props) {
             )}
             <span>Sesiones: {patient.session_count}</span>
           </div>
-          {/* Eliminado el marcador de progreso de la última sesión */}
         </div>
 
         {/* Columna derecha: botones de acción */}
@@ -76,6 +76,15 @@ export default function PatientCard({ patient, onNewSession }: Props) {
           >
             WISC-V
           </button>
+          {/* Botón EDITAR (opcional) */}
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+            >
+              Editar
+            </button>
+          )}
         </div>
       </div>
     </div>

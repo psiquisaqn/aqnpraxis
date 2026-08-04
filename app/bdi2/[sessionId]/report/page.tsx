@@ -1,6 +1,6 @@
 'use client'
 // app/bdi2/[sessionId]/report/page.tsx
-// Versión con descarga DOCX/ODT para premium + logs de depuración
+// Versión con contenido completo + DOCX/ODT para premium
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -145,8 +145,6 @@ export default function Bdi2ReportPage() {
 
   useEffect(() => {
     async function load() {
-      console.log('🔍 [BDI-II Report] Iniciando carga de datos...')
-
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -160,11 +158,9 @@ export default function Bdi2ReportPage() {
         .single()
 
       if (error || !score) {
-        console.error('❌ Error cargando scores BDI-II:', error)
         setLoading(false)
         return
       }
-      console.log('✅ Scores BDI-II cargados:', score)
       setData(score)
 
       // 2. Cargar datos del paciente
@@ -173,8 +169,6 @@ export default function Bdi2ReportPage() {
         .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
         .eq('id', sessionId as string)
         .single()
-
-      console.log('✅ Datos de sesión cargados:', session)
 
       if (session?.patient) {
         const p = session.patient as any
@@ -197,57 +191,21 @@ export default function Bdi2ReportPage() {
 
       // 3. Cargar plan del usuario
       const { data: { user } } = await supabase.auth.getUser()
-      console.log('🔍 Usuario autenticado:', user)
-
       if (user) {
-        // Opción A: usando RPC (si existe)
-        const { data: planData, error: rpcError } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
-        console.log('🔍 planData (RPC):', planData)
-        console.log('🔍 error RPC:', rpcError)
-
-        let plan = Array.isArray(planData) ? planData[0] : planData
-        if (plan && typeof plan === 'object' && 'is_pro' in plan) {
-          console.log('✅ Plan obtenido vía RPC:', plan)
-          setPlanStatus(plan)
-        } else {
-          console.warn('⚠️ RPC no devolvió un plan válido, intentando consulta directa a profiles...')
-
-          // Opción B: consulta directa a la tabla profiles (fallback)
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('plan')
-            .eq('id', user.id)
-            .single()
-
-          console.log('🔍 Perfil obtenido:', profile)
-          console.log('🔍 error perfil:', profileError)
-
-          if (!profileError && profile) {
-            const isPro = profile.plan === 'premium' || profile.plan === 'pro'
-            setPlanStatus({ is_pro: isPro })
-            console.log('✅ Plan obtenido desde profiles, isPro:', isPro)
-          } else {
-            console.warn('⚠️ No se pudo obtener el plan, se asume free.')
-            setPlanStatus({ is_pro: false })
-          }
-        }
-      } else {
-        console.warn('⚠️ Usuario no autenticado, se asume plan gratuito.')
-        setPlanStatus({ is_pro: false })
+        const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
+        const plan = Array.isArray(planData) ? planData[0] : planData
+        setPlanStatus(plan)
       }
 
-      console.log('🔍 Estado final planStatus:', planStatus)
       setLoading(false)
     }
     load()
   }, [sessionId])
 
-  const isPro = planStatus?.is_pro ?? false
-  console.log('🔍 isPro calculado:', isPro)
+  const isPro = planStatus?.is_pro || false
 
   const handleDownload = (type: 'docx' | 'odt') => {
     if (!data) return
-    console.log(`📥 Descargando ${type.toUpperCase()} para BDI‑II`)
     const meta = {
       sessionId: sessionId as string,
       patientId,
@@ -317,7 +275,7 @@ export default function Bdi2ReportPage() {
           }}
           label="PDF"
         />
-        {isPro ? (
+        {isPro && (
           <>
             <button
               onClick={() => handleDownload('docx')}
@@ -332,10 +290,6 @@ export default function Bdi2ReportPage() {
               ODT
             </button>
           </>
-        ) : (
-          <span className="text-xs text-gray-400 italic">
-            (Descarga DOCX/ODT disponible en plan premium)
-          </span>
         )}
         <button
           onClick={() => router.push('/dashboard')}
@@ -349,6 +303,7 @@ export default function Bdi2ReportPage() {
       {/* Contenido del informe */}
       <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
         
+        {/* Header con logo y datos del paciente */}
         <ReporteHeader
           patientName={patient?.full_name || 'Paciente'}
           patientRut={patientRut}

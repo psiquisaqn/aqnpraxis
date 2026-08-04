@@ -3,10 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import PatientCard from '@/app/dashboard/components/PatientCard'
-import { SessionsTab } from '@/app/dashboard/components/SessionsTab'
-import { ProgramsTab } from '@/app/dashboard/components/ProgramsTab'
-import { EntrevistasTab } from '@/app/dashboard/components/EntrevistasTab'
+import { PatientDetailClient } from './PatientDetailClient'
 import { calcAge } from '@/lib/utils'
 
 export default function PatientDetailPage() {
@@ -17,7 +14,6 @@ export default function PatientDetailPage() {
   const [patient, setPatient] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'evaluaciones' | 'programas' | 'entrevistas'>('evaluaciones')
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,6 +54,7 @@ export default function PatientDetailPage() {
           age_years: age?.years || 0,
           age_months: age?.months || 0,
           sessions: data.sessions || [],
+          session_count: data.sessions?.length || 0,
         })
       } catch (err: any) {
         setError(err.message)
@@ -93,45 +90,6 @@ export default function PatientDetailPage() {
     )
   }
 
-  // Pestañas actualizadas: sin "Informes", "Sesiones" → "Evaluaciones"
-  const tabs = [
-    { id: 'evaluaciones', label: 'Evaluaciones' },
-    { id: 'programas', label: 'Programas' },
-    { id: 'entrevistas', label: 'Entrevistas' },
-  ]
-
-  return (
-    <div className="max-w-6xl mx-auto p-4">
-      {/* Tarjeta del paciente - responsiva */}
-      <div className="mb-6">
-        <PatientCard patient={patient} onNewSession={() => {}} />
-      </div>
-
-      {/* Navegación de pestañas - responsive con scroll horizontal en móvil */}
-      <div className="border-b border-gray-200 mb-6 overflow-x-auto">
-        <nav className="flex gap-1 min-w-max">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-white text-blue-600 border border-b-0 border-gray-200'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Contenido de pestañas */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        {activeTab === 'evaluaciones' && <SessionsTab patientId={patient.id} />}
-        {activeTab === 'programas' && <ProgramsTab patientId={patient.id} />}
-        {activeTab === 'entrevistas' && <EntrevistasTab patientId={patient.id} />}
-      </div>
-    </div>
-  )
+  // Usamos PatientDetailClient que contiene el botón Editar y las pestañas
+  return <PatientDetailClient patient={patient} />
 }
