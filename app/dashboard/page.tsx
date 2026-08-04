@@ -3,13 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { DashboardShell } from './components/DashboardShell'
 import { PatientList } from './components/PatientList'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [profile, setProfile] = useState(null)
-  const [patients, setPatients] = useState([])
+  const [patients, setPatients] = useState<any[]>([])
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,14 +22,6 @@ export default function DashboardPage() {
         return
       }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-
-      setProfile(profileData)
-
       const { data: patientsData } = await supabase
         .from('patients')
         .select('*')
@@ -43,21 +33,24 @@ export default function DashboardPage() {
     load()
   }, [supabase, router])
 
-  return (
-    <DashboardShell profile={profile}>
-      <div className="max-w-6xl mx-auto p-4">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
-          <h1 className="text-xl font-semibold text-gray-800">Pacientes</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Listado de todos tus pacientes registrados.
-          </p>
-        </div>
+  const handlePatientDeleted = (id: string) => {
+    setPatients(prev => prev.filter(p => p.id !== id))
+  }
 
-        <PatientList
-          patients={patients}
-          onPatientClick={(id) => router.push(`/dashboard/paciente/${id}`)}
-        />
+  return (
+    <div className="max-w-6xl mx-auto p-4">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+        <h1 className="text-xl font-semibold text-gray-800">Pacientes</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Listado de todos tus pacientes registrados.
+        </p>
       </div>
-    </DashboardShell>
+
+      <PatientList
+        patients={patients}
+        onPatientClick={(id) => router.push(`/dashboard/paciente/${id}`)}
+        onPatientDeleted={handlePatientDeleted}
+      />
+    </div>
   )
 }

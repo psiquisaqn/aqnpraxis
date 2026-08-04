@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 
 interface Patient {
@@ -14,10 +15,11 @@ interface Patient {
 interface PatientListProps {
   patients: Patient[]
   onPatientClick: (id: string) => void
-  onPatientDeleted?: (id: string) => void // opcional para actualizar lista padre
+  onPatientDeleted?: (id: string) => void
 }
 
 export function PatientList({ patients, onPatientClick, onPatientDeleted }: PatientListProps) {
+  const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const supabase = createBrowserClient(
@@ -26,34 +28,23 @@ export function PatientList({ patients, onPatientClick, onPatientDeleted }: Pati
   )
 
   const handleDelete = async (patientId: string, e: React.MouseEvent) => {
-    e.stopPropagation() // Evitar que se dispare el click en la fila
-
+    e.stopPropagation()
     if (!confirm('¿Estás seguro de eliminar a este paciente? Esto eliminará todas sus sesiones e informes asociados. Esta acción no se puede deshacer.')) {
       return
     }
-
     setDeletingId(patientId)
-
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
-
-      // Primero eliminar las sesiones asociadas (opcional, depende de tu schema con ON DELETE CASCADE)
-      // Si tienes ON DELETE CASCADE en la BD, no necesitas hacerlo manualmente.
-      // Pero por seguridad, podemos intentar eliminar el paciente directamente.
       const { error } = await supabase
         .from('patients')
         .delete()
         .eq('id', patientId)
         .eq('psychologist_id', user.id)
-
       if (error) throw error
-
-      // Notificar al padre para que actualice la lista (si se pasa la prop)
       if (onPatientDeleted) {
         onPatientDeleted(patientId)
       } else {
-        // Si no hay callback, recargar la página para refrescar la lista
         window.location.reload()
       }
     } catch (err: any) {
@@ -61,6 +52,11 @@ export function PatientList({ patients, onPatientClick, onPatientDeleted }: Pati
     } finally {
       setDeletingId(null)
     }
+  }
+
+  const handleWisc5 = (patientId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/dashboard/paciente/${patientId}/wisc5-calculadora`)
   }
 
   if (patients.length === 0) {
@@ -76,8 +72,7 @@ export function PatientList({ patients, onPatientClick, onPatientDeleted }: Pati
       {patients.map((patient) => (
         <div
           key={patient.id}
-          onClick={() => onPatientClick(patient.id)}
-          className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer flex items-center justify-between gap-4"
+          className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow flex items-center justify-between gap-4"
         >
           <div className="flex-1 min-w-0">
             <p className="font-medium text-gray-800 truncate">{patient.full_name}</p>
@@ -87,13 +82,27 @@ export function PatientList({ patients, onPatientClick, onPatientDeleted }: Pati
               {patient.school && <span>Colegio: {patient.school}</span>}
             </div>
           </div>
-          <button
-            onClick={(e) => handleDelete(patient.id, e)}
-            disabled={deletingId === patient.id}
-            className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50 shrink-0"
-          >
-            {deletingId === patient.id ? 'Eliminando...' : 'Eliminar'}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); onPatientClick(patient.id) }}
+              className="text-blue-600 hover:text-blue-800 text-sm"
+            >
+              Ver ficha
+            </button>
+            <button
+              onClick={(e) => handleWisc5(patient.id, e)}
+              className="text-purple-600 hover:text-purple-800 text-sm"
+            >
+              WISC‑V
+            </button>
+            <button
+              onClick={(e) => handleDelete(patient.id, e)}
+              disabled={deletingId === patient.id}
+              className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
+            >
+              {deletingId === patient.id ? 'Eliminando...' : 'Eliminar'}
+            </button>
+          </div>
         </div>
       ))}
     </div>
