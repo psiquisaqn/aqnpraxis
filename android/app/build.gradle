@@ -12,21 +12,14 @@ android {
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
 
-    // 🔥 CONFIGURACIÓN DE FIRMA (DEBE IR ANTES DE buildTypes)
+    // 🔥 CONFIGURACIÓN DE FIRMA (SOLO RELEASE, SI LA NECESITAS)
     signingConfigs {
-        debug {
-            storeFile file("debug.keystore")
-            storePassword "android"
-            keyAlias "androiddebugkey"
-            keyPassword "android"
-        }
         release {
-            // Usa variables de entorno si existen, o valores por defecto (cámbialos)
+            // Usa variables de entorno o valores por defecto (cámbialos)
             storeFile file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
             storePassword System.getenv("KEYSTORE_PASSWORD") ?: "tu_contraseña"
             keyAlias System.getenv("KEY_ALIAS") ?: "tu_alias"
@@ -38,11 +31,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release  // ← Usa la firma release
+            signingConfig signingConfigs.release  // ← Usa la firma release (si está definida)
         }
-        debug {
-            signingConfig signingConfigs.debug    // ← Usa la firma debug
-        }
+        // DEBUG no necesita configuración de firma explícita; usa el keystore por defecto
     }
 }
 
