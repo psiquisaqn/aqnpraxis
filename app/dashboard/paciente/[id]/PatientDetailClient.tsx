@@ -18,12 +18,11 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
   const [currentPatient, setCurrentPatient] = useState(patient)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
-  // Log para verificar que el componente se monta
+  // Logs de depuración (puedes eliminarlos después)
   useEffect(() => {
     console.log('✅ PatientDetailClient montado con paciente:', patient?.full_name)
   }, [patient])
 
-  // Log para verificar cambios en el estado del modal
   useEffect(() => {
     console.log('🔍 isEditModalOpen cambió a:', isEditModalOpen)
   }, [isEditModalOpen])
@@ -46,26 +45,13 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      {/* Cabecera del paciente - responsive con botón Editar */}
-      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <PatientCard
-            patient={currentPatient}
-            onNewSession={() => {}}
-            onEdit={handleEditClick}
-          />
-        </div>
-        {/* Botón Editar externo (más visible) */}
-        <button
-          onClick={handleEditClick}
-          className="mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap shadow-sm flex items-center gap-2"
-          style={{ position: 'relative', zIndex: 10 }}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-          Editar paciente
-        </button>
+      {/* Tarjeta del paciente - con el botón Editar integrado */}
+      <div className="mb-6">
+        <PatientCard
+          patient={currentPatient}
+          onNewSession={() => {}}
+          onEdit={handleEditClick}  // ← Botón "Editar" dentro de la tarjeta
+        />
       </div>
 
       {/* Navegación de pestañas */}
@@ -94,23 +80,13 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
         {activeTab === 'entrevistas' && <EntrevistasTab patientId={patient.id} />}
       </div>
 
-      {/* Modal de edición - con un div de depuración */}
-      <div className="debug-modal-container">
-        {isEditModalOpen && (
-          <div style={{ position: 'fixed', bottom: 10, right: 10, background: 'red', color: 'white', padding: 10, zIndex: 9999 }}>
-            🔥 MODAL DEBERÍA ESTAR ABIERTO 🔥
-          </div>
-        )}
-        <EditPatientModal
-          patient={currentPatient}
-          isOpen={isEditModalOpen}
-          onClose={() => {
-            console.log('❌ Cerrando modal')
-            setIsEditModalOpen(false)
-          }}
-          onUpdate={handleUpdatePatient}
-        />
-      </div>
+      {/* Modal de edición */}
+      <EditPatientModal
+        patient={currentPatient}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onUpdate={handleUpdatePatient}
+      />
     </div>
   )
 }
