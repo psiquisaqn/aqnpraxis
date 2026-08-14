@@ -16,14 +16,13 @@ android {
         }
     }
 
-    // 🔥 CONFIGURACIÓN DE FIRMA (SOLO RELEASE, SI LA NECESITAS)
     signingConfigs {
         release {
-            // Usa variables de entorno o valores por defecto (cámbialos)
-            storeFile file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "tu_contraseña"
-            keyAlias System.getenv("KEY_ALIAS") ?: "tu_alias"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "tu_contraseña"
+            storeFile file("aqnpraxis.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "floyder1"
+            keyAlias "aqnpraxis"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "floyder1"
+            storeType "pkcs12"
         }
     }
 
@@ -31,9 +30,8 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release  // ← Usa la firma release (si está definida)
+            signingConfig signingConfigs.release
         }
-        // DEBUG no necesita configuración de firma explícita; usa el keystore por defecto
     }
 }
 

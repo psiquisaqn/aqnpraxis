@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AQN Praxis</title>
+  <meta http-equiv="refresh" content="0; url=https://aqnpraxis.vercel.app" />
+</head>
+<body>
+  <p>Redirigiendo a AQN Praxis...</p>
+  <script>
+    window.location.href = 'https://aqnpraxis.vercel.app';
+  </script>
+</body>
+</html>

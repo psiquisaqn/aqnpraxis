@@ -1,5 +1,21 @@
 {
   "appId": "com.aqnpraxis.app",
   "appName": "AQN Praxis",
-  "webDir": "public"
+  "webDir": "public",
+  "server": {
+    "url": "http://aqnpraxis.vercel.app",
+    "cleartext": true,
+    "android": {
+      "allowNavigation": ["http://aqnpraxis.vercel.app"]
+    }
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 3000,
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP"
+    }
+  }
 }

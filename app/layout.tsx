@@ -21,7 +21,12 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased min-h-screen flex flex-col">
+        {/* Este div asegura que el contenido principal herede el padding de safe-area y se expanda */}
+        <div className="flex-1 flex flex-col">
+          {children}
+        </div>
+      </body>
     </html>
   )
 }

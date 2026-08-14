@@ -28,11 +28,15 @@
     color: var(--text-primary);
     font-family: system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     min-height: 100vh;
+    /* Safe areas para dispositivos con notch o barra de navegación */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 }
 
 @layer components {
-  /* Botón primario */
   .btn-primary {
     background: var(--primary);
     color: white;
@@ -42,7 +46,6 @@
     background: var(--primary-hover);
   }
 
-  /* Botón secundario */
   .btn-secondary {
     background: white;
     color: var(--text-secondary);
@@ -53,7 +56,6 @@
     background: var(--surface);
   }
 
-  /* Tarjetas */
   .card {
     background: white;
     border: 1px solid var(--border);
@@ -61,14 +63,12 @@
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
   
-  /* Fondo blanco para componentes específicos */
   .bg-white-card {
     background: white;
   }
 }
 
 @layer utilities {
-  /* Animaciones */
   @keyframes spin {
     to {
       transform: rotate(360deg);
@@ -78,7 +78,6 @@
     animation: spin 1s linear infinite;
   }
 
-  /* Transiciones */
   .transition-smooth {
     transition: all 0.2s ease-in-out;
   }
@@ -124,7 +123,6 @@
     padding-bottom: 0.625rem;
   }
   
-  /* Mejorar legibilidad en móvil */
   p, li, .text-base {
     line-height: 1.5;
   }
@@ -140,7 +138,6 @@
   }
 }
 
-/* Asegurar visibilidad de botones */
 button, 
 a[role="button"],
 [class*="btn"],
@@ -148,13 +145,11 @@ a[role="button"],
   cursor: pointer;
 }
 
-/* Mejorar contraste en hover */
 button:hover,
 a:hover {
   transition: all 0.2s ease;
 }
 
-/* Asegurar que los botones con fondo oscuro tengan texto visible */
 .bg-blue-600,
 .bg-blue-700,
 .bg-green-600,
@@ -162,12 +157,10 @@ a:hover {
   color: white !important;
 }
 
-/* Botones secundarios */
 .bg-gray-100 {
   color: #374151 !important;
 }
 
-/* Fix para Tailwind en móvil - asegurar que los estilos se aplican */
 *,
 *::before,
 *::after {
@@ -182,24 +175,25 @@ canvas {
   height: auto;
 }
 
-/* Fondo para elementos que deben mantener blanco puro */
 .bg-white,
 .bg-white-card,
 [class*="bg-white"] {
   background-color: #ffffff !important;
 }
 
-/* Gradientes suaves para secciones */
 .bg-gradient-soft {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
-/* Sombra suave para tarjetas */
 .shadow-soft {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
-/* Borde sutil */
 .border-subtle {
   border-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Asegurar que el contenido principal respete el safe-area inferior */
+main, .main-content {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
 }

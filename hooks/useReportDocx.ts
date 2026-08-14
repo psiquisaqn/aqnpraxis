@@ -1,6 +1,11 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, TableLayoutType } from 'docx'
 import { saveAs } from 'file-saver'
 import type { ReportMeta } from '@/hooks/useReportPdf'
+// Importar las funciones de interpretación
+import { getInterpretacionSeveridad, getInterpretacionDimension, getConclusionGeneral as getBdiConclusion } from '@/lib/interpretaciones/bdi2'
+
+// Nota: Para los otros tests (Coopersmith, PECA, WISC) se pueden agregar sus propias interpretaciones.
+// Por ahora, se mantienen como estaban (mostrando solo números).
 
 interface EntrevistaContent {
   type: 'entrevista'
@@ -23,7 +28,7 @@ export function useReportDocx() {
   const generateDocx = async (contentRef: React.RefObject<HTMLElement | null>, meta: ReportMeta, type: 'docx' | 'odt') => {
     try {
       const { patientName, content, testId } = meta
-      const data = content as any // Para evitar errores de TypeScript al acceder a propiedades dinámicas
+      const data = content as any
       const { indexes, scaledScores } = data || {}
 
       const isEntrevista = data?.type === 'entrevista'
@@ -32,7 +37,7 @@ export function useReportDocx() {
       const children: any[] = []
 
       if (isEntrevista && e) {
-        // --- Entrevista ---
+        // --- Entrevista (igual que antes) ---
         children.push(
           new Paragraph({
             text: 'Informe de Entrevista Psicológica',
@@ -120,20 +125,26 @@ export function useReportDocx() {
         )
 
       } else if (testId === 'bdi2') {
-        // --- BDI-II ---
+        // =====================================================
+        // BDI‑II CON INTERPRETACIONES COMPLETAS
+        // =====================================================
         const totalScore = data.totalScore ?? 0
         const severity = data.severity ?? 'No clasificado'
         const cognitiveAffectiveScore = data.cognitiveAffectiveScore ?? 0
         const somaticMotivationalScore = data.somaticMotivationalScore ?? 0
         const suicidalIdeationScore = data.suicidalIdeationScore ?? 0
 
+        const interpretacion = getInterpretacionSeveridad(totalScore)
+
         children.push(
+          // Título
           new Paragraph({
             text: 'Informe BDI-II - Inventario de Depresión',
             heading: HeadingLevel.TITLE,
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
           }),
+          // Paciente
           new Paragraph({
             children: [
               new TextRun({ text: 'Paciente: ', bold: true }),
@@ -141,6 +152,7 @@ export function useReportDocx() {
             ],
             spacing: { after: 100 },
           }),
+          // Fecha
           new Paragraph({
             children: [
               new TextRun({ text: 'Fecha de informe: ', bold: true }),
@@ -148,16 +160,118 @@ export function useReportDocx() {
             ],
             spacing: { after: 200 },
           }),
-          new Paragraph({ text: 'Resultados', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Puntaje total: ', bold: true }), new TextRun({ text: String(totalScore) })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Severidad: ', bold: true }), new TextRun({ text: severity })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Puntaje cognitivo-afectivo: ', bold: true }), new TextRun({ text: String(cognitiveAffectiveScore) })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Puntaje somático-motivacional: ', bold: true }), new TextRun({ text: String(somaticMotivationalScore) })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Ideación suicida: ', bold: true }), new TextRun({ text: String(suicidalIdeationScore) })], spacing: { after: 50 } }),
+
+          // Puntaje total
+          new Paragraph({
+            text: 'Puntaje Total',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Puntaje: ${totalScore} (${interpretacion.nivel})`, bold: true }),
+            ],
+            spacing: { after: 50 },
+          }),
+          new Paragraph({
+            text: interpretacion.descripcion,
+            spacing: { after: 50 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Recomendación: ', bold: true }),
+              new TextRun({ text: interpretacion.recomendacion }),
+            ],
+            spacing: { after: 200 },
+          }),
+
+          // Perfil de Dimensiones (tabla)
+          new Paragraph({
+            text: 'Perfil de Dimensiones',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+          }),
+          new Table({
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: 'Dimensión', alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Puntaje', alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Máximo', alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Porcentaje', alignment: AlignmentType.CENTER })] }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: 'Cognitivo-Afectivo' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(cognitiveAffectiveScore), alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: '42', alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round((cognitiveAffectiveScore / 42) * 100)}%`, alignment: AlignmentType.CENTER })] }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: 'Somático-Motivacional' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(somaticMotivationalScore), alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: '21', alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round((somaticMotivationalScore / 21) * 100)}%`, alignment: AlignmentType.CENTER })] }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: 'Ideación Suicida' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(suicidalIdeationScore), alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: '6', alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round((suicidalIdeationScore / 6) * 100)}%`, alignment: AlignmentType.CENTER })] }),
+                ],
+              }),
+            ],
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            layout: TableLayoutType.FIXED,
+          }),
+
+          // Interpretación de dimensiones
+          new Paragraph({
+            text: 'Interpretación de Dimensiones',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Cognitivo-Afectivo: ', bold: true }),
+              new TextRun({ text: getInterpretacionDimension('Cognitivo-Afectivo', cognitiveAffectiveScore, 42) }),
+            ],
+            spacing: { after: 50 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Somático-Motivacional: ', bold: true }),
+              new TextRun({ text: getInterpretacionDimension('Somático-Motivacional', somaticMotivationalScore, 21) }),
+            ],
+            spacing: { after: 50 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Ideación Suicida: ', bold: true }),
+              new TextRun({ text: getInterpretacionDimension('Ideación Suicida', suicidalIdeationScore, 6) }),
+            ],
+            spacing: { after: 200 },
+          }),
+
+          // Conclusión y recomendaciones
+          new Paragraph({
+            text: 'Conclusión y Recomendaciones',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+          }),
+          new Paragraph({
+            text: getBdiConclusion(totalScore, severity, patientName),
+            spacing: { after: 200 },
+          }),
         )
 
       } else if (testId === 'coopersmith') {
-        // --- Coopersmith ---
+        // --- Coopersmith (versión original, solo números) ---
         const totalScore = data.totalScore ?? 0
         const general = data.general ?? 0
         const social = data.social ?? 0
@@ -194,7 +308,7 @@ export function useReportDocx() {
         )
 
       } else if (testId === 'peca') {
-        // --- PECA ---
+        // --- PECA (versión original) ---
         const participationLevel = data.participationLevel ?? 0
         const participationText = data.participationText ?? ''
         const dims = data.dimensions
@@ -234,7 +348,7 @@ export function useReportDocx() {
         }
 
       } else {
-        // --- WISC-V ---
+        // --- WISC-V (versión original) ---
         children.push(
           new Paragraph({
             text: 'Informe WISC-V',
@@ -328,7 +442,6 @@ export function useReportDocx() {
             ARI: 'Aritmética',
           }
           for (const [code, pe] of Object.entries(scaledScores)) {
-            // Convertir pe a número de forma segura
             const peNum = typeof pe === 'number' ? pe : Number(pe)
             if (!isNaN(peNum)) {
               const label = subtestLabels[code] || code
