@@ -1,3 +1,12 @@
+// lib/interpretaciones/peca.ts
+
+function getShortName(fullName: string): string {
+  if (!fullName) return 'El evaluado'
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length <= 2) return fullName
+  return parts.slice(0, 2).join(' ')
+}
+
 export function getInterpretacionParticipacion(porcentaje: number): { nivel: string; descripcion: string; recomendacion: string } {
   if (porcentaje >= 75) {
     return {
@@ -58,6 +67,7 @@ export interface PecaResultForDocx {
 export function getConclusionGeneral(result: PecaResultForDocx, nombrePaciente: string): string {
   const porcentaje = Math.round(result.participationLevel * 100)
   const interpretacion = getInterpretacionParticipacion(porcentaje)
+  const nombre = getShortName(nombrePaciente)
   
   let dimensionAlta = { label: '', puntaje: -1 }
   let dimensionBaja = { label: '', puntaje: 101 }
@@ -72,5 +82,5 @@ export function getConclusionGeneral(result: PecaResultForDocx, nombrePaciente: 
     }
   })
   
-  return `${nombrePaciente || 'El evaluado'} presenta ${interpretacion.nivel.toLowerCase()} en conducta adaptativa, con un puntaje global de ${porcentaje}%. ${interpretacion.descripcion} Las principales fortalezas se observan en ${dimensionAlta.label} (${Math.round(dimensionAlta.puntaje)}%), mientras que las mayores dificultades se concentran en ${dimensionBaja.label} (${Math.round(dimensionBaja.puntaje)}%). ${interpretacion.recomendacion} Es fundamental que esta evaluación sea complementada con observación directa en contextos naturales y entrevistas con cuidadores o educadores para obtener un perfil completo y preciso del funcionamiento adaptativo del evaluado.`
+  return `${nombre} presenta ${interpretacion.nivel.toLowerCase()} en conducta adaptativa, con un puntaje global de ${porcentaje}%. ${interpretacion.descripcion} Las principales fortalezas se observan en ${dimensionAlta.label} (${Math.round(dimensionAlta.puntaje)}%), mientras que las mayores dificultades se concentran en ${dimensionBaja.label} (${Math.round(dimensionBaja.puntaje)}%). ${interpretacion.recomendacion} Es fundamental que esta evaluación sea complementada con observación directa en contextos naturales y entrevistas con cuidadores o educadores para obtener un perfil completo y preciso del funcionamiento adaptativo del evaluado.`
 }

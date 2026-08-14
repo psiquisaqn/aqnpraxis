@@ -6,6 +6,14 @@ export interface InterpretacionSeveridad {
   recomendacion: string
 }
 
+// Función auxiliar para obtener solo dos primeras palabras
+function getShortName(fullName: string): string {
+  if (!fullName) return 'El evaluado'
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length <= 2) return fullName
+  return parts.slice(0, 2).join(' ')
+}
+
 export function getInterpretacionSeveridad(puntaje: number): InterpretacionSeveridad {
   if (puntaje >= 0 && puntaje <= 13) {
     return {
@@ -65,5 +73,6 @@ export function getInterpretacionDimension(nombre: string, puntaje: number, maxi
 
 export function getConclusionGeneral(puntaje: number, severityLabel: string, nombrePaciente: string): string {
   const interpretacion = getInterpretacionSeveridad(puntaje)
-  return `${nombrePaciente || 'El evaluado'} presenta un cuadro de ${interpretacion.nivel.toLowerCase()} según el BDI-II, con una puntuación total de ${puntaje} puntos. ${interpretacion.descripcion} ${interpretacion.recomendacion} Es importante destacar que este instrumento es una medida de tamizaje, no un diagnóstico definitivo. Cualquier plan de intervención debe basarse en una evaluación clínica integral que considere el contexto biopsicosocial del evaluado. El presente informe debe ser interpretado por un profesional de la salud mental capacitado.`
+  const nombre = getShortName(nombrePaciente)
+  return `${nombre} presenta un cuadro de ${interpretacion.nivel.toLowerCase()} según el BDI-II, con una puntuación total de ${puntaje} puntos. ${interpretacion.descripcion} ${interpretacion.recomendacion} Es importante destacar que este instrumento es una medida de tamizaje, no un diagnóstico definitivo. Cualquier plan de intervención debe basarse en una evaluación clínica integral que considere el contexto biopsicosocial del evaluado. El presente informe debe ser interpretado por un profesional de la salud mental capacitado.`
 }

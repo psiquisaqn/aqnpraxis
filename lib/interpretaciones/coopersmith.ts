@@ -1,3 +1,12 @@
+// lib/interpretaciones/coopersmith.ts
+
+function getShortName(fullName: string): string {
+  if (!fullName) return 'El evaluado'
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length <= 2) return fullName
+  return parts.slice(0, 2).join(' ')
+}
+
 export function getInterpretacionSubescala(puntaje: number, maximo: number, nombre: string): string {
   const porcentaje = (puntaje / maximo) * 100
   if (porcentaje >= 75) {
@@ -21,16 +30,17 @@ export interface CooperResultForDocx {
 
 export function getConclusionGeneral(result: CooperResultForDocx, nombrePaciente: string): string {
   const puntaje = result.totalScaled
+  const nombre = getShortName(nombrePaciente)
   let conclusion = ""
 
   if (puntaje >= 75) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima alta y bien consolidada. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en el percentil superior, lo que refleja una percepción positiva y bien consolidada de sí mismo. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombre} presenta una autoestima alta y bien consolidada. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en el percentil superior, lo que refleja una percepción positiva y bien consolidada de sí mismo. `
   } else if (puntaje >= 50) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima media-alta. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en un rango medio-alto, mostrando una percepción generalmente positiva de sí mismo, aunque con algunas áreas de inseguridad. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombre} presenta una autoestima media-alta. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en un rango medio-alto, mostrando una percepción generalmente positiva de sí mismo, aunque con algunas áreas de inseguridad. `
   } else if (puntaje >= 25) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima media-baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se observan dificultades significativas en la percepción de autoeficacia y valía personal. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombre} presenta una autoestima media-baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se observan dificultades significativas en la percepción de autoeficacia y valía personal. `
   } else {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se evidencia un patrón consistente de autodescalificación que requiere intervención prioritaria. `
+    conclusion = `Los resultados del Coopersmith SEI indican que ${nombre} presenta una autoestima baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se evidencia un patrón consistente de autodescalificación que requiere intervención prioritaria. `
   }
   
   conclusion += `Las subescalas permiten identificar áreas específicas de fortaleza y vulnerabilidad. `

@@ -1,3 +1,12 @@
+// lib/interpretaciones/wisc5.ts
+
+function getShortName(fullName: string): string {
+  if (!fullName) return 'El evaluado'
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length <= 2) return fullName
+  return parts.slice(0, 2).join(' ')
+}
+
 export function getClassification(score: number): string {
   if (score >= 130) return 'Muy Superior'
   if (score >= 120) return 'Superior'

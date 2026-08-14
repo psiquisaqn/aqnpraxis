@@ -1,6 +1,4 @@
 'use client'
-// app/resultados/coopersmith/page.tsx
-// Versión con descarga de DOCX/ODT para premium
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -11,7 +9,9 @@ import { scoreCoopersmith, type CooperResult } from '@/lib/coopersmith/engine'
 import { ReporteHeader } from '@/components/ReporteHeader'
 import { ReporteFooter } from '@/components/ReporteFooter'
 
-// Estilos para impresión
+// Importar interpretaciones desde lib
+import { getInterpretacionSubescala, getConclusionGeneral } from '@/lib/interpretaciones/coopersmith'
+
 const printStyles = `
   @media print {
     body { margin: 0; padding: 0; background: white; }
@@ -23,51 +23,8 @@ const printStyles = `
   }
 `
 
-// Función para obtener texto interpretativo según percentil
-function getInterpretacionSubescala(puntaje: number, maximo: number, nombre: string): string {
-  const porcentaje = (puntaje / maximo) * 100
-  if (porcentaje >= 75) {
-    return `${nombre}: El evaluado muestra una percepción muy alta de sí mismo en esta área. Se siente competente, valorado y aceptado, lo que contribuye positivamente a su autoestima general. No se detectan dificultades significativas en este dominio.`
-  } else if (porcentaje >= 50) {
-    return `${nombre}: La autopercepción del evaluado en esta área es media-alta. Generalmente se siente adecuado, aunque puede experimentar inseguridades en situaciones específicas que requieren mayor exigencia. Se recomienda reforzar las áreas de fortaleza.`
-  } else if (porcentaje >= 25) {
-    return `${nombre}: Se observa una autopercepción baja en esta área. El evaluado tiende a subestimar sus capacidades y puede experimentar sentimientos de incompetencia o de no ser "suficientemente bueno" en comparación con otros. Es un área que podría beneficiarse de intervención focalizada.`
-  } else {
-    return `${nombre}: La autopercepción es muy baja. Existe un patrón consistente de autodescalificación, lo que sugiere que esta área es una fuente significativa de malestar y requiere intervención prioritaria. Se recomienda trabajo psicoterapéutico específico para fortalecer la autoestima en este dominio.`
-  }
-}
-
-// Función para generar conclusión general
-function getConclusionGeneral(result: CooperResult, nombrePaciente: string): string {
-  const puntaje = result.totalScaled
-  
-  let conclusion = ""
-  
-  if (puntaje >= 75) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima alta y bien consolidada. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en el percentil superior, lo que refleja una percepción positiva y bien consolidada de sí mismo. `
-  } else if (puntaje >= 50) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima media-alta. Con un puntaje total de ${puntaje} puntos (sobre 100), se ubica en un rango medio-alto, mostrando una percepción generalmente positiva de sí mismo, aunque con algunas áreas de inseguridad. `
-  } else if (puntaje >= 25) {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima media-baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se observan dificultades significativas en la percepción de autoeficacia y valía personal. `
-  } else {
-    conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se evidencia un patrón consistente de autodescalificación que requiere intervención prioritaria. `
-  }
-  
-  conclusion += `Las subescalas permiten identificar áreas específicas de fortaleza y vulnerabilidad. `
-  
-  if (result.lieScaleInvalid) {
-    conclusion += `⚠️ Precaución: La puntuación en la escala de mentira (${result.lieScaleRaw}/8) sugiere una tendencia a responder de manera socialmente deseable, por lo que los resultados deben interpretarse con cautela. `
-  }
-  
-  conclusion += `Se recomienda utilizar estos resultados como base para un plan de intervención focalizado en las áreas deficitarias, fortaleciendo los recursos existentes y promoviendo una autopercepción más realista y positiva. La autoestima es un constructo dinámico que puede modificarse a través de intervenciones psicosociales y psicoterapéuticas adecuadas.`
-  
-  return conclusion
-}
-
-// Componente de gráfico de barras verticales
 function GraficoBarras({ data, maxValue = 100 }: { data: Array<{ label: string; value: number; max: number }>; maxValue?: number }) {
   const maxVal = Math.max(...data.map(d => d.value), maxValue)
-  
   return (
     <div className="grafico-barras-container" style={{ margin: '20px 0', fontFamily: 'Georgia, Times New Roman, serif', pageBreakInside: 'avoid' }}>
       <div className="grafico-barras" style={{ 
@@ -90,8 +47,7 @@ function GraficoBarras({ data, maxValue = 100 }: { data: Array<{ label: string; 
                 width: '40px', 
                 margin: '0 auto', 
                 height: `${Math.max(alturaRelativa, 4)}px`,
-                marginBottom: '8px',
-                transition: 'height 0.3s ease'
+                marginBottom: '8px'
               }} title={`${item.value} / ${item.max}`} />
               <div style={{ fontSize: '11px', fontWeight: 'bold', fontFamily: 'Georgia, Times New Roman, serif' }}>{item.label}</div>
               <div style={{ fontSize: '10px', color: '#555' }}>{item.value}</div>
@@ -105,7 +61,6 @@ function GraficoBarras({ data, maxValue = 100 }: { data: Array<{ label: string; 
 
 function buildResultFromDb(db: any): CooperResult | null {
   if (!db) return null
-
   const resp: Record<number, 'igual' | 'diferente'> = {}
   for (let i = 1; i <= 58; i++) {
     const key = `r${String(i).padStart(2, '0')}`
@@ -196,7 +151,6 @@ function CoopersmithReportPageInner() {
 
     async function load() {
       try {
-        // 1. Cargar puntajes Coopersmith
         const { data: scores, error: scoresError } = await supabase
           .from('coopersmith_scores')
           .select('*')
@@ -211,7 +165,6 @@ function CoopersmithReportPageInner() {
         const built = buildResultFromDb(scores)
         setResult(built)
 
-        // 2. Cargar datos del paciente
         const { data: sessionData } = await supabase
           .from('sessions')
           .select('started_at, patient:patients(id, full_name, rut, birth_date, school)')
@@ -224,7 +177,6 @@ function CoopersmithReportPageInner() {
           setPatientId(p.id ?? '')
           setPatientRut(p.rut ?? '')
           setPatientSchool(p.school ?? '')
-          
           if (p.birth_date) {
             setPatientBirthDate(new Date(p.birth_date).toLocaleDateString('es-CL'))
             const age = new Date().getFullYear() - new Date(p.birth_date).getFullYear()
@@ -237,7 +189,6 @@ function CoopersmithReportPageInner() {
           }))
         }
 
-        // 3. Cargar plan del usuario
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           const { data: planData } = await supabase.rpc('get_plan_status', { p_user_id: user.id })
@@ -258,7 +209,6 @@ function CoopersmithReportPageInner() {
 
   const handleDownload = (type: 'docx' | 'odt') => {
     if (!result) return
-    // Mapear subescalas a los campos esperados por el hook
     const subscales = result.subscales.reduce((acc, s) => {
       acc[s.code] = s.scaledScore
       return acc
@@ -269,13 +219,18 @@ function CoopersmithReportPageInner() {
       patientId,
       testId: 'coopersmith',
       patientName,
+      patientRut,
+      patientBirthDate,
+      patientAge,
+      patientSchool,
+      evalDate,
       content: {
         totalScore: result.totalScaled,
         level: result.level,
         general: subscales.general || 0,
         social: subscales.social || 0,
-        familiar: subscales.hogar || 0,    // Hogar → Familiar
-        academico: subscales.escolar || 0, // Escolar → Académico
+        familiar: subscales.hogar || 0,
+        academico: subscales.escolar || 0,
       }
     }
     generateDocx(contentRef, meta, type)
@@ -296,7 +251,6 @@ function CoopersmithReportPageInner() {
     <div className="min-h-screen" style={{ background: 'white' }}>
       <style>{printStyles}</style>
       
-      {/* Barra superior - no imprimible */}
       <div className="sticky top-0 z-20 border-b px-6 py-3 flex items-center gap-3 flex-wrap no-print" style={{ background: 'white', borderColor: '#e5e5e0' }}>
         <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm" style={{ color: '#6b7280' }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -342,10 +296,8 @@ function CoopersmithReportPageInner() {
         </button>
       </div>
 
-      {/* Contenido del informe */}
-      <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
+      <div ref={contentRef} className="reporte-container max-w-4xl mx-auto px-6 py-8 pb-12" style={{ fontFamily: 'Georgia, Times New Roman, serif', background: 'white' }}>
         
-        {/* Header con logo y datos del paciente */}
         <ReporteHeader
           patientName={patientName}
           patientRut={patientRut}
@@ -432,17 +384,22 @@ function CoopersmithReportPageInner() {
           </div>
         </div>
 
-        {/* Conclusión general con salto de página */}
+        {/* Conclusión general */}
         <div className="mb-6" style={{ pageBreakBefore: 'always', pageBreakInside: 'avoid' }}>
           <div className="border-b border-gray-300 pb-2 mb-3">
             <h2 className="text-lg font-semibold uppercase tracking-wide" style={{ color: '#1a1a1a' }}>Conclusión y Recomendaciones</h2>
           </div>
           <p className="text-sm leading-relaxed text-justify" style={{ color: '#4b5563', textAlign: 'justify' }}>
-            {getConclusionGeneral(result, patientName)}
+            {getConclusionGeneral({
+              totalScaled: result.totalScaled,
+              levelLabel: result.levelLabel,
+              lieScaleInvalid: result.lieScaleInvalid,
+              lieScaleRaw: result.lieScaleRaw,
+              subscales: result.subscales.map(s => ({ ...s, code: s.code, label: s.label, scaledScore: s.scaledScore, maxScaled: s.maxScaled, pct: s.pct }))
+            }, patientName)}
           </p>
         </div>
 
-        {/* Footer con firma e isotipo */}
         <ReporteFooter showFirma={true} />
       </div>
     </div>
