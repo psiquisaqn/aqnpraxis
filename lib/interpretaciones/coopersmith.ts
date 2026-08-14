@@ -1,5 +1,3 @@
-// lib/interpretaciones/coopersmith.ts
-
 export function getInterpretacionSubescala(puntaje: number, maximo: number, nombre: string): string {
   const porcentaje = (puntaje / maximo) * 100
   if (porcentaje >= 75) {
@@ -34,14 +32,14 @@ export function getConclusionGeneral(result: CooperResultForDocx, nombrePaciente
   } else {
     conclusion = `Los resultados del Coopersmith SEI indican que ${nombrePaciente || 'el evaluado'} presenta una autoestima baja. Con un puntaje total de ${puntaje} puntos (sobre 100), se evidencia un patrón consistente de autodescalificación que requiere intervención prioritaria. `
   }
-
+  
   conclusion += `Las subescalas permiten identificar áreas específicas de fortaleza y vulnerabilidad. `
-
+  
   if (result.lieScaleInvalid) {
     conclusion += `⚠️ Precaución: La puntuación en la escala de mentira (${result.lieScaleRaw}/8) sugiere una tendencia a responder de manera socialmente deseable, por lo que los resultados deben interpretarse con cautela. `
   }
-
+  
   conclusion += `Se recomienda utilizar estos resultados como base para un plan de intervención focalizado en las áreas deficitarias, fortaleciendo los recursos existentes y promoviendo una autopercepción más realista y positiva. La autoestima es un constructo dinámico que puede modificarse a través de intervenciones psicosociales y psicoterapéuticas adecuadas.`
-
+  
   return conclusion
 }

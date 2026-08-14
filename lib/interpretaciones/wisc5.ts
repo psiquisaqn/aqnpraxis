@@ -1,5 +1,3 @@
-// lib/interpretaciones/wisc5.ts
-
 export function getClassification(score: number): string {
   if (score >= 130) return 'Muy Superior'
   if (score >= 120) return 'Superior'

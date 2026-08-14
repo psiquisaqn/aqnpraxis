@@ -33,26 +33,23 @@ export function ReporteFooter({ showFirma = true }: ReporteFooterProps) {
 
   return (
     <div className="mt-8 pt-4" style={{ pageBreakInside: 'avoid' }}>
-      {/* Espacio para firma */}
       {showFirma && (
         <div className="text-center mb-4">
-          {/* Contenedor de la imagen con altura máxima y centrado */}
-          <div className="flex justify-center items-center" style={{ maxHeight: '60px', overflow: 'hidden' }}>
+          <div className="flex justify-center items-center">
             {firmaUrl ? (
               <Image
                 src={firmaUrl}
                 alt="Firma"
-                width={150}
-                height={60}
+                width={200}
+                height={80}
                 className="object-contain"
-                style={{ maxHeight: '60px', width: 'auto' }}
+                style={{ maxWidth: '200px', height: 'auto' }}
               />
             ) : (
               <div className="w-40 border-b border-gray-400" />
             )}
           </div>
           
-          {/* Texto del pie de firma (HTML enriquecido) */}
           {firmaTexto && (
             <div 
               className="text-sm text-gray-600 mt-2"
@@ -65,7 +62,6 @@ export function ReporteFooter({ showFirma = true }: ReporteFooterProps) {
         </div>
       )}
 
-      {/* Isotipo AQN Praxis */}
       <div className="text-center pt-4 border-t border-gray-200">
         <div className="flex items-center justify-center gap-2">
           <img src="/isotipoaqnpraxis.png" alt="AQN Praxis" className="h-6 w-auto" />

@@ -1,11 +1,12 @@
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, TableLayoutType } from 'docx'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
 import type { ReportMeta } from '@/hooks/useReportPdf'
-// Importar las funciones de interpretación
-import { getInterpretacionSeveridad, getInterpretacionDimension, getConclusionGeneral as getBdiConclusion } from '@/lib/interpretaciones/bdi2'
 
-// Nota: Para los otros tests (Coopersmith, PECA, WISC) se pueden agregar sus propias interpretaciones.
-// Por ahora, se mantienen como estaban (mostrando solo números).
+// Importar funciones de interpretación para todos los tests
+import { getInterpretacionSeveridad, getInterpretacionDimension, getConclusionGeneral as getBdiConclusion } from '@/lib/interpretaciones/bdi2'
+import { getInterpretacionSubescala, getConclusionGeneral as getCoopersmithConclusion } from '@/lib/interpretaciones/coopersmith'
+import { getInterpretacionParticipacion, getInterpretacionDimension as getPecaDimension, getConclusionGeneral as getPecaConclusion } from '@/lib/interpretaciones/peca'
+import { getClassification, getScaledClassification, getSubtestInterpretation, getInterpretacionIndice } from '@/lib/interpretaciones/wisc5'
 
 interface EntrevistaContent {
   type: 'entrevista'
@@ -24,6 +25,19 @@ interface EntrevistaContent {
   } | null
 }
 
+// Estilos comunes para el documento
+const STYLES = {
+  font: 'Georgia, Times New Roman, serif',
+  fontSize: 12,
+  lineHeight: 1.5,
+  color: '#333333',
+  titleColor: '#1a1a1a',
+  subtitleColor: '#2d2d2d',
+  primaryColor: '#3B82F6',
+  accentColor: '#4a4a4a',
+  borderColor: '#cccccc',
+}
+
 export function useReportDocx() {
   const generateDocx = async (contentRef: React.RefObject<HTMLElement | null>, meta: ReportMeta, type: 'docx' | 'odt') => {
     try {
@@ -36,19 +50,31 @@ export function useReportDocx() {
 
       const children: any[] = []
 
+      // ============================================================
+      // FUNCIÓN AUXILIAR PARA CREAR BORDE DE TABLA
+      // ============================================================
+      const tableBorder = {
+        style: BorderStyle.SINGLE,
+        size: 1,
+        color: STYLES.borderColor,
+      }
+
+      // ============================================================
+      // ENTREVISTA (sin cambios, pero con estilos mejorados)
+      // ============================================================
       if (isEntrevista && e) {
-        // --- Entrevista (igual que antes) ---
         children.push(
           new Paragraph({
             text: 'Informe de Entrevista Psicológica',
             heading: HeadingLevel.TITLE,
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
+            style: 'title',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Paciente: ', bold: true }),
-              new TextRun({ text: patientName || 'No especificado' }),
+              new TextRun({ text: 'Paciente: ', bold: true, size: 24 }),
+              new TextRun({ text: patientName || 'No especificado', size: 24 }),
             ],
             spacing: { after: 100 },
           })
@@ -59,10 +85,10 @@ export function useReportDocx() {
           children.push(
             new Paragraph({
               children: [
-                new TextRun({ text: 'Fecha: ', bold: true }),
-                new TextRun({ text: fechaFormateada }),
-                new TextRun({ text: '     Hora: ', bold: true }),
-                new TextRun({ text: e.hora || 'No registrada' }),
+                new TextRun({ text: 'Fecha: ', bold: true, size: 24 }),
+                new TextRun({ text: fechaFormateada, size: 24 }),
+                new TextRun({ text: '     Hora: ', bold: true, size: 24 }),
+                new TextRun({ text: e.hora || 'No registrada', size: 24 }),
               ],
               spacing: { after: 100 },
             })
@@ -73,8 +99,8 @@ export function useReportDocx() {
           children.push(
             new Paragraph({
               children: [
-                new TextRun({ text: 'Asistentes: ', bold: true }),
-                new TextRun({ text: e.asistentes }),
+                new TextRun({ text: 'Asistentes: ', bold: true, size: 24 }),
+                new TextRun({ text: e.asistentes, size: 24 }),
               ],
               spacing: { after: 100 },
             })
@@ -89,8 +115,9 @@ export function useReportDocx() {
               text: 'Motivación o Inquietud Principal',
               heading: HeadingLevel.HEADING_2,
               spacing: { before: 200, after: 100 },
+              style: 'subtitle',
             }),
-            new Paragraph({ text: e.motivacion_principal, spacing: { after: 200 } })
+            new Paragraph({ text: e.motivacion_principal, spacing: { after: 200 }, style: 'body' })
           )
         }
 
@@ -100,8 +127,9 @@ export function useReportDocx() {
               text: 'Información Relevante',
               heading: HeadingLevel.HEADING_2,
               spacing: { before: 200, after: 100 },
+              style: 'subtitle',
             }),
-            new Paragraph({ text: e.info_relevante, spacing: { after: 200 } })
+            new Paragraph({ text: e.info_relevante, spacing: { after: 200 }, style: 'body' })
           )
         }
 
@@ -111,8 +139,9 @@ export function useReportDocx() {
               text: 'Sugerencias y Acuerdos',
               heading: HeadingLevel.HEADING_2,
               spacing: { before: 200, after: 100 },
+              style: 'subtitle',
             }),
-            new Paragraph({ text: e.sugerencias_acuerdos, spacing: { after: 200 } })
+            new Paragraph({ text: e.sugerencias_acuerdos, spacing: { after: 200 }, style: 'body' })
           )
         }
 
@@ -121,13 +150,15 @@ export function useReportDocx() {
             text: '--- Fin del informe ---',
             alignment: AlignmentType.CENTER,
             spacing: { before: 400 },
+            style: 'footer',
           })
         )
+      }
 
-      } else if (testId === 'bdi2') {
-        // =====================================================
-        // BDI‑II CON INTERPRETACIONES COMPLETAS
-        // =====================================================
+      // ============================================================
+      // BDI‑II (completo con interpretaciones)
+      // ============================================================
+      else if (testId === 'bdi2') {
         const totalScore = data.totalScore ?? 0
         const severity = data.severity ?? 'No clasificado'
         const cognitiveAffectiveScore = data.cognitiveAffectiveScore ?? 0
@@ -137,146 +168,171 @@ export function useReportDocx() {
         const interpretacion = getInterpretacionSeveridad(totalScore)
 
         children.push(
-          // Título
           new Paragraph({
             text: 'Informe BDI-II - Inventario de Depresión',
             heading: HeadingLevel.TITLE,
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
+            style: 'title',
           }),
-          // Paciente
           new Paragraph({
             children: [
-              new TextRun({ text: 'Paciente: ', bold: true }),
-              new TextRun({ text: patientName || 'No especificado' }),
+              new TextRun({ text: 'Paciente: ', bold: true, size: 24 }),
+              new TextRun({ text: patientName || 'No especificado', size: 24 }),
             ],
             spacing: { after: 100 },
           }),
-          // Fecha
           new Paragraph({
             children: [
-              new TextRun({ text: 'Fecha de informe: ', bold: true }),
-              new TextRun({ text: new Date().toLocaleDateString('es-CL') }),
+              new TextRun({ text: 'Fecha de informe: ', bold: true, size: 24 }),
+              new TextRun({ text: new Date().toLocaleDateString('es-CL'), size: 24 }),
             ],
             spacing: { after: 200 },
           }),
-
           // Puntaje total
           new Paragraph({
             text: 'Puntaje Total',
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 200, after: 100 },
+            style: 'subtitle',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: `Puntaje: ${totalScore} (${interpretacion.nivel})`, bold: true }),
+              new TextRun({ text: `Puntaje: ${totalScore} (${interpretacion.nivel})`, bold: true, size: 24, color: STYLES.primaryColor }),
             ],
             spacing: { after: 50 },
           }),
           new Paragraph({
             text: interpretacion.descripcion,
             spacing: { after: 50 },
+            style: 'body',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Recomendación: ', bold: true }),
-              new TextRun({ text: interpretacion.recomendacion }),
+              new TextRun({ text: 'Recomendación: ', bold: true, size: 24 }),
+              new TextRun({ text: interpretacion.recomendacion, size: 24 }),
             ],
             spacing: { after: 200 },
+            style: 'body',
           }),
-
-          // Perfil de Dimensiones (tabla)
+          // Tabla de dimensiones
           new Paragraph({
             text: 'Perfil de Dimensiones',
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 200, after: 100 },
+            style: 'subtitle',
           }),
           new Table({
             rows: [
               new TableRow({
                 children: [
-                  new TableCell({ children: [new Paragraph({ text: 'Dimensión', alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: 'Puntaje', alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: 'Máximo', alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: 'Porcentaje', alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Dimensión', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Puntaje', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Máximo', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Porcentaje', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({ children: [new Paragraph({ text: 'Cognitivo-Afectivo' })] }),
-                  new TableCell({ children: [new Paragraph({ text: String(cognitiveAffectiveScore), alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: '42', alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: `${Math.round((cognitiveAffectiveScore / 42) * 100)}%`, alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Cognitivo-Afectivo', style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(cognitiveAffectiveScore), alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: '42', alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round((cognitiveAffectiveScore / 42) * 100)}%`, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({ children: [new Paragraph({ text: 'Somático-Motivacional' })] }),
-                  new TableCell({ children: [new Paragraph({ text: String(somaticMotivationalScore), alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: '21', alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: `${Math.round((somaticMotivationalScore / 21) * 100)}%`, alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Somático-Motivacional', style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(somaticMotivationalScore), alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: '21', alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round((somaticMotivationalScore / 21) * 100)}%`, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({ children: [new Paragraph({ text: 'Ideación Suicida' })] }),
-                  new TableCell({ children: [new Paragraph({ text: String(suicidalIdeationScore), alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: '6', alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: `${Math.round((suicidalIdeationScore / 6) * 100)}%`, alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Ideación Suicida', style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(suicidalIdeationScore), alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: '6', alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round((suicidalIdeationScore / 6) * 100)}%`, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
                 ],
               }),
             ],
             width: { size: 100, type: WidthType.PERCENTAGE },
             layout: TableLayoutType.FIXED,
+            borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder, insideHorizontal: tableBorder, insideVertical: tableBorder },
           }),
-
           // Interpretación de dimensiones
           new Paragraph({
             text: 'Interpretación de Dimensiones',
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 200, after: 100 },
+            style: 'subtitle',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Cognitivo-Afectivo: ', bold: true }),
-              new TextRun({ text: getInterpretacionDimension('Cognitivo-Afectivo', cognitiveAffectiveScore, 42) }),
+              new TextRun({ text: 'Cognitivo-Afectivo: ', bold: true, size: 24 }),
+              new TextRun({ text: getInterpretacionDimension('Cognitivo-Afectivo', cognitiveAffectiveScore, 42), size: 24 }),
             ],
             spacing: { after: 50 },
+            style: 'body',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Somático-Motivacional: ', bold: true }),
-              new TextRun({ text: getInterpretacionDimension('Somático-Motivacional', somaticMotivationalScore, 21) }),
+              new TextRun({ text: 'Somático-Motivacional: ', bold: true, size: 24 }),
+              new TextRun({ text: getInterpretacionDimension('Somático-Motivacional', somaticMotivationalScore, 21), size: 24 }),
             ],
             spacing: { after: 50 },
+            style: 'body',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Ideación Suicida: ', bold: true }),
-              new TextRun({ text: getInterpretacionDimension('Ideación Suicida', suicidalIdeationScore, 6) }),
+              new TextRun({ text: 'Ideación Suicida: ', bold: true, size: 24 }),
+              new TextRun({ text: getInterpretacionDimension('Ideación Suicida', suicidalIdeationScore, 6), size: 24 }),
             ],
             spacing: { after: 200 },
+            style: 'body',
           }),
-
-          // Conclusión y recomendaciones
+          // Conclusión
           new Paragraph({
             text: 'Conclusión y Recomendaciones',
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 200, after: 100 },
+            style: 'subtitle',
           }),
           new Paragraph({
             text: getBdiConclusion(totalScore, severity, patientName),
             spacing: { after: 200 },
+            style: 'body',
           }),
         )
+      }
 
-      } else if (testId === 'coopersmith') {
-        // --- Coopersmith (versión original, solo números) ---
+      // ============================================================
+      // COOPERSMITH (completo con interpretaciones)
+      // ============================================================
+      else if (testId === 'coopersmith') {
         const totalScore = data.totalScore ?? 0
+        const level = data.level ?? ''
         const general = data.general ?? 0
         const social = data.social ?? 0
         const familiar = data.familiar ?? 0
         const academico = data.academico ?? 0
+
+        const subscales = [
+          { label: 'General', scaledScore: general, maxScaled: 26 },
+          { label: 'Social', scaledScore: social, maxScaled: 8 },
+          { label: 'Familiar', scaledScore: familiar, maxScaled: 8 },
+          { label: 'Académico', scaledScore: academico, maxScaled: 8 },
+        ]
+
+        // Construimos un objeto para la conclusión
+        const resultForConclusion = {
+          totalScaled: totalScore,
+          levelLabel: level,
+          lieScaleInvalid: false,
+          lieScaleRaw: 0,
+          subscales: subscales.map(s => ({ code: s.label.toLowerCase(), label: s.label, scaledScore: s.scaledScore, maxScaled: s.maxScaled, pct: s.scaledScore / s.maxScaled })),
+        }
 
         children.push(
           new Paragraph({
@@ -284,34 +340,114 @@ export function useReportDocx() {
             heading: HeadingLevel.TITLE,
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
+            style: 'title',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Paciente: ', bold: true }),
-              new TextRun({ text: patientName || 'No especificado' }),
+              new TextRun({ text: 'Paciente: ', bold: true, size: 24 }),
+              new TextRun({ text: patientName || 'No especificado', size: 24 }),
             ],
             spacing: { after: 100 },
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Fecha de informe: ', bold: true }),
-              new TextRun({ text: new Date().toLocaleDateString('es-CL') }),
+              new TextRun({ text: 'Fecha de informe: ', bold: true, size: 24 }),
+              new TextRun({ text: new Date().toLocaleDateString('es-CL'), size: 24 }),
             ],
             spacing: { after: 200 },
           }),
-          new Paragraph({ text: 'Resultados', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Puntaje total: ', bold: true }), new TextRun({ text: String(totalScore) })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Área general: ', bold: true }), new TextRun({ text: String(general) })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Área social: ', bold: true }), new TextRun({ text: String(social) })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Área familiar: ', bold: true }), new TextRun({ text: String(familiar) })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Área académica: ', bold: true }), new TextRun({ text: String(academico) })], spacing: { after: 50 } }),
+          // Puntaje total
+          new Paragraph({
+            text: 'Puntaje Total',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Puntaje: ${totalScore} (${level})`, bold: true, size: 24, color: STYLES.primaryColor }),
+            ],
+            spacing: { after: 50 },
+          }),
+          // Tabla de subescalas
+          new Paragraph({
+            text: 'Subescalas',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          new Table({
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: 'Área', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Puntaje', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Máximo', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Porcentaje', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                ],
+              }),
+              ...subscales.map(s => new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: s.label, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(s.scaledScore), alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(s.maxScaled), alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round((s.scaledScore / s.maxScaled) * 100)}%`, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                ],
+              })),
+            ],
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            layout: TableLayoutType.FIXED,
+            borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder, insideHorizontal: tableBorder, insideVertical: tableBorder },
+          }),
+          // Interpretación de subescalas
+          new Paragraph({
+            text: 'Interpretación de Subescalas',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          ...subscales.map(s => new Paragraph({
+            children: [
+              new TextRun({ text: `${s.label}: `, bold: true, size: 24 }),
+              new TextRun({ text: getInterpretacionSubescala(s.scaledScore, s.maxScaled, s.label), size: 24 }),
+            ],
+            spacing: { after: 50 },
+            style: 'body',
+          })),
+          // Conclusión
+          new Paragraph({
+            text: 'Conclusión y Recomendaciones',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          new Paragraph({
+            text: getCoopersmithConclusion(resultForConclusion, patientName),
+            spacing: { after: 200 },
+            style: 'body',
+          }),
         )
+      }
 
-      } else if (testId === 'peca') {
-        // --- PECA (versión original) ---
+      // ============================================================
+      // PECA (completo con interpretaciones)
+      // ============================================================
+      else if (testId === 'peca') {
         const participationLevel = data.participationLevel ?? 0
+        const dimensions = data.dimensions ?? []
+        const aamrSets = data.aamrSets ?? []
         const participationText = data.participationText ?? ''
-        const dims = data.dimensions
+        const participationNeeds = data.participationNeeds ?? false
+
+        const resultado = {
+          participationLevel,
+          dimensions,
+          aamrSets,
+          participationText,
+          participationNeeds,
+        }
+
+        const interpretacion = getInterpretacionParticipacion(Math.round(participationLevel * 100))
 
         children.push(
           new Paragraph({
@@ -319,111 +455,231 @@ export function useReportDocx() {
             heading: HeadingLevel.TITLE,
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
+            style: 'title',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Paciente: ', bold: true }),
-              new TextRun({ text: patientName || 'No especificado' }),
+              new TextRun({ text: 'Paciente: ', bold: true, size: 24 }),
+              new TextRun({ text: patientName || 'No especificado', size: 24 }),
             ],
             spacing: { after: 100 },
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Fecha de informe: ', bold: true }),
-              new TextRun({ text: new Date().toLocaleDateString('es-CL') }),
+              new TextRun({ text: 'Fecha de informe: ', bold: true, size: 24 }),
+              new TextRun({ text: new Date().toLocaleDateString('es-CL'), size: 24 }),
             ],
             spacing: { after: 200 },
           }),
-          new Paragraph({ text: 'Resultados', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Participación general: ', bold: true }), new TextRun({ text: `${Math.round(participationLevel * 100)}%` })], spacing: { after: 50 } }),
-          new Paragraph({ children: [new TextRun({ text: 'Texto: ', bold: true }), new TextRun({ text: String(participationText) })], spacing: { after: 50 } }),
+          // Participación general
+          new Paragraph({
+            text: 'Participación General',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Nivel: ${Math.round(participationLevel * 100)}% (${interpretacion.nivel})`, bold: true, size: 24, color: STYLES.primaryColor }),
+            ],
+            spacing: { after: 50 },
+          }),
+          new Paragraph({
+            text: interpretacion.descripcion,
+            spacing: { after: 50 },
+            style: 'body',
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Recomendación: ', bold: true, size: 24 }),
+              new TextRun({ text: interpretacion.recomendacion, size: 24 }),
+            ],
+            spacing: { after: 200 },
+            style: 'body',
+          }),
+          // Dimensiones
+          new Paragraph({
+            text: 'Dimensiones Adaptativas',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          new Table({
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: 'Dimensión', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Puntaje', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                  new TableCell({ children: [new Paragraph({ text: 'Intensidad', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                ],
+              }),
+              ...dimensions.map((dim: any) => new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: dim.label, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: `${Math.round(dim.p2 * 100)}%`, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                  new TableCell({ children: [new Paragraph({ text: dim.intensityLabel, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                ],
+              })),
+            ],
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            layout: TableLayoutType.FIXED,
+            borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder, insideHorizontal: tableBorder, insideVertical: tableBorder },
+          }),
+          // Interpretación de dimensiones
+          new Paragraph({
+            text: 'Interpretación de Dimensiones',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          ...dimensions.map((dim: any) => new Paragraph({
+            children: [
+              new TextRun({ text: `${dim.label}: `, bold: true, size: 24 }),
+              new TextRun({ text: getPecaDimension(dim.code, dim.p2, dim.intensityLabel), size: 24 }),
+            ],
+            spacing: { after: 50 },
+            style: 'body',
+          })),
+          // Conjuntos AAMR (si existen)
+          ...(aamrSets && aamrSets.length > 0 ? [
+            new Paragraph({
+              text: 'Conjuntos AAMR',
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 200, after: 100 },
+              style: 'subtitle',
+            }),
+            ...aamrSets.map((set: any) => new Paragraph({
+              children: [
+                new TextRun({ text: `${set.label}: `, bold: true, size: 24 }),
+                new TextRun({ text: `${set.descriptionText} (${set.demandLabel})`, size: 24 }),
+              ],
+              spacing: { after: 30 },
+              style: 'body',
+            })),
+          ] : []),
+          // Conclusión
+          new Paragraph({
+            text: 'Conclusión y Recomendaciones',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+            style: 'subtitle',
+          }),
+          new Paragraph({
+            text: getPecaConclusion(resultado, patientName),
+            spacing: { after: 200 },
+            style: 'body',
+          }),
         )
-        if (Array.isArray(dims) && dims.length) {
-          children.push(new Paragraph({ text: 'Dimensiones', heading: HeadingLevel.HEADING_3, spacing: { before: 100, after: 50 } }))
-          for (const dim of dims) {
-            const p2 = (dim as any).p2 ?? 0
-            const intensityLabel = (dim as any).intensityLabel ?? ''
-            children.push(new Paragraph({ children: [new TextRun({ text: `${(dim as any).label}: `, bold: true }), new TextRun({ text: `${Math.round(p2 * 100)}% (${intensityLabel})` })], spacing: { after: 20 } }))
-          }
-        }
+      }
 
-      } else {
-        // --- WISC-V (versión original) ---
+      // ============================================================
+      // WISC‑V (completo con interpretaciones)
+      // ============================================================
+      else {
+        // WISC-V (por defecto)
         children.push(
           new Paragraph({
             text: 'Informe WISC-V',
             heading: HeadingLevel.TITLE,
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
+            style: 'title',
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Paciente: ', bold: true }),
-              new TextRun({ text: patientName || 'No especificado' }),
+              new TextRun({ text: 'Paciente: ', bold: true, size: 24 }),
+              new TextRun({ text: patientName || 'No especificado', size: 24 }),
             ],
             spacing: { after: 100 },
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: 'Fecha de evaluación: ', bold: true }),
-              new TextRun({ text: new Date().toLocaleDateString('es-CL') }),
+              new TextRun({ text: 'Fecha de evaluación: ', bold: true, size: 24 }),
+              new TextRun({ text: new Date().toLocaleDateString('es-CL'), size: 24 }),
             ],
             spacing: { after: 200 },
           }),
-          new Paragraph({
-            text: 'Índices Compuestos',
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 200, after: 100 },
-          })
         )
 
-        if (indexes) {
+        // Índices Compuestos
+        if (indexes && typeof indexes === 'object') {
+          children.push(
+            new Paragraph({
+              text: 'Índices Compuestos',
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 200, after: 100 },
+              style: 'subtitle',
+            })
+          )
+          const indexCodes = ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']
           const indexRows: TableRow[] = [
             new TableRow({
               children: [
-                new TableCell({ children: [new Paragraph({ text: 'Índice' })] }),
-                new TableCell({ children: [new Paragraph({ text: 'Puntaje', alignment: AlignmentType.CENTER })] }),
-                new TableCell({ children: [new Paragraph({ text: 'Percentil', alignment: AlignmentType.CENTER })] }),
-                new TableCell({ children: [new Paragraph({ text: 'Clasificación', alignment: AlignmentType.CENTER })] }),
+                new TableCell({ children: [new Paragraph({ text: 'Índice', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                new TableCell({ children: [new Paragraph({ text: 'Puntaje', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                new TableCell({ children: [new Paragraph({ text: 'Clasificación', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
               ],
             }),
           ]
-          const indexCodes = ['ICV', 'IVE', 'IRF', 'IMT', 'IVP', 'CIT']
           for (const code of indexCodes) {
             const idx = (indexes as any)[code]
-            if (idx) {
+            if (idx && idx.score !== undefined) {
+              const clasif = getClassification(idx.score)
               indexRows.push(
                 new TableRow({
                   children: [
-                    new TableCell({ children: [new Paragraph({ text: code })] }),
-                    new TableCell({ children: [new Paragraph({ text: String(idx.score), alignment: AlignmentType.CENTER })] }),
-                    new TableCell({ children: [new Paragraph({ text: String(idx.percentile), alignment: AlignmentType.CENTER })] }),
-                    new TableCell({ children: [new Paragraph({ text: idx.classification || '', alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: code, style: 'tableBody' })] }),
+                    new TableCell({ children: [new Paragraph({ text: String(idx.score), alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                    new TableCell({ children: [new Paragraph({ text: clasif, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
                   ],
                 })
               )
             }
           }
-          children.push(new Table({ rows: indexRows, width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.FIXED }))
+          children.push(
+            new Table({
+              rows: indexRows,
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              layout: TableLayoutType.FIXED,
+              borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder, insideHorizontal: tableBorder, insideVertical: tableBorder },
+            })
+          )
+          // Interpretación de índices
+          children.push(
+            new Paragraph({
+              text: 'Interpretación de Índices',
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 200, after: 100 },
+              style: 'subtitle',
+            })
+          )
+          for (const code of indexCodes) {
+            const idx = (indexes as any)[code]
+            if (idx && idx.score !== undefined) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: `${code}: `, bold: true, size: 24 }),
+                    new TextRun({ text: getInterpretacionIndice(code, idx.score), size: 24 }),
+                  ],
+                  spacing: { after: 30 },
+                  style: 'body',
+                })
+              )
+            }
+          }
         }
 
+        // Subpruebas
         if (scaledScores && typeof scaledScores === 'object') {
           children.push(
             new Paragraph({
               text: 'Puntajes por Subprueba',
               heading: HeadingLevel.HEADING_2,
               spacing: { before: 200, after: 100 },
+              style: 'subtitle',
             })
           )
-          const subtestRows: TableRow[] = [
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph({ text: 'Subprueba' })] }),
-                new TableCell({ children: [new Paragraph({ text: 'PE', alignment: AlignmentType.CENTER })] }),
-                new TableCell({ children: [new Paragraph({ text: 'Clasificación', alignment: AlignmentType.CENTER })] }),
-              ],
-            }),
-          ]
           const subtestLabels: Record<string, string> = {
             CC: 'Construcción con Cubos',
             AN: 'Analogías',
@@ -441,27 +697,192 @@ export function useReportDocx() {
             COM: 'Comprensión',
             ARI: 'Aritmética',
           }
-          for (const [code, pe] of Object.entries(scaledScores)) {
+          const subtestRows: TableRow[] = [
+            new TableRow({
+              children: [
+                new TableCell({ children: [new Paragraph({ text: 'Subprueba', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                new TableCell({ children: [new Paragraph({ text: 'PE', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+                new TableCell({ children: [new Paragraph({ text: 'Clasificación', alignment: AlignmentType.CENTER, style: 'tableHeader' })] }),
+              ],
+            }),
+          ]
+          const entries = Object.entries(scaledScores).filter(([_, pe]) => pe !== null && pe !== undefined)
+          for (const [code, pe] of entries) {
             const peNum = typeof pe === 'number' ? pe : Number(pe)
             if (!isNaN(peNum)) {
               const label = subtestLabels[code] || code
-              const clasif = peNum >= 12 ? 'Alto' : peNum >= 8 ? 'Suficiente' : 'Bajo'
+              const clasif = getScaledClassification(peNum)
               subtestRows.push(
                 new TableRow({
                   children: [
-                    new TableCell({ children: [new Paragraph({ text: label })] }),
-                    new TableCell({ children: [new Paragraph({ text: String(peNum), alignment: AlignmentType.CENTER })] }),
-                    new TableCell({ children: [new Paragraph({ text: clasif, alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: label, style: 'tableBody' })] }),
+                    new TableCell({ children: [new Paragraph({ text: String(peNum), alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
+                    new TableCell({ children: [new Paragraph({ text: clasif, alignment: AlignmentType.CENTER, style: 'tableBody' })] }),
                   ],
                 })
               )
             }
           }
-          children.push(new Table({ rows: subtestRows, width: { size: 100, type: WidthType.PERCENTAGE }, layout: TableLayoutType.FIXED }))
+          children.push(
+            new Table({
+              rows: subtestRows,
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              layout: TableLayoutType.FIXED,
+              borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder, insideHorizontal: tableBorder, insideVertical: tableBorder },
+            })
+          )
+          // Interpretación de subpruebas
+          children.push(
+            new Paragraph({
+              text: 'Interpretación de Subpruebas',
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 200, after: 100 },
+              style: 'subtitle',
+            })
+          )
+          for (const [code, pe] of entries) {
+            const peNum = typeof pe === 'number' ? pe : Number(pe)
+            if (!isNaN(peNum)) {
+              const label = subtestLabels[code] || code
+              const interp = getSubtestInterpretation(code, peNum)
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: `${label}: `, bold: true, size: 24 }),
+                    new TextRun({ text: interp, size: 24 }),
+                  ],
+                  spacing: { after: 30 },
+                  style: 'body',
+                })
+              )
+            }
+          }
+          // Recomendaciones finales (genéricas)
+          children.push(
+            new Paragraph({
+              text: 'Recomendaciones Finales',
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 200, after: 100 },
+              style: 'subtitle',
+            }),
+            new Paragraph({
+              text: 'Con base en los resultados obtenidos, se sugiere potenciar las áreas de fortaleza identificadas mediante actividades desafiantes que mantengan el interés y promuevan el desarrollo de habilidades superiores. En las áreas de debilidad, se deben implementar apoyos específicos según los índices más bajos. Se recomienda una reevaluación en 12 a 18 meses para monitorear la evolución del perfil cognitivo y ajustar las intervenciones según sea necesario. Los resultados deben interpretarse en el contexto de la historia personal, educativa y familiar del evaluado.',
+              spacing: { after: 200 },
+              style: 'body',
+            })
+          )
         }
       }
 
+      // ============================================================
+      // CREAR EL DOCUMENTO CON ESTILOS
+      // ============================================================
       const doc = new Document({
+        styles: {
+          default: {
+            document: {
+              run: {
+                font: 'Georgia',
+                size: 24, // 12pt
+                color: STYLES.color,
+              },
+              paragraph: {
+                spacing: {
+                  line: 300, // 1.5 interlineado
+                },
+              },
+            },
+          },
+          paragraphStyles: [
+            {
+              id: 'title',
+              name: 'Title',
+              basedOn: 'Normal',
+              next: 'Normal',
+              run: {
+                font: 'Georgia',
+                size: 32,
+                bold: true,
+                color: STYLES.titleColor,
+              },
+              paragraph: {
+                spacing: { before: 200, after: 200 },
+                alignment: AlignmentType.CENTER,
+              },
+            },
+            {
+              id: 'subtitle',
+              name: 'Subtitle',
+              basedOn: 'Normal',
+              next: 'Normal',
+              run: {
+                font: 'Georgia',
+                size: 28,
+                bold: true,
+                color: STYLES.subtitleColor,
+              },
+              paragraph: {
+                spacing: { before: 200, after: 100 },
+              },
+            },
+            {
+              id: 'body',
+              name: 'Body',
+              basedOn: 'Normal',
+              next: 'Normal',
+              run: {
+                font: 'Georgia',
+                size: 24,
+                color: STYLES.color,
+              },
+              paragraph: {
+                spacing: { line: 300 },
+                alignment: AlignmentType.JUSTIFIED,
+              },
+            },
+            {
+              id: 'tableHeader',
+              name: 'TableHeader',
+              basedOn: 'Normal',
+              run: {
+                font: 'Georgia',
+                size: 22,
+                bold: true,
+                color: STYLES.titleColor,
+              },
+              paragraph: {
+                alignment: AlignmentType.CENTER,
+              },
+            },
+            {
+              id: 'tableBody',
+              name: 'TableBody',
+              basedOn: 'Normal',
+              run: {
+                font: 'Georgia',
+                size: 22,
+                color: STYLES.color,
+              },
+              paragraph: {
+                alignment: AlignmentType.LEFT,
+              },
+            },
+            {
+              id: 'footer',
+              name: 'Footer',
+              basedOn: 'Normal',
+              run: {
+                font: 'Georgia',
+                size: 20,
+                color: '#999999',
+                italics: true,
+              },
+              paragraph: {
+                alignment: AlignmentType.CENTER,
+              },
+            },
+          ],
+        },
         sections: [
           {
             properties: {

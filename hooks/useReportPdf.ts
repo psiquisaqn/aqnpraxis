@@ -2,13 +2,8 @@
  * useReportPdf
  *
  * Hook reutilizable para los 4 tests (WISC-V, PECA, BDI-II, Coopersmith).
- * Captura el HTML del informe con html2canvas â†’ genera PDF con jsPDF â†’
- * sube a Supabase Storage â†’ guarda URL en tabla `reports`.
- *
- * Uso:
- *   const { generating, saved, generatePdf } = useReportPdf()
- *   <div ref={contentRef}>â€¦contenido del informeâ€¦</div>
- *   <button onClick={() => generatePdf(contentRef, meta)}>Guardar PDF</button>
+ * Captura el HTML del informe con html2canvas → genera PDF con jsPDF →
+ * sube a Supabase Storage → guarda URL en tabla `reports`.
  */
 
 'use client'
@@ -22,7 +17,7 @@ export interface ReportMeta {
   testId:      string       // 'wisc5_cl' | 'peca_aqn' | 'beck_bdi2' | 'coopersmith'
   patientName: string
   evalDate?:   string
-  content?:    Record<string, unknown>  // resumen JSON opcional para bÃºsqueda
+  content?:    Record<string, unknown>
 }
 
 export interface UseReportPdfReturn {
@@ -55,15 +50,13 @@ export function useReportPdf(): UseReportPdfReturn {
     setError(null)
 
     try {
-      // â”€â”€ 1. Importar librerÃ­as dinÃ¡micamente (evita SSR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
         import('jspdf'),
         import('html2canvas'),
       ])
 
-      // â”€â”€ 2. Capturar el HTML como canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const canvas = await html2canvas(ref.current, {
-        scale:           2,          // resoluciÃ³n 2x para nitidez
+        scale:           2,
         useCORS:         true,
         backgroundColor: '#ffffff',
         logging:         false,
@@ -71,13 +64,12 @@ export function useReportPdf(): UseReportPdfReturn {
         windowHeight:    ref.current.scrollHeight,
       })
 
-      // â”€â”€ 3. Construir el PDF pÃ¡gina a pÃ¡gina â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const A4_W_MM   = 210
       const A4_H_MM   = 297
       const MARGIN_MM = 15
+      const EXTRA_MM  = 20   // Margen extra para la última página (asegura footer)
 
       const pdf       = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
-      const imgData   = canvas.toDataURL('image/jpeg', 0.95)
       const pxPerMm   = canvas.width / (A4_W_MM - MARGIN_MM * 2)
       const imgH_mm   = canvas.height / pxPerMm
       const pageH_mm  = A4_H_MM - MARGIN_MM * 2
@@ -88,8 +80,12 @@ export function useReportPdf(): UseReportPdfReturn {
       while (yOffset < imgH_mm) {
         if (page > 0) pdf.addPage()
 
-        const sliceH_mm = Math.min(pageH_mm, imgH_mm - yOffset)
-        // Recortar el canvas verticalmente para esta pÃ¡gina
+        let sliceH_mm = Math.min(pageH_mm, imgH_mm - yOffset)
+        // Si es la última página, añadir margen extra
+        if (yOffset + sliceH_mm >= imgH_mm) {
+          sliceH_mm = Math.min(sliceH_mm + EXTRA_MM, imgH_mm - yOffset + EXTRA_MM)
+        }
+
         const srcY  = (yOffset / imgH_mm) * canvas.height
         const srcH  = (sliceH_mm / imgH_mm) * canvas.height
 
@@ -112,7 +108,6 @@ export function useReportPdf(): UseReportPdfReturn {
         page++
       }
 
-      // â”€â”€ 3b. Resolver patientId si no se pasÃ³ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       let resolvedPatientId = meta.patientId
       if (!resolvedPatientId) {
         const res = await fetch(`/api/session/patient?sessionId=${meta.sessionId}`)
@@ -122,7 +117,6 @@ export function useReportPdf(): UseReportPdfReturn {
         }
       }
 
-      // â”€â”€ 4. Subir a Supabase Storage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
@@ -139,15 +133,13 @@ export function useReportPdf(): UseReportPdfReturn {
 
       if (uploadErr) throw new Error(uploadErr.message)
 
-      // â”€â”€ 5. Obtener URL firmada (24 h) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const { data: urlData } = await supabase.storage
         .from('reports')
         .createSignedUrl(fileName, 60 * 60 * 24)
 
       const pdfUrl = urlData?.signedUrl ?? null
 
-      // â”€â”€ 6. Guardar registro en tabla reports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      const title = `${TEST_TITLE[meta.testId] ?? 'Informe'} â€” ${meta.patientName}`
+      const title = `${TEST_TITLE[meta.testId] ?? 'Informe'} — ${meta.patientName}`
 
       await supabase.from('reports').upsert({
         session_id:       meta.sessionId,
@@ -158,7 +150,6 @@ export function useReportPdf(): UseReportPdfReturn {
         pdf_url:          pdfUrl,
       }, { onConflict: 'session_id' })
 
-      // â”€â”€ 7. Descargar localmente tambiÃ©n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       pdf.save(`${title.replace(/\s+/g, '_')}.pdf`)
 
       setSaved(true)

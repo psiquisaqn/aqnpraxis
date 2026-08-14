@@ -1,5 +1,3 @@
-// lib/interpretaciones/peca.ts
-
 export function getInterpretacionParticipacion(porcentaje: number): { nivel: string; descripcion: string; recomendacion: string } {
   if (porcentaje >= 75) {
     return {
@@ -40,12 +38,12 @@ export function getInterpretacionDimension(nombre: string, puntaje: number, inte
     'css': 'Conducta social y responsabilidad, respeto por normas sociales y capacidad para trabajar en grupo.',
     'aor': 'Áreas ocupacionales y recreativas, habilidades para el trabajo y uso adecuado del tiempo libre.'
   }
-
+  
   const gradoAfectacion = intensidad === 'Generalizado' ? 'muy afectada' :
                           intensidad === 'Extenso' ? 'significativamente afectada' :
                           intensidad === 'Limitado' ? 'moderadamente afectada' :
                           'levemente afectada'
-
+  
   return `${nombre}: ${baseDescripcion[nombre] || 'Habilidad adaptativa evaluada.'} La habilidad adaptativa evaluada está ${gradoAfectacion}, por lo que el nivel de apoyos necesario es ${intensidad.toLowerCase()}.`
 }
 
@@ -60,10 +58,10 @@ export interface PecaResultForDocx {
 export function getConclusionGeneral(result: PecaResultForDocx, nombrePaciente: string): string {
   const porcentaje = Math.round(result.participationLevel * 100)
   const interpretacion = getInterpretacionParticipacion(porcentaje)
-
+  
   let dimensionAlta = { label: '', puntaje: -1 }
   let dimensionBaja = { label: '', puntaje: 101 }
-
+  
   result.dimensions.forEach(dim => {
     const pct = dim.p2 * 100
     if (pct > dimensionAlta.puntaje) {
@@ -73,6 +71,6 @@ export function getConclusionGeneral(result: PecaResultForDocx, nombrePaciente: 
       dimensionBaja = { label: dim.label, puntaje: pct }
     }
   })
-
+  
   return `${nombrePaciente || 'El evaluado'} presenta ${interpretacion.nivel.toLowerCase()} en conducta adaptativa, con un puntaje global de ${porcentaje}%. ${interpretacion.descripcion} Las principales fortalezas se observan en ${dimensionAlta.label} (${Math.round(dimensionAlta.puntaje)}%), mientras que las mayores dificultades se concentran en ${dimensionBaja.label} (${Math.round(dimensionBaja.puntaje)}%). ${interpretacion.recomendacion} Es fundamental que esta evaluación sea complementada con observación directa en contextos naturales y entrevistas con cuidadores o educadores para obtener un perfil completo y preciso del funcionamiento adaptativo del evaluado.`
 }
