@@ -1,8 +1,9 @@
 // app/dashboard/paciente/[id]/actividades/[programa]/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import { useActivity } from '@/hooks/useActivity'
 import { RegistroLogroModal } from '@/components/RegistroLogroModal'
 import { ACHIEVEMENT_SCALE } from '@/lib/activities/all-sessions'
@@ -11,11 +12,38 @@ export default function ProgramaPage() {
   // Obtener parámetros de la URL
   const { id: patientId, programa } = useParams() as { id: string; programa: string }
 
-  // Aquí deberías obtener el ID del psicólogo desde el contexto de autenticación
-  // Por ahora lo dejamos fijo (ejemplo)
-  const psychologistId = '...' // Reemplazar con el ID real
+  // Estado para el ID del psicólogo autenticado
+  const [psychologistId, setPsychologistId] = useState<string | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
 
-  // Hook de actividades
+  // Obtener el ID del psicólogo desde Supabase
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    const fetchPsychologist = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (error) throw new Error(error.message)
+        if (!user) throw new Error('No hay usuario autenticado')
+        setPsychologistId(user.id)
+        setAuthError(null)
+      } catch (err: any) {
+        console.error('Error obteniendo psicólogo:', err)
+        setAuthError(err.message || 'Error al obtener datos del psicólogo')
+        setPsychologistId(null)
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+
+    fetchPsychologist()
+  }, [])
+
+  // Hook de actividades (solo se ejecuta si tenemos psychologistId)
   const {
     loading,
     error,
@@ -29,7 +57,11 @@ export default function ProgramaPage() {
     startNewSession,
     submitAchievement,
     skipSession,
-  } = useActivity(patientId, psychologistId, programa as any)
+  } = useActivity(
+    patientId,
+    psychologistId || '', // Si es null, pasamos string vacío (el hook lo validará)
+    programa as any
+  )
 
   // Estado del modal
   const [showModal, setShowModal] = useState(false)
@@ -47,14 +79,37 @@ export default function ProgramaPage() {
   // ============================================================
   // RENDERIZADO
   // ============================================================
-  if (loading) {
+
+  // Cargando autenticación
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <span className="ml-3 text-sm text-gray-600">Verificando autenticación...</span>
       </div>
     )
   }
 
+  // Error de autenticación
+  if (authError || !psychologistId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-600">Error de autenticación: {authError || 'No se pudo obtener el ID del psicólogo'}</div>
+      </div>
+    )
+  }
+
+  // Cargando datos del hook
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <span className="ml-3 text-sm text-gray-600">Cargando sesiones...</span>
+      </div>
+    )
+  }
+
+  // Error del hook
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">

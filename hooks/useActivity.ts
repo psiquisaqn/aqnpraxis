@@ -40,6 +40,14 @@ interface UseActivityReturn {
 }
 
 // ====================================================================
+// FUNCIÓN AUXILIAR PARA VALIDAR UUID
+// ====================================================================
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(uuid)
+}
+
+// ====================================================================
 // HOOK PRINCIPAL
 // ====================================================================
 
@@ -63,25 +71,30 @@ export function useActivity(
   // CARGA DE DATOS
   // ============================================================
   const loadData = useCallback(async () => {
-    if (!patientId || !psychologistId) return
+    if (!patientId || !psychologistId) {
+      setError('Faltan datos del paciente o psicólogo')
+      return
+    }
+    // Validar que psychologistId sea un UUID válido
+    if (!isValidUUID(psychologistId)) {
+      setError(`ID del psicólogo inválido: "${psychologistId}"`)
+      return
+    }
+
     setLoading(true)
     setError(null)
 
     try {
-      // 1. Obtener todas las sesiones del paciente
       const patientSessions = await getPatientSessions(patientId, programCode)
       setSessions(patientSessions)
 
-      // 2. Obtener progreso
       const prog = await getProgramProgress(patientId, programCode)
       setProgress(prog)
 
-      // 3. Obtener próxima sesión
       const next = await getNextSessionNumber(patientId, programCode)
       setNextSessionNumber(next)
       setIsComplete(next >= totalSessions)
 
-      // 4. Buscar sesión en progreso
       const inProgress = patientSessions.find(s => s.status === 'in_progress')
       if (inProgress) {
         setCurrentSession(inProgress)
@@ -93,7 +106,7 @@ export function useActivity(
       }
     } catch (err: any) {
       setError(err.message || 'Error al cargar datos')
-      console.error(err)
+      console.error('❌ Error en loadData:', err)
     } finally {
       setLoading(false)
     }
@@ -107,6 +120,15 @@ export function useActivity(
   // INICIAR NUEVA SESIÓN
   // ============================================================
   const startNewSession = useCallback(async () => {
+    if (!patientId || !psychologistId) {
+      setError('Faltan datos del paciente o psicólogo')
+      return
+    }
+    if (!isValidUUID(psychologistId)) {
+      setError(`ID del psicólogo inválido: "${psychologistId}"`)
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -116,7 +138,7 @@ export function useActivity(
       await loadData()
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión')
-      console.error(err)
+      console.error('❌ Error en startNewSession:', err)
     } finally {
       setLoading(false)
     }
@@ -131,10 +153,20 @@ export function useActivity(
       observations?: string
       nextSessionNotes?: string
     }) => {
+      // VALIDACIONES
       if (!currentSession) {
         setError('No hay sesión activa')
         return
       }
+      if (!psychologistId || !isValidUUID(psychologistId)) {
+        setError(`ID del psicólogo inválido: "${psychologistId}"`)
+        return
+      }
+      if (!currentSession.id || !isValidUUID(currentSession.id)) {
+        setError(`ID de sesión inválido: "${currentSession.id}"`)
+        return
+      }
+
       setLoading(true)
       setError(null)
       try {
@@ -143,6 +175,15 @@ export function useActivity(
         const overallLevel = scores.length > 0
           ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
           : 1
+
+        console.log('📝 Enviando logro:', {
+          activitySessionId: currentSession.id,
+          psychologistId,
+          overallLevel,
+          domainScores: data.domainScores,
+          observations: data.observations,
+          nextSessionNotes: data.nextSessionNotes,
+        })
 
         await recordAchievement(
           currentSession.id,
@@ -155,7 +196,7 @@ export function useActivity(
         await loadData()
       } catch (err: any) {
         setError(err.message || 'Error al registrar logro')
-        console.error(err)
+        console.error('❌ Error en submitAchievement:', err)
       } finally {
         setLoading(false)
       }
@@ -171,6 +212,11 @@ export function useActivity(
       setError('No hay sesión activa')
       return
     }
+    if (!currentSession.id || !isValidUUID(currentSession.id)) {
+      setError(`ID de sesión inválido: "${currentSession.id}"`)
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -178,7 +224,7 @@ export function useActivity(
       await loadData()
     } catch (err: any) {
       setError(err.message || 'Error al saltar sesión')
-      console.error(err)
+      console.error('❌ Error en skipSession:', err)
     } finally {
       setLoading(false)
     }

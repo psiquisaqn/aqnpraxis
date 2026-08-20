@@ -221,6 +221,26 @@ export async function recordAchievement(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
+  // VALIDACIONES
+  if (!activitySessionId || typeof activitySessionId !== 'string' || activitySessionId.trim() === '') {
+    throw new Error('activitySessionId es requerido y debe ser un UUID válido')
+  }
+  if (!psychologistId || typeof psychologistId !== 'string' || psychologistId.trim() === '') {
+    throw new Error('psychologistId es requerido y debe ser un UUID válido')
+  }
+  if (achievementLevel < 1 || achievementLevel > 6) {
+    throw new Error('achievementLevel debe estar entre 1 y 6')
+  }
+
+  console.log('📝 Registrando logro:', {
+    activitySessionId,
+    psychologistId,
+    achievementLevel,
+    domainScores,
+    observations,
+    nextSessionNotes,
+  })
+
   // 1. Insertar el registro de logro
   const { data: record, error: insertError } = await supabase
     .from('achievement_records')
@@ -235,7 +255,10 @@ export async function recordAchievement(
     .select()
     .single()
 
-  if (insertError) throw new Error(`Error al registrar logro: ${insertError.message}`)
+  if (insertError) {
+    console.error('❌ Error al insertar achievement_records:', insertError)
+    throw new Error(`Error al registrar logro: ${insertError.message}`)
+  }
 
   // 2. Actualizar el estado de la sesión a 'completed'
   const { error: updateError } = await supabase
@@ -249,6 +272,7 @@ export async function recordAchievement(
   if (updateError) {
     // Si falla la actualización, eliminamos el registro de logro (rollback manual)
     await supabase.from('achievement_records').delete().eq('id', record.id)
+    console.error('❌ Error al actualizar sesión:', updateError)
     throw new Error(`Error al completar sesión: ${updateError.message}`)
   }
 
