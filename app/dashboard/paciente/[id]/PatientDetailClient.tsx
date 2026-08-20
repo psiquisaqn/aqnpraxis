@@ -1,12 +1,10 @@
 ﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { SessionsTab } from '@/app/dashboard/components/SessionsTab'
-import { ProgramsTab } from '@/app/dashboard/components/ProgramsTab'
-import { EntrevistasTab } from '@/app/dashboard/components/EntrevistasTab'
-import PatientCard from '@/app/dashboard/components/PatientCard'
-import { EditPatientModal } from '@/app/dashboard/components/EditPatientModal'
+import PatientCard from '@/app/dashboard/components/PatientCard'  // ← Importación correcta
+import { NewSessionModal } from '../../components/NewSessionModal'  // ← Ruta relativa
+import { ProgramsTab } from '../../components/ProgramsTab'  // ← Ruta relativa
 
 interface PatientDetailClientProps {
   patient: any
@@ -14,78 +12,112 @@ interface PatientDetailClientProps {
 
 export function PatientDetailClient({ patient }: PatientDetailClientProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'evaluaciones' | 'programas' | 'entrevistas'>('evaluaciones')
-  const [currentPatient, setCurrentPatient] = useState(patient)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'info' | 'programs' | 'sessions'>('info')
+  const [showNewSessionModal, setShowNewSessionModal] = useState(false)
 
-  // Logs de depuración (puedes eliminarlos después)
-  useEffect(() => {
-    console.log('✅ PatientDetailClient montado con paciente:', patient?.full_name)
-  }, [patient])
-
-  useEffect(() => {
-    console.log('🔍 isEditModalOpen cambió a:', isEditModalOpen)
-  }, [isEditModalOpen])
-
-  const tabs = [
-    { id: 'evaluaciones', label: 'Evaluaciones' },
-    { id: 'programas', label: 'Programas' },
-    { id: 'entrevistas', label: 'Entrevistas' },
-  ]
-
-  const handleUpdatePatient = (updatedPatient: any) => {
-    console.log('📝 Actualizando paciente:', updatedPatient)
-    setCurrentPatient(updatedPatient)
+  const handleNewSession = () => {
+    setShowNewSessionModal(true)
   }
 
-  const handleEditClick = () => {
-    console.log('🖱️ Botón Editar clickeado')
-    setIsEditModalOpen(true)
+  const handleEdit = () => {
+    // Aquí puedes abrir el modal de edición
+    alert('Funcionalidad de edición en desarrollo')
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      {/* Tarjeta del paciente - con el botón Editar integrado */}
-      <div className="mb-6">
-        <PatientCard
-          patient={currentPatient}
-          onNewSession={() => {}}
-          onEdit={handleEditClick}  // ← Botón "Editar" dentro de la tarjeta
-        />
-      </div>
+    <div className="max-w-5xl mx-auto p-6">
+      {/* Tarjeta del paciente */}
+      <PatientCard
+        patient={patient}
+        onNewSession={handleNewSession}
+        onEdit={handleEdit}
+      />
 
-      {/* Navegación de pestañas */}
-      <div className="border-b border-gray-200 mb-6 overflow-x-auto">
-        <nav className="flex gap-1 min-w-max">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-white text-blue-600 border border-b-0 border-gray-200'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {/* Pestañas */}
+      <div className="mt-6 border-b border-gray-200">
+        <nav className="flex space-x-6">
+          <button
+            onClick={() => setActiveTab('info')}
+            className={`py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'info'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Información
+          </button>
+          <button
+            onClick={() => setActiveTab('sessions')}
+            className={`py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'sessions'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Sesiones
+          </button>
+          <button
+            onClick={() => setActiveTab('programs')}
+            className={`py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'programs'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Programas
+          </button>
         </nav>
       </div>
 
       {/* Contenido de pestañas */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        {activeTab === 'evaluaciones' && <SessionsTab patientId={patient.id} />}
-        {activeTab === 'programas' && <ProgramsTab patientId={patient.id} />}
-        {activeTab === 'entrevistas' && <EntrevistasTab patientId={patient.id} />}
+      <div className="mt-6">
+        {activeTab === 'info' && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Datos del paciente</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div><strong>Nombre:</strong> {patient.full_name}</div>
+              <div><strong>RUT:</strong> {patient.rut || 'No registrado'}</div>
+              <div><strong>Fecha de nacimiento:</strong> {patient.birth_date ? new Date(patient.birth_date).toLocaleDateString('es-CL') : 'No registrada'}</div>
+              <div><strong>Edad:</strong> {patient.age_years > 0 ? `${patient.age_years} años ${patient.age_months} meses` : 'No calculada'}</div>
+              <div><strong>Colegio:</strong> {patient.school || 'No registrado'}</div>
+              <div><strong>Total de sesiones:</strong> {patient.session_count}</div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'sessions' && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Historial de sesiones</h3>
+            {patient.sessions.length === 0 ? (
+              <p className="text-sm text-gray-400">No hay sesiones registradas.</p>
+            ) : (
+              <ul className="space-y-2">
+                {patient.sessions.map((session: any) => (
+                  <li key={session.id} className="flex justify-between items-center border-b border-gray-100 py-2 text-sm">
+                    <span>{session.test_id || 'Sin test'}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      session.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      session.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {session.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'programs' && (
+          <ProgramsTab patientId={patient.id} />
+        )}
       </div>
 
-      {/* Modal de edición */}
-      <EditPatientModal
-        patient={currentPatient}
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onUpdate={handleUpdatePatient}
+      {/* Modal de nueva sesión */}
+      <NewSessionModal
+        patientId={patient.id}
+        onClose={() => setShowNewSessionModal(false)}
       />
     </div>
   )

@@ -1,3 +1,4 @@
+// components/PatientCard.tsx
 'use client'
 
 import { useRouter } from 'next/navigation'
@@ -33,30 +34,24 @@ export default function PatientCard({ patient, onNewSession, onEdit }: Props) {
   return (
     <div className="w-full">
       <div className="flex flex-col gap-3">
-        {/* Nombre y datos - arriba */}
+        {/* Datos del paciente */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate">
               {patient.full_name}
             </h3>
-            {patient.rut && (
-              <span className="text-xs text-gray-400">{patient.rut}</span>
-            )}
+            {patient.rut && <span className="text-xs text-gray-400">{patient.rut}</span>}
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500">
             {patient.age_years > 0 && (
-              <span>
-                {patient.age_years} años {patient.age_months} meses
-              </span>
+              <span>{patient.age_years} años {patient.age_months} meses</span>
             )}
-            {patient.school && (
-              <span className="truncate max-w-[180px] sm:max-w-none">{patient.school}</span>
-            )}
+            {patient.school && <span className="truncate max-w-[180px] sm:max-w-none">{patient.school}</span>}
             <span>Sesiones: {patient.session_count}</span>
           </div>
         </div>
 
-        {/* Botones - en una fila con wrap */}
+        {/* Botones */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => onNewSession(patient.id)}
