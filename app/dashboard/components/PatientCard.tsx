@@ -24,7 +24,7 @@ interface Patient {
 
 interface Props {
   patient: Patient
-  onNewSession: (patientId: string) => void
+  onNewSession: (patientId: string) => void   // ← Función para abrir modal
   onEdit?: () => void
 }
 
@@ -53,24 +53,30 @@ export default function PatientCard({ patient, onNewSession, onEdit }: Props) {
 
         {/* Botones */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Botón NUEVA SESIÓN */}
           <button
             onClick={() => onNewSession(patient.id)}
             className="flex-1 sm:flex-none min-h-[44px] px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
           >
             Nueva sesión
           </button>
+
+          {/* Botón VER FICHA */}
           <button
             onClick={() => router.push(`/dashboard/paciente/${patient.id}`)}
             className="flex-1 sm:flex-none min-h-[44px] px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
             Ver ficha
           </button>
+
+          {/* Botón WISC-V */}
           <button
             onClick={() => router.push(`/dashboard/paciente/${patient.id}/wisc5-calculadora`)}
             className="flex-1 sm:flex-none min-h-[44px] px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
           >
             WISC-V
           </button>
+
           {onEdit && (
             <button
               onClick={onEdit}

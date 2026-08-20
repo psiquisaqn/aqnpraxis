@@ -1,3 +1,4 @@
+// app/dashboard/components/NewSessionModal.tsx
 'use client'
 
 import { useState } from 'react'
@@ -107,7 +108,6 @@ export function NewSessionModal({ patientId, onClose }: Props) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No autenticado')
 
-      // Obtener o crear sesión de actividad
       await getOrCreateSession(patientId, user.id, programId as any)
       onClose()
       router.push(`/dashboard/paciente/${patientId}/actividades/${programId}`)

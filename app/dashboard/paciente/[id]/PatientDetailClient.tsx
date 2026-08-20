@@ -1,10 +1,11 @@
-﻿'use client'
+﻿// app/dashboard/paciente/[id]/PatientDetailClient.tsx
+'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import PatientCard from '@/app/dashboard/components/PatientCard'  // ← Importación correcta
-import { NewSessionModal } from '../../components/NewSessionModal'  // ← Ruta relativa
-import { ProgramsTab } from '../../components/ProgramsTab'  // ← Ruta relativa
+import PatientCard from '@/app/dashboard/components/PatientCard'  // ← Alias @/ para componentes raíz
+import { NewSessionModal } from '../../components/NewSessionModal'
+import { ProgramsTab } from '../../components/ProgramsTab'
 
 interface PatientDetailClientProps {
   patient: any
@@ -20,13 +21,11 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
   }
 
   const handleEdit = () => {
-    // Aquí puedes abrir el modal de edición
     alert('Funcionalidad de edición en desarrollo')
   }
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      {/* Tarjeta del paciente */}
       <PatientCard
         patient={patient}
         onNewSession={handleNewSession}
@@ -115,10 +114,12 @@ export function PatientDetailClient({ patient }: PatientDetailClientProps) {
       </div>
 
       {/* Modal de nueva sesión */}
-      <NewSessionModal
-        patientId={patient.id}
-        onClose={() => setShowNewSessionModal(false)}
-      />
+      {showNewSessionModal && (
+        <NewSessionModal
+          patientId={patient.id}
+          onClose={() => setShowNewSessionModal(false)}
+        />
+      )}
     </div>
   )
 }
