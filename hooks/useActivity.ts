@@ -7,13 +7,13 @@ import {
   getOrCreateSession,
   recordAchievement,
   updateSessionStatus,
-  getNextSessionNumber,
+  getNextAvailableSessionNumber,  // ← Cambiado
   type ProgramCode,
   type ActivitySessionDB,
   type ProgramProgress,
   type AchievementRecordDB,
 } from '@/lib/supabase/activities'
-import { type PdpiSession } from '@/lib/activities/all-sessions'
+import { type PdpiSession } from '@/lib/activities'  // ← Cambiado a @/lib/activities
 
 // ====================================================================
 // INTERFAZ DE RETORNO DEL HOOK
@@ -90,7 +90,8 @@ export function useActivity(
       const prog = await getProgramProgress(patientId, programCode)
       setProgress(prog)
 
-      const next = await getNextSessionNumber(patientId, programCode)
+      // Usar la nueva función que encuentra el siguiente número disponible
+      const next = await getNextAvailableSessionNumber(patientId, programCode)
       setNextSessionNumber(next)
       setIsComplete(next >= totalSessions)
 
@@ -174,13 +175,11 @@ export function useActivity(
           ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
           : 1
 
-        // Guardar los niveles por actividad en domain_scores (JSONB)
-        // y el nivel general en achievement_level
         await recordAchievement(
           currentSession.id,
           psychologistId,
           overallLevel,
-          data.activityScores, // Aquí guardamos el mapa step → nivel
+          data.activityScores,
           data.observations || null,
           data.nextSessionNotes || null
         )

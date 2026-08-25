@@ -108,7 +108,12 @@ export async function getProgramProgress(
   return data?.[0] || null
 }
 
-export async function getNextSessionNumber(
+/**
+ * Obtiene el siguiente número de sesión disponible para un paciente y programa.
+ * Considera todos los números de sesión ya utilizados (cualquier estado) y
+ * los números de sesión disponibles en el programa estático.
+ */
+export async function getNextAvailableSessionNumber(
   patientId: string,
   programCode: ProgramCode
 ): Promise<number> {
@@ -117,22 +122,30 @@ export async function getNextSessionNumber(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const { data, error } = await supabase.rpc('get_next_session_number', {
-    p_patient_id: patientId,
-    p_program_code: programCode,
-  })
+  // 1. Obtener todos los números de sesión ya utilizados para este paciente y programa
+  const { data: existingSessions, error } = await supabase
+    .from('activity_sessions')
+    .select('session_number')
+    .eq('patient_id', patientId)
+    .eq('program_code', programCode)
 
-  if (error) throw new Error(`Error al obtener siguiente sesión: ${error.message}`)
-  return data ?? 0
-}
+  if (error) throw new Error(`Error al obtener sesiones existentes: ${error.message}`)
 
-/**
- * Obtiene el primer número de sesión disponible para un programa.
- * Para PDPI es 0, para TP-CREM es 1.
- */
-function getFirstSessionNumber(programCode: ProgramCode): number {
-  const sessions = getProgramSessions(programCode)
-  return sessions.length > 0 ? sessions[0].id : 0
+  const usedNumbers = new Set(existingSessions.map(s => s.session_number))
+
+  // 2. Obtener los números de sesión disponibles en el programa estático
+  const staticSessions = getProgramSessions(programCode)
+  const availableNumbers = staticSessions.map(s => s.id).sort((a, b) => a - b)
+
+  // 3. Encontrar el primer número disponible que no esté en usedNumbers
+  for (const num of availableNumbers) {
+    if (!usedNumbers.has(num)) {
+      return num
+    }
+  }
+
+  // 4. Si no hay ninguno, el programa está completo
+  throw new Error('El programa ya ha sido completado.')
 }
 
 /**
@@ -165,29 +178,16 @@ export async function getOrCreateSession(
     return { session: existing, sessionData: sessionData || null }
   }
 
-  // 2. Obtener el siguiente número de sesión
-  let nextNumber = await getNextSessionNumber(patientId, programCode)
+  // 2. Obtener el siguiente número de sesión disponible
+  const nextNumber = await getNextAvailableSessionNumber(patientId, programCode)
 
-  // 3. Ajustar el número de sesión si no corresponde a ninguna sesión del programa
-  //    (esto ocurre para TP-CREM, donde la primera sesión es 1 y nextNumber es 0)
-  const firstAvailable = getFirstSessionNumber(programCode)
-  if (nextNumber < firstAvailable) {
-    nextNumber = firstAvailable
-  }
-
-  // 4. Verificar si el programa ya está completo
-  const total = getTotalSessions(programCode)
-  if (nextNumber >= total) {
-    throw new Error('El programa ya ha sido completado.')
-  }
-
-  // 5. Verificar que exista una sesión estática con ese número
+  // 3. Obtener los datos estáticos de la sesión
   const sessionData = getSessionByNumber(programCode, nextNumber)
   if (!sessionData) {
     throw new Error(`No existe una sesión con el número ${nextNumber} en el programa ${programCode}`)
   }
 
-  // 6. Crear la nueva sesión
+  // 4. Crear la nueva sesión
   const { data: newSession, error: insertError } = await supabase
     .from('activity_sessions')
     .insert({
