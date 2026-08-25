@@ -7,13 +7,13 @@ import {
   getOrCreateSession,
   recordAchievement,
   updateSessionStatus,
-  getNextAvailableSessionNumber,  // ← Cambiado
+  getNextAvailableSessionNumber,
   type ProgramCode,
   type ActivitySessionDB,
   type ProgramProgress,
   type AchievementRecordDB,
 } from '@/lib/supabase/activities'
-import { type PdpiSession } from '@/lib/activities'  // ← Cambiado a @/lib/activities
+import { type PdpiSession } from '@/lib/activities'
 
 // ====================================================================
 // INTERFAZ DE RETORNO DEL HOOK
@@ -31,7 +31,7 @@ interface UseActivityReturn {
   isComplete: boolean
   startNewSession: () => Promise<void>
   submitAchievement: (data: {
-    activityScores: Record<string, number> // step → nivel
+    activityScores: Record<string, number>
     observations?: string
     nextSessionNotes?: string
   }) => Promise<void>
@@ -84,18 +84,37 @@ export function useActivity(
     setError(null)
 
     try {
+      // 1. Obtener todas las sesiones del paciente
       const patientSessions = await getPatientSessions(patientId, programCode)
       setSessions(patientSessions)
 
+      // 2. Obtener progreso
       const prog = await getProgramProgress(patientId, programCode)
       setProgress(prog)
 
-      // Usar la nueva función que encuentra el siguiente número disponible
+      // 3. Obtener siguiente número disponible
       const next = await getNextAvailableSessionNumber(patientId, programCode)
       setNextSessionNumber(next)
       setIsComplete(next >= totalSessions)
 
-      const inProgress = patientSessions.find(s => s.status === 'in_progress')
+      // 4. Buscar sesión en progreso
+      let inProgress = patientSessions.find(s => s.status === 'in_progress')
+
+      // 5. Si existe en progreso pero su número no tiene datos estáticos, marcar como skipped
+      if (inProgress) {
+        const sessionData = getProgramSessions(programCode).find(s => s.id === inProgress.session_number)
+        if (!sessionData) {
+          // La sesión tiene un número inválido (ej. 0 para TP-CREM)
+          console.warn(`⚠️ Sesión en progreso con número inválido (${inProgress.session_number}) para ${programCode}. Marcando como 'skipped'.`)
+          await updateSessionStatus(inProgress.id, 'skipped')
+          // Volver a cargar sesiones para actualizar la lista
+          const updatedSessions = await getPatientSessions(patientId, programCode)
+          setSessions(updatedSessions)
+          inProgress = undefined
+        }
+      }
+
+      // 6. Asignar sesión actual si existe y es válida
       if (inProgress) {
         setCurrentSession(inProgress)
         const data = getProgramSessions(programCode).find(s => s.id === inProgress.session_number)
@@ -145,7 +164,7 @@ export function useActivity(
   }, [patientId, psychologistId, programCode, loadData])
 
   // ============================================================
-  // REGISTRAR LOGRO (por actividad)
+  // REGISTRAR LOGRO
   // ============================================================
   const submitAchievement = useCallback(
     async (data: {
@@ -169,7 +188,6 @@ export function useActivity(
       setLoading(true)
       setError(null)
       try {
-        // Calcular nivel de logro general como promedio de todas las actividades
         const scores = Object.values(data.activityScores)
         const overallLevel = scores.length > 0
           ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
