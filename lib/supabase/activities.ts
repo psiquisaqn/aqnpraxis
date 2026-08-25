@@ -126,6 +126,19 @@ export async function getNextSessionNumber(
   return data ?? 0
 }
 
+/**
+ * Obtiene el primer número de sesión disponible para un programa.
+ * Para PDPI es 0, para TP-CREM es 1.
+ */
+function getFirstSessionNumber(programCode: ProgramCode): number {
+  const sessions = getProgramSessions(programCode)
+  return sessions.length > 0 ? sessions[0].id : 0
+}
+
+/**
+ * Crea una nueva sesión en la BD para un paciente
+ * (o la recupera si ya existe una 'in_progress')
+ */
 export async function getOrCreateSession(
   patientId: string,
   psychologistId: string,
@@ -136,6 +149,7 @@ export async function getOrCreateSession(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
+  // 1. Verificar si hay una sesión en progreso
   const { data: existing, error: checkError } = await supabase
     .from('activity_sessions')
     .select('*')
@@ -151,12 +165,29 @@ export async function getOrCreateSession(
     return { session: existing, sessionData: sessionData || null }
   }
 
-  const nextNumber = await getNextSessionNumber(patientId, programCode)
+  // 2. Obtener el siguiente número de sesión
+  let nextNumber = await getNextSessionNumber(patientId, programCode)
+
+  // 3. Ajustar el número de sesión si no corresponde a ninguna sesión del programa
+  //    (esto ocurre para TP-CREM, donde la primera sesión es 1 y nextNumber es 0)
+  const firstAvailable = getFirstSessionNumber(programCode)
+  if (nextNumber < firstAvailable) {
+    nextNumber = firstAvailable
+  }
+
+  // 4. Verificar si el programa ya está completo
   const total = getTotalSessions(programCode)
   if (nextNumber >= total) {
     throw new Error('El programa ya ha sido completado.')
   }
 
+  // 5. Verificar que exista una sesión estática con ese número
+  const sessionData = getSessionByNumber(programCode, nextNumber)
+  if (!sessionData) {
+    throw new Error(`No existe una sesión con el número ${nextNumber} en el programa ${programCode}`)
+  }
+
+  // 6. Crear la nueva sesión
   const { data: newSession, error: insertError } = await supabase
     .from('activity_sessions')
     .insert({
@@ -172,8 +203,7 @@ export async function getOrCreateSession(
 
   if (insertError) throw new Error(`Error al crear sesión: ${insertError.message}`)
 
-  const sessionData = getSessionByNumber(programCode, nextNumber)
-  return { session: newSession, sessionData: sessionData || null }
+  return { session: newSession, sessionData }
 }
 
 export async function recordAchievement(
