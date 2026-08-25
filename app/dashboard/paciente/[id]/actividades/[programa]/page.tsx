@@ -1,4 +1,3 @@
-// app/dashboard/paciente/[id]/actividades/[programa]/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -6,44 +5,29 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { useActivity } from '@/hooks/useActivity'
 import { RegistroLogroModal } from '@/components/RegistroLogroModal'
-import { ACHIEVEMENT_SCALE } from '@/lib/activities/all-sessions'
+import { ACHIEVEMENT_SCALE } from '@/lib/activities'
 
 export default function ProgramaPage() {
-  // Obtener parámetros de la URL
-  const { id: patientId, programa } = useParams() as { id: string; programa: string }
+  const params = useParams()
+  const patientId = params?.id as string
+  const programa = params?.programa as string
 
-  // Estado para el ID del psicólogo autenticado
   const [psychologistId, setPsychologistId] = useState<string | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [authError, setAuthError] = useState<string | null>(null)
+  const [loadingAuth, setLoadingAuth] = useState(true)
 
-  // Obtener el ID del psicólogo desde Supabase
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
-
-    const fetchPsychologist = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser()
-        if (error) throw new Error(error.message)
-        if (!user) throw new Error('No hay usuario autenticado')
-        setPsychologistId(user.id)
-        setAuthError(null)
-      } catch (err: any) {
-        console.error('Error obteniendo psicólogo:', err)
-        setAuthError(err.message || 'Error al obtener datos del psicólogo')
-        setPsychologistId(null)
-      } finally {
-        setAuthLoading(false)
-      }
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setPsychologistId(user?.id || null)
+      setLoadingAuth(false)
     }
-
-    fetchPsychologist()
+    getUser()
   }, [])
 
-  // Hook de actividades (solo se ejecuta si tenemos psychologistId)
   const {
     loading,
     error,
@@ -57,18 +41,12 @@ export default function ProgramaPage() {
     startNewSession,
     submitAchievement,
     skipSession,
-  } = useActivity(
-    patientId,
-    psychologistId || '', // Si es null, pasamos string vacío (el hook lo validará)
-    programa as any
-  )
+  } = useActivity(patientId, psychologistId || '', programa as any)
 
-  // Estado del modal
   const [showModal, setShowModal] = useState(false)
 
-  // Manejador para guardar el logro desde el modal
   const handleSaveAchievement = async (data: {
-    domainScores: Record<string, number>
+    activityScores: Record<string, number>   // ← Cambiado de domainScores
     observations: string
     nextSessionNotes: string
   }) => {
@@ -76,51 +54,25 @@ export default function ProgramaPage() {
     setShowModal(false)
   }
 
-  // ============================================================
-  // RENDERIZADO
-  // ============================================================
-
-  // Cargando autenticación
-  if (authLoading) {
+  if (loadingAuth || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <span className="ml-3 text-sm text-gray-600">Verificando autenticación...</span>
       </div>
     )
   }
 
-  // Error de autenticación
-  if (authError || !psychologistId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-600">Error de autenticación: {authError || 'No se pudo obtener el ID del psicólogo'}</div>
-      </div>
-    )
+  if (!psychologistId) {
+    return <div className="p-6 text-red-600">Error: No autenticado</div>
   }
 
-  // Cargando datos del hook
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <span className="ml-3 text-sm text-gray-600">Cargando sesiones...</span>
-      </div>
-    )
-  }
-
-  // Error del hook
   if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-600">Error: {error}</div>
-      </div>
-    )
+    return <div className="p-6 text-red-600">Error: {error}</div>
   }
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      {/* ======== CABECERA ======== */}
+      {/* CABECERA */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Programa {programa}</h1>
         <div className="text-sm text-gray-600">
@@ -128,7 +80,7 @@ export default function ProgramaPage() {
         </div>
       </div>
 
-      {/* ======== PROGRESO ======== */}
+      {/* PROGRESO */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
         <div className="flex flex-wrap gap-4 text-sm">
           {progress?.avg_achievement && (
@@ -136,7 +88,6 @@ export default function ProgramaPage() {
           )}
           <span>Última sesión: {progress?.last_session ?? 'Ninguna'}</span>
         </div>
-        {/* Barra de progreso */}
         <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-blue-600 transition-all"
@@ -147,14 +98,13 @@ export default function ProgramaPage() {
         </div>
       </div>
 
-      {/* ======== SESIÓN ACTUAL O INICIO ======== */}
+      {/* SESIÓN ACTUAL O INICIO */}
       {isComplete ? (
         <div className="text-center p-8 bg-green-50 rounded-xl border border-green-200">
           <p className="text-xl font-semibold text-green-700">🎉 ¡Programa completado!</p>
           <p className="text-sm text-green-600 mt-2">Has finalizado todas las sesiones de este programa.</p>
         </div>
       ) : currentSessionData ? (
-        // ---------- SESIÓN EN PROGRESO ----------
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-start justify-between">
             <div>
@@ -168,7 +118,6 @@ export default function ProgramaPage() {
             </span>
           </div>
 
-          {/* Actividades */}
           <div className="mt-4 space-y-3">
             {currentSessionData.activities.map((act) => (
               <div key={act.step} className="bg-gray-50 p-3 rounded-lg">
@@ -186,7 +135,6 @@ export default function ProgramaPage() {
             ))}
           </div>
 
-          {/* Botones de acción */}
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               onClick={() => setShowModal(true)}
@@ -203,7 +151,6 @@ export default function ProgramaPage() {
           </div>
         </div>
       ) : (
-        // ---------- INICIAR PRÓXIMA SESIÓN ----------
         <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-200">
           <p className="text-lg font-medium">
             Próxima sesión: <span className="text-blue-600">{nextSessionNumber}</span>
@@ -217,7 +164,7 @@ export default function ProgramaPage() {
         </div>
       )}
 
-      {/* ======== HISTORIAL DE SESIONES ======== */}
+      {/* HISTORIAL */}
       <div className="mt-8">
         <h3 className="font-semibold text-lg mb-3">Historial de sesiones</h3>
         <div className="space-y-2">
@@ -225,8 +172,6 @@ export default function ProgramaPage() {
             <p className="text-sm text-gray-400">No hay sesiones registradas.</p>
           ) : (
             sessions.map((s) => {
-              // Buscar el registro de logro para esta sesión (si existe)
-              // Podríamos tenerlo en un estado aparte, pero por ahora solo mostramos el estado
               const statusLabels: Record<string, { label: string; className: string }> = {
                 completed: { label: 'Completada', className: 'bg-green-100 text-green-800' },
                 in_progress: { label: 'En progreso', className: 'bg-yellow-100 text-yellow-800' },
@@ -247,12 +192,11 @@ export default function ProgramaPage() {
         </div>
       </div>
 
-      {/* ======== MODAL DE REGISTRO DE LOGRO ======== */}
       <RegistroLogroModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onSave={handleSaveAchievement}
-        achievementDomains={currentSessionData?.achievement_domains || []}
+        activities={currentSessionData?.activities || []}
         isSubmitting={loading}
       />
     </div>

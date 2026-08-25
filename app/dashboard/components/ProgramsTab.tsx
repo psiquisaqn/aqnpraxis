@@ -4,24 +4,18 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getProgramProgress } from '@/lib/supabase/activities'
 import type { ProgramCode } from '@/lib/supabase/activities'
-import { PDPI_SESSIONS, TPCREM_SESSIONS, POSMAN_SESSION } from '@/lib/activities/all-sessions'
+import { PDPI_SESSIONS, TPCREM_SESSIONS } from '@/lib/activities'
 
 const programList: { code: ProgramCode; label: string; totalSessions: number }[] = [
   { code: 'PDPI', label: 'PDPI', totalSessions: PDPI_SESSIONS.length },
   { code: 'TP-CREM', label: 'TP-CREM', totalSessions: TPCREM_SESSIONS.length },
-  { code: 'POSMAN', label: 'POSMAN', totalSessions: 1 }, // POSMAN_SESSION es una sesión única
 ]
 
-interface Props {
-  patientId: string
-}
-
-export function ProgramsTab({ patientId }: Props) {
+export function ProgramsTab({ patientId }: { patientId: string }) {
   const [loading, setLoading] = useState(true)
   const [progressData, setProgressData] = useState<Record<ProgramCode, any>>({
     PDPI: null,
     'TP-CREM': null,
-    POSMAN: null,
   })
 
   useEffect(() => {
@@ -30,7 +24,6 @@ export function ProgramsTab({ patientId }: Props) {
       const results: Record<ProgramCode, any> = {
         PDPI: null,
         'TP-CREM': null,
-        POSMAN: null,
       }
       for (const p of programList) {
         try {
@@ -75,7 +68,6 @@ export function ProgramsTab({ patientId }: Props) {
                 <span className="font-semibold text-gray-800">{prog.label}</span>
                 <span className="text-sm text-gray-500">{completed} / {total} sesiones</span>
               </div>
-              {/* Barra de progreso */}
               <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-blue-600 transition-all"

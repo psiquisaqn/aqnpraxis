@@ -1,18 +1,17 @@
 // lib/supabase/activities.ts
 import { createBrowserClient } from '@supabase/ssr'
-import { supabase } from './client' // Asegúrate de tener tu cliente configurado
-import { 
-  PDPI_SESSIONS, 
-  TPCREM_SESSIONS, 
-  POSMAN_SESSION,
-  type PdpiSession 
-} from '@/lib/activities/all-sessions'
+import { supabase } from './client'
+import {
+  PDPI_SESSIONS,
+  TPCREM_SESSIONS,
+  type PdpiSession
+} from '@/lib/activities'
 
 // ====================================================================
-// TIPOS (coinciden con las tablas de Supabase)
+// TIPOS (POSMAN eliminado)
 // ====================================================================
 
-export type ProgramCode = 'PDPI' | 'TP-CREM' | 'POSMAN'
+export type ProgramCode = 'PDPI' | 'TP-CREM'
 
 export interface ActivitySessionDB {
   id: string
@@ -30,7 +29,7 @@ export interface AchievementRecordDB {
   id: string
   activity_session_id: string
   psychologist_id: string
-  achievement_level: number // 1-6
+  achievement_level: number
   domain_scores: Record<string, number> | null
   observations: string | null
   next_session_notes: string | null
@@ -50,29 +49,19 @@ export interface ProgramProgress {
 // ====================================================================
 
 const programSessionMap: Record<ProgramCode, PdpiSession[]> = {
-  PDPI: PDPI_SESSIONS,      // 59 sesiones (0–58)
-  'TP-CREM': TPCREM_SESSIONS, // 12 sesiones (1–12)
-  POSMAN: [POSMAN_SESSION],   // 1 sesión
+  PDPI: PDPI_SESSIONS,
+  'TP-CREM': TPCREM_SESSIONS,
 }
 
-/**
- * Obtiene las sesiones de un programa (datos estáticos)
- */
 export function getProgramSessions(programCode: ProgramCode): PdpiSession[] {
   return programSessionMap[programCode] || []
 }
 
-/**
- * Obtiene una sesión específica por su número
- */
 export function getSessionByNumber(programCode: ProgramCode, sessionNumber: number): PdpiSession | undefined {
   const sessions = getProgramSessions(programCode)
   return sessions.find(s => s.id === sessionNumber)
 }
 
-/**
- * Obtiene el total de sesiones de un programa
- */
 export function getTotalSessions(programCode: ProgramCode): number {
   return getProgramSessions(programCode).length
 }
@@ -81,9 +70,6 @@ export function getTotalSessions(programCode: ProgramCode): number {
 // FUNCIONES DE SUPABASE (cliente)
 // ====================================================================
 
-/**
- * Obtiene todas las sesiones de un paciente para un programa (desde la BD)
- */
 export async function getPatientSessions(
   patientId: string,
   programCode: ProgramCode
@@ -104,9 +90,6 @@ export async function getPatientSessions(
   return data || []
 }
 
-/**
- * Obtiene el progreso de un paciente en un programa (usando la función SQL)
- */
 export async function getProgramProgress(
   patientId: string,
   programCode: ProgramCode
@@ -125,9 +108,6 @@ export async function getProgramProgress(
   return data?.[0] || null
 }
 
-/**
- * Obtiene el número de la siguiente sesión para un paciente
- */
 export async function getNextSessionNumber(
   patientId: string,
   programCode: ProgramCode
@@ -146,10 +126,6 @@ export async function getNextSessionNumber(
   return data ?? 0
 }
 
-/**
- * Crea una nueva sesión en la BD para un paciente
- * (o la recupera si ya existe una 'in_progress')
- */
 export async function getOrCreateSession(
   patientId: string,
   psychologistId: string,
@@ -160,7 +136,6 @@ export async function getOrCreateSession(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  // 1. Verificar si hay una sesión en progreso
   const { data: existing, error: checkError } = await supabase
     .from('activity_sessions')
     .select('*')
@@ -176,16 +151,12 @@ export async function getOrCreateSession(
     return { session: existing, sessionData: sessionData || null }
   }
 
-  // 2. Obtener el siguiente número de sesión
   const nextNumber = await getNextSessionNumber(patientId, programCode)
-
-  // 3. Verificar si el programa ya está completo
   const total = getTotalSessions(programCode)
   if (nextNumber >= total) {
     throw new Error('El programa ya ha sido completado.')
   }
 
-  // 4. Crear la nueva sesión
   const { data: newSession, error: insertError } = await supabase
     .from('activity_sessions')
     .insert({
@@ -205,9 +176,6 @@ export async function getOrCreateSession(
   return { session: newSession, sessionData: sessionData || null }
 }
 
-/**
- * Registra un logro para una sesión y la marca como completada
- */
 export async function recordAchievement(
   activitySessionId: string,
   psychologistId: string,
@@ -221,7 +189,6 @@ export async function recordAchievement(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  // VALIDACIONES
   if (!activitySessionId || typeof activitySessionId !== 'string' || activitySessionId.trim() === '') {
     throw new Error('activitySessionId es requerido y debe ser un UUID válido')
   }
@@ -232,16 +199,6 @@ export async function recordAchievement(
     throw new Error('achievementLevel debe estar entre 1 y 6')
   }
 
-  console.log('📝 Registrando logro:', {
-    activitySessionId,
-    psychologistId,
-    achievementLevel,
-    domainScores,
-    observations,
-    nextSessionNotes,
-  })
-
-  // 1. Insertar el registro de logro
   const { data: record, error: insertError } = await supabase
     .from('achievement_records')
     .insert({
@@ -260,7 +217,6 @@ export async function recordAchievement(
     throw new Error(`Error al registrar logro: ${insertError.message}`)
   }
 
-  // 2. Actualizar el estado de la sesión a 'completed'
   const { error: updateError } = await supabase
     .from('activity_sessions')
     .update({
@@ -270,7 +226,6 @@ export async function recordAchievement(
     .eq('id', activitySessionId)
 
   if (updateError) {
-    // Si falla la actualización, eliminamos el registro de logro (rollback manual)
     await supabase.from('achievement_records').delete().eq('id', record.id)
     console.error('❌ Error al actualizar sesión:', updateError)
     throw new Error(`Error al completar sesión: ${updateError.message}`)
@@ -279,9 +234,6 @@ export async function recordAchievement(
   return record
 }
 
-/**
- * Actualiza el estado de una sesión (útil para marcar como pending o skipped)
- */
 export async function updateSessionStatus(
   sessionId: string,
   status: 'pending' | 'in_progress' | 'completed' | 'skipped'

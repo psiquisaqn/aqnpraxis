@@ -1,4 +1,3 @@
-// app/dashboard/components/NewSessionModal.tsx
 'use client'
 
 import { useState } from 'react'
@@ -21,7 +20,6 @@ const TESTS = [
 const PROGRAMS = [
   { id: 'PDPI', label: 'PDPI - Programa Desarrollo del Pensamiento Inteligente' },
   { id: 'TP-CREM', label: 'TP-CREM - Conexión y Regulación Emocional' },
-  { id: 'POSMAN', label: 'POSMAN - Ejercicios de Focalización' },
 ]
 
 export function NewSessionModal({ patientId, onClose }: Props) {

@@ -31,7 +31,7 @@ interface UseActivityReturn {
   isComplete: boolean
   startNewSession: () => Promise<void>
   submitAchievement: (data: {
-    domainScores: Record<string, number>
+    activityScores: Record<string, number> // step → nivel
     observations?: string
     nextSessionNotes?: string
   }) => Promise<void>
@@ -75,7 +75,6 @@ export function useActivity(
       setError('Faltan datos del paciente o psicólogo')
       return
     }
-    // Validar que psychologistId sea un UUID válido
     if (!isValidUUID(psychologistId)) {
       setError(`ID del psicólogo inválido: "${psychologistId}"`)
       return
@@ -145,15 +144,14 @@ export function useActivity(
   }, [patientId, psychologistId, programCode, loadData])
 
   // ============================================================
-  // REGISTRAR LOGRO (con dominios, observaciones y notas)
+  // REGISTRAR LOGRO (por actividad)
   // ============================================================
   const submitAchievement = useCallback(
     async (data: {
-      domainScores: Record<string, number>
+      activityScores: Record<string, number>
       observations?: string
       nextSessionNotes?: string
     }) => {
-      // VALIDACIONES
       if (!currentSession) {
         setError('No hay sesión activa')
         return
@@ -170,26 +168,19 @@ export function useActivity(
       setLoading(true)
       setError(null)
       try {
-        // Calcular nivel de logro general (promedio de todos los dominios)
-        const scores = Object.values(data.domainScores)
+        // Calcular nivel de logro general como promedio de todas las actividades
+        const scores = Object.values(data.activityScores)
         const overallLevel = scores.length > 0
           ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
           : 1
 
-        console.log('📝 Enviando logro:', {
-          activitySessionId: currentSession.id,
-          psychologistId,
-          overallLevel,
-          domainScores: data.domainScores,
-          observations: data.observations,
-          nextSessionNotes: data.nextSessionNotes,
-        })
-
+        // Guardar los niveles por actividad en domain_scores (JSONB)
+        // y el nivel general en achievement_level
         await recordAchievement(
           currentSession.id,
           psychologistId,
           overallLevel,
-          data.domainScores,
+          data.activityScores, // Aquí guardamos el mapa step → nivel
           data.observations || null,
           data.nextSessionNotes || null
         )
