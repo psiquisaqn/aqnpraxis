@@ -8,7 +8,7 @@ import {
 } from '@/lib/activities'
 
 // ====================================================================
-// TIPOS (POSMAN eliminado)
+// TIPOS
 // ====================================================================
 
 export type ProgramCode = 'PDPI' | 'TP-CREM'
@@ -48,18 +48,27 @@ export interface ProgramProgress {
 // MAPEO DE PROGRAMAS A SESIONES ESTÁTICAS
 // ====================================================================
 
+// Log para depuración
+console.log('🔍 Cargando actividades...')
+console.log('✅ PDPI_SESSIONS:', PDPI_SESSIONS?.length || 0)
+console.log('✅ TPCREM_SESSIONS:', TPCREM_SESSIONS?.length || 0)
+
 const programSessionMap: Record<ProgramCode, PdpiSession[]> = {
   PDPI: PDPI_SESSIONS,
   'TP-CREM': TPCREM_SESSIONS,
 }
 
 export function getProgramSessions(programCode: ProgramCode): PdpiSession[] {
-  return programSessionMap[programCode] || []
+  const sessions = programSessionMap[programCode] || []
+  console.log(`🔍 getProgramSessions(${programCode}): ${sessions.length} sesiones`)
+  return sessions
 }
 
 export function getSessionByNumber(programCode: ProgramCode, sessionNumber: number): PdpiSession | undefined {
   const sessions = getProgramSessions(programCode)
-  return sessions.find(s => s.id === sessionNumber)
+  const found = sessions.find(s => s.id === sessionNumber)
+  console.log(`🔍 getSessionByNumber(${programCode}, ${sessionNumber}):`, found ? '✅ encontrada' : '❌ no encontrada')
+  return found
 }
 
 export function getTotalSessions(programCode: ProgramCode): number {
@@ -132,20 +141,24 @@ export async function getNextAvailableSessionNumber(
   if (error) throw new Error(`Error al obtener sesiones existentes: ${error.message}`)
 
   const usedNumbers = new Set(existingSessions.map(s => s.session_number))
+  console.log(`🔍 getNextAvailableSessionNumber: usedNumbers =`, [...usedNumbers])
 
   // 2. Obtener los números de sesión disponibles en el programa estático
   const staticSessions = getProgramSessions(programCode)
   const availableNumbers = staticSessions.map(s => s.id).sort((a, b) => a - b)
+  console.log(`🔍 getNextAvailableSessionNumber: availableNumbers =`, availableNumbers)
 
   // 3. Encontrar el primer número disponible que no esté en usedNumbers
   for (const num of availableNumbers) {
     if (!usedNumbers.has(num)) {
+      console.log(`🔍 getNextAvailableSessionNumber: devolviendo ${num}`)
       return num
     }
   }
 
   // 4. Si no hay ninguno, el programa está completo
-  throw new Error('El programa ya ha sido completado.')
+  console.warn('⚠️ getNextAvailableSessionNumber: No hay sesiones disponibles, programa completado')
+  return -1 // Valor centinela para indicar completado
 }
 
 /**
@@ -181,13 +194,18 @@ export async function getOrCreateSession(
   // 2. Obtener el siguiente número de sesión disponible
   const nextNumber = await getNextAvailableSessionNumber(patientId, programCode)
 
-  // 3. Obtener los datos estáticos de la sesión
+  // 3. Si nextNumber es -1, el programa está completo
+  if (nextNumber === -1) {
+    throw new Error('El programa ya ha sido completado.')
+  }
+
+  // 4. Obtener los datos estáticos de la sesión
   const sessionData = getSessionByNumber(programCode, nextNumber)
   if (!sessionData) {
     throw new Error(`No existe una sesión con el número ${nextNumber} en el programa ${programCode}`)
   }
 
-  // 4. Crear la nueva sesión
+  // 5. Crear la nueva sesión
   const { data: newSession, error: insertError } = await supabase
     .from('activity_sessions')
     .insert({
